@@ -411,7 +411,8 @@ func main() {
 			}
 		}
 
-		nerrs, ncorrect, t, rc, mistakes := typer.Start(tests[idx], time.Duration(timeout))
+		//nerrs, ncorrect, t, rc, mistakes, correct, errors := typer.Start(tests[idx], time.Duration(timeout))
+		_, ncorrect, t, rc, mistakes, correct, errors := typer.Start(tests[idx], time.Duration(timeout))
 		saveMistakes(mistakes)
 
 		switch rc {
@@ -424,7 +425,8 @@ func main() {
 		case TyperComplete:
 			cpm := int(float64(ncorrect) / (float64(t) / 60e9))
 			wpm := cpm / 5
-			accuracy := float64(ncorrect) / float64(nerrs+ncorrect) * 100
+			//accuracy := float64(ncorrect) / float64(nerrs+ncorrect) * 100
+			accuracy := float64(correct) / float64(errors+correct) * 100
 
 			results = append(results, result{wpm, cpm, accuracy, time.Now().Unix(), mistakes})
 			if !noReport {

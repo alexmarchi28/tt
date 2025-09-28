@@ -79,7 +79,7 @@ func NewTyper(scr tcell.Screen, emboldenTypedText bool, fgcol, bgcol, hicol, hic
 	}
 }
 
-func (t *typer) Start(text []segment, timeout time.Duration) (nerrs, ncorrect int, duration time.Duration, rc int, mistakes []mistake) {
+func (t *typer) Start(text []segment, timeout time.Duration) (nerrs, ncorrect int, duration time.Duration, rc int, mistakes []mistake, correct int, errors int) {
 	timeLeft := timeout
 
 	for i, s := range text {
@@ -92,7 +92,7 @@ func (t *typer) Start(text []segment, timeout time.Duration) (nerrs, ncorrect in
 			startImmediately = false
 		}
 
-		e, c, rc, d, m = t.start(s.Text, timeLeft, startImmediately, s.Attribution)
+		e, c, rc, d, m, correct, errors = t.start(s.Text, timeLeft, startImmediately, s.Attribution)
 
 		nerrs += e
 		ncorrect += c
@@ -155,7 +155,7 @@ func extractMistypedWords(text []rune, typed []rune) (mistakes []mistake) {
 	return
 }
 
-func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, attribution string) (nerrs int, ncorrect int, rc int, duration time.Duration, mistakes []mistake) {
+func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, attribution string) (nerrs int, ncorrect int, rc int, duration time.Duration, mistakes []mistake, correctChar int, errorChar int) {
 	var startTime time.Time
 	text := []rune(s)
 	typed := make([]rune, len(text))
@@ -389,6 +389,11 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 						}
 					} else {
 						typed[idx] = ev.Rune()
+						if ev.Rune() == text[idx] {
+							correctChar++
+						} else {
+							errorChar++
+						}
 						idx++
 					}
 
