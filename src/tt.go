@@ -311,7 +311,7 @@ func main() {
 	}
 
 	if versionFlag {
-		fmt.Fprintf(os.Stderr, "tt version 0.4.3\n")
+		fmt.Fprintf(os.Stderr, "tt version 0.4.4\n")
 		os.Exit(1)
 	}
 
