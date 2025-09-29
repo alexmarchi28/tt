@@ -127,7 +127,7 @@ func createDefaultTyper(scr tcell.Screen) *typer {
 		tcell.ColorMaroon)
 }
 
-func createTyper(scr tcell.Screen, bold bool, themeName string, transparentBg bool) *typer {
+func createTyper(scr tcell.Screen, bold bool, themeName string, disableTransparentBg bool) *typer {
 	var theme map[string]string
 
 	if b := readResource("themes", themeName); b == nil {
@@ -136,12 +136,12 @@ func createTyper(scr tcell.Screen, bold bool, themeName string, transparentBg bo
 		theme = parseConfig(b)
 	}
 
-	var bgcol, fgcol, hicol, hicol2, hicol3, errcol tcell.Color
+	var fgcol, hicol, hicol2, hicol3, errcol tcell.Color
 	var err error
 
-	if transparentBg {
-		bgcol = tcell.ColorDefault
-	} else {
+	bgcol := tcell.ColorDefault
+
+	if disableTransparentBg {
 		if bgcol, err = newTcellColor(theme["bgcol"]); err != nil {
 			die("bgcol is not defined and/or a valid hex colour.")
 		}
@@ -190,7 +190,7 @@ Aesthetics
     -notheme            Attempt to use the default terminal theme. 
                         This may produce odd results depending 
                         on the theme colours.
-    -transparent        Uses a transparent background.
+    -notransparent      Disable transparent background.
     -blockcursor        Use the default cursor style.
     -bold               Embolden typed text.
                         ignored if -raw is present.
@@ -246,7 +246,7 @@ func main() {
 	var noBackspace bool
 	var noReport bool
 	var noTheme bool
-	var transparentBg bool
+	var disableTransparentBg bool
 	var normalCursor bool
 	var timeout int
 	var startParagraph int
@@ -281,7 +281,7 @@ func main() {
 	flag.BoolVar(&normalCursor, "blockcursor", false, "")
 	flag.BoolVar(&noBackspace, "nobackspace", false, "")
 	flag.BoolVar(&noTheme, "notheme", false, "")
-	flag.BoolVar(&transparentBg, "transparent", false, "")
+	flag.BoolVar(&disableTransparentBg, "notransparent", false, "")
 	flag.BoolVar(&oneShotMode, "oneshot", false, "")
 	flag.BoolVar(&noHighlight, "nohighlight", false, "")
 	flag.BoolVar(&noHighlightCurrent, "highlight2", false, "")
@@ -372,7 +372,7 @@ func main() {
 	if noTheme {
 		typer = createDefaultTyper(scr)
 	} else {
-		typer = createTyper(scr, boldFlag, themeName, transparentBg)
+		typer = createTyper(scr, boldFlag, themeName, disableTransparentBg)
 	}
 
 	if noHighlightNext || noHighlight {
