@@ -11,7 +11,7 @@ func generateTestFromData(data []byte, raw bool, split bool) func() []segment {
 			if i < len(paragraphs) {
 				p := paragraphs[i]
 				i++
-				return []segment{segment{p, ""}}
+				return []segment{{p, ""}}
 			} else {
 				return nil
 			}
