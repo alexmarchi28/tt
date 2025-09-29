@@ -3,7 +3,6 @@ package main
 import (
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"runtime"
 	"strconv"
@@ -57,7 +56,7 @@ func NewTyper(scr tcell.Screen, emboldenTypedText bool, fgcol, bgcol, hicol, hic
 	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
 	//Will fail on windows, but tt is still mostly usable via tcell
 	if err != nil {
-		tty = ioutil.Discard
+		tty = io.Discard
 	}
 
 	correctStyle := def.Foreground(hicol)
@@ -193,7 +192,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 		}
 
 		rc = TyperComplete
-		duration = time.Now().Sub(startTime)
+		duration = time.Since(startTime)
 	}
 
 	redraw := func() {
@@ -246,7 +245,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 		drawString(t.Scr, x+nc-aw, y+nr+1, attribution, -1, t.defaultStyle)
 
 		if timeLimit != -1 && !startTime.IsZero() {
-			remaining := timeLimit - time.Now().Sub(startTime)
+			remaining := timeLimit - time.Since(startTime)
 			drawString(t.Scr, x+nc/2, y+nr+ah+1, "      ", -1, t.defaultStyle)
 			drawString(t.Scr, x+nc/2, y+nr+ah+1, strconv.Itoa(int(remaining/1e9)+1), -1, t.defaultStyle)
 		}
@@ -409,7 +408,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 				}
 			}
 		default: //tick
-			if timeLimit != -1 && !startTime.IsZero() && timeLimit <= time.Now().Sub(startTime) {
+			if timeLimit != -1 && !startTime.IsZero() && timeLimit <= time.Since(startTime) {
 				calcStats()
 				return
 			}

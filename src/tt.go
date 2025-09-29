@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"flag"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -14,6 +13,7 @@ import (
 
 	"github.com/gdamore/tcell"
 	"github.com/mattn/go-isatty"
+	"io"
 )
 
 var scr tcell.Screen
@@ -300,7 +300,7 @@ func main() {
 
 	if listFlag != "" {
 		prefix := listFlag + "/"
-		for path, _ := range packedFiles {
+		for path := range packedFiles {
 			if strings.Index(path, prefix) == 0 {
 				_, f := filepath.Split(path)
 				fmt.Println(f)
@@ -327,10 +327,10 @@ func main() {
 			wsz = sw - 8
 		}
 
-		s = regexp.MustCompile("\\s+").ReplaceAllString(s, " ")
-		return strings.Replace(
+		s = regexp.MustCompile(`\s+`).ReplaceAllString(s, " ")
+		return strings.ReplaceAll(
 			wordWrap(strings.Trim(s, " "), wsz),
-			"\n", " \n", -1)
+			"\n", " \n")
 	}
 
 	switch {
@@ -339,7 +339,7 @@ func main() {
 	case quoteFile != "":
 		testFn = generateQuoteTest(quoteFile)
 	case !isatty.IsTerminal(os.Stdin.Fd()):
-		b, err := ioutil.ReadAll(os.Stdin)
+		b, err := io.ReadAll(os.Stdin)
 		if err != nil {
 			panic(err)
 		}
@@ -406,7 +406,7 @@ func main() {
 		}
 
 		if !rawMode {
-			for i, _ := range tests[idx] {
+			for i := range tests[idx] {
 				tests[idx][i].Text = reflow(tests[idx][i].Text)
 			}
 		}

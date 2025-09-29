@@ -2,7 +2,7 @@ package main
 
 func generateTestFromData(data []byte, raw bool, split bool) func() []segment {
 	if raw {
-		return func() []segment { return []segment{segment{string(data), ""}} }
+		return func() []segment { return []segment{{string(data), ""}} }
 	} else if split {
 		paragraphs := getParagraphs(string(data))
 		i := 0

@@ -9,7 +9,7 @@ func generateWordTest(name string, n int, g int) func() []segment {
 		die("%s does not appear to be a valid word list. See '-list words' for a list of builtin word lists.", name)
 	}
 
-	words := regexp.MustCompile("\\s+").Split(string(b), -1)
+	words := regexp.MustCompile(`\s+`).Split(string(b), -1)
 
 	return func() []segment {
 		segments := make([]segment, g)
