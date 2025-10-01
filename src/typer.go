@@ -35,6 +35,7 @@ type typer struct {
 	OnStart          func()
 	SkipWord         bool
 	ShowWpm          bool
+	ShowAccuracy     bool
 	DisableBackspace bool
 	BlockCursor      bool
 	tty              io.Writer
@@ -246,11 +247,31 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 			drawString(t.Scr, x+nc/2, y+nr+ah+1, strconv.Itoa(int(remaining/1e9)+1), -1, t.defaultStyle)
 		}
 
-		if t.ShowWpm && !startTime.IsZero() {
+		formatAccuracy := func(accuracy float64) string {
+			if accuracy == 100 {
+				return fmt.Sprintf("Accuracy: %.0f%%\n", accuracy)
+			}
+			return fmt.Sprintf("Accuracy: %.2f%%\n", accuracy)
+		}
+
+		if (t.ShowWpm || t.ShowAccuracy) && !startTime.IsZero() {
 			calcStats()
+			accuracyX := x + nc/2 - 4
+			accuracyY := y - 2
+			wpmX := accuracyX
+			wpmY := accuracyY
+			if t.ShowAccuracy {
+				wpmY -= 1
+			}
 			if duration > 1e7 { //Avoid flashing large numbers on test start.
-				wpm := int((float64(ncorrect) / 5) / (float64(duration) / 60e9))
-				drawString(t.Scr, x+nc/2-4, y-2, fmt.Sprintf("WPM: %-10d\n", wpm), -1, t.defaultStyle)
+				if t.ShowAccuracy {
+					accuracy := float64(correctChar) / float64(errorChar+correctChar) * 100
+					drawString(t.Scr, accuracyX, accuracyY, formatAccuracy(accuracy), -1, t.defaultStyle)
+				}
+				if t.ShowWpm {
+					wpm := int((float64(ncorrect) / 5) / (float64(duration) / 60e9))
+					drawString(t.Scr, wpmX, wpmY, fmt.Sprintf("WPM: %-10d\n", wpm), -1, t.defaultStyle)
+				}
 			}
 		}
 

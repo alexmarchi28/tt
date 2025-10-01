@@ -185,6 +185,7 @@ File Mode
                         reset progress on a given file.
 Aesthetics
     -showwpm            Display WPM whilst typing.
+    -showaccuracy       Display accuracy whilst typing.
     -theme THEMEFILE    The theme to use. 
     -w                  The maximum line length in characters. This option is 
     -notheme            Attempt to use the default terminal theme. 
@@ -257,6 +258,7 @@ func main() {
 
 	var themeName string
 	var showWpm bool
+	var showAccuracy bool
 	var multiMode bool
 	var versionFlag bool
 	var boldFlag bool
@@ -277,6 +279,7 @@ func main() {
 	flag.StringVar(&quoteFile, "quotes", "", "")
 
 	flag.BoolVar(&showWpm, "showwpm", false, "")
+	flag.BoolVar(&showAccuracy, "showaccuracy", false, "")
 	flag.BoolVar(&noSkip, "noskip", false, "")
 	flag.BoolVar(&normalCursor, "blockcursor", false, "")
 	flag.BoolVar(&noBackspace, "nobackspace", false, "")
@@ -388,6 +391,7 @@ func main() {
 	typer.DisableBackspace = noBackspace
 	typer.BlockCursor = normalCursor
 	typer.ShowWpm = showWpm
+	typer.ShowAccuracy = showAccuracy
 
 	if timeout != -1 {
 		timeout *= 1e9
