@@ -145,6 +145,10 @@ are determined exclusively by the input.
 
     Lists internal resources of the given type. TYPE=[themes|quotes|words].
 
+**-stats**\
+
+    Print average WPM and accuracy over the last hour, day and week.
+
 **-v**\
 
     Print the current version.
@@ -161,6 +165,11 @@ Creates a series of tests each consisting of 10 random words drawn from
 words.txt
 ```
 tt -words words.txt -n 10
+```
+
+Prints the average WPM and accuracy over the last hour, day and week.
+```
+tt -stats
 ```
 
 Starts a sequence of tests in which each test consists of a paragraph from war

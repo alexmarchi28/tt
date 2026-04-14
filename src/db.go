@@ -9,10 +9,17 @@ import (
 
 var FILE_STATE_DB string
 var MISTAKE_DB string
+var RESULTS_DB string
 var APP_CONFIG_PATH string
 
 type appConfig struct {
 	Theme string `json:"theme,omitempty"`
+}
+
+type persistedResult struct {
+	Wpm       int     `json:"wpm"`
+	Accuracy  float64 `json:"accuracy"`
+	Timestamp int64   `json:"timestamp"`
 }
 
 func init() {
@@ -37,6 +44,7 @@ func init() {
 
 	FILE_STATE_DB = filepath.Join(data, ".db")
 	MISTAKE_DB = filepath.Join(data, ".errors")
+	RESULTS_DB = filepath.Join(data, ".results")
 	APP_CONFIG_PATH = filepath.Join(config, "config.json")
 }
 
@@ -75,4 +83,19 @@ func writeAppConfig(cfg appConfig) error {
 	}
 
 	return ioutil.WriteFile(APP_CONFIG_PATH, b, 0600)
+}
+
+func readPersistedResults() ([]persistedResult, error) {
+	var stored []persistedResult
+	err := readValue(RESULTS_DB, &stored)
+	return stored, err
+}
+
+func writePersistedResults(stored []persistedResult) error {
+	b, err := json.Marshal(stored)
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(RESULTS_DB, b, 0600)
 }

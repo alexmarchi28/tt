@@ -65,6 +65,7 @@ options.
  - `tt -n 10 -g 5` produces a test consisting of 50 randomly drawn words in 5 groups of 10 words each.
  - `tt -t 10` starts a timed test lasting 10 seconds.
  - `tt -theme gruvbox` Starts tt with the gruvbox theme.
+ - `tt -stats` Prints the average WPM and accuracy over the last hour, day and week.
 
 `tt` is designed to be easily scriptable and integrate nicely with
 other *nix tools. With a little shell scripting most features the user can
@@ -88,3 +89,6 @@ accessible by default using the respective flags.
 
 When no `-theme` flag is supplied, tt reuses the last selected theme saved in
 `~/.config/tt/config.json`.
+
+Completed tests are saved automatically, and `tt -stats` reads the saved
+history to show recent average WPM and accuracy.

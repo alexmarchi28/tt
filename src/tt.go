@@ -253,6 +253,8 @@ Scripting
 Misc
     -list TYPE          Lists internal resources of the given type.
                         TYPE=[themes|quotes|words]
+    -stats              Print average WPM and accuracy over the last hour,
+                        day and week.
 
 Version
     -v                  Print the current version.
@@ -267,6 +269,79 @@ func saveMistakes(mistakes []mistake) {
 
 	db = append(db, mistakes...)
 	writeValue(MISTAKE_DB, db)
+}
+
+func savePersistedResult(wpm int, accuracy float64, timestamp int64) {
+	stored, err := readPersistedResults()
+	if err != nil {
+		if os.IsNotExist(err) {
+			stored = nil
+		} else {
+			panic(err)
+		}
+	}
+
+	stored = append(stored, persistedResult{
+		Wpm:       wpm,
+		Accuracy:  accuracy,
+		Timestamp: timestamp,
+	})
+
+	if err := writePersistedResults(stored); err != nil {
+		panic(err)
+	}
+}
+
+func formatStatsLine(label string, stored []persistedResult, window time.Duration, now time.Time) string {
+	var wpmSum int
+	var accuracySum float64
+	var count int
+	cutoff := now.Add(-window).Unix()
+
+	for _, r := range stored {
+		if r.Timestamp < cutoff {
+			continue
+		}
+
+		wpmSum += r.Wpm
+		accuracySum += r.Accuracy
+		count++
+	}
+
+	if count == 0 {
+		return fmt.Sprintf("%-10s no results", label)
+	}
+
+	return fmt.Sprintf(
+		"%-10s avg wpm %.2f, avg accuracy %.2f%% (%d tests)",
+		label,
+		float64(wpmSum)/float64(count),
+		accuracySum/float64(count),
+		count,
+	)
+}
+
+func printStats() {
+	stored, err := readPersistedResults()
+	if err != nil {
+		if os.IsNotExist(err) {
+			fmt.Println("No saved results yet.")
+			return
+		}
+
+		die("Could not read saved results: %v", err)
+	}
+
+	if len(stored) == 0 {
+		fmt.Println("No saved results yet.")
+		return
+	}
+
+	now := time.Now()
+	fmt.Println("Typing stats")
+	fmt.Println(formatStatsLine("Last hour", stored, time.Hour, now))
+	fmt.Println(formatStatsLine("Last day", stored, 24*time.Hour, now))
+	fmt.Println(formatStatsLine("Last week", stored, 7*24*time.Hour, now))
 }
 
 func loadRememberedTheme(disableTransparentBg bool) string {
@@ -314,6 +389,7 @@ func main() {
 	var showWpm bool
 	var showAccuracy bool
 	var multiMode bool
+	var statsFlag bool
 	var versionFlag bool
 	var boldFlag bool
 
@@ -349,6 +425,7 @@ func main() {
 	flag.BoolVar(&jsonMode, "json", false, "")
 	flag.BoolVar(&rawMode, "raw", false, "")
 	flag.BoolVar(&multiMode, "multi", false, "")
+	flag.BoolVar(&statsFlag, "stats", false, "")
 	flag.StringVar(&themeName, "theme", "default", "")
 	flag.StringVar(&listFlag, "list", "", "")
 
@@ -373,6 +450,11 @@ func main() {
 	if versionFlag {
 		fmt.Fprintf(os.Stderr, "tt version 0.4.4\n")
 		os.Exit(1)
+	}
+
+	if statsFlag {
+		printStats()
+		os.Exit(0)
 	}
 
 	if noTheme {
@@ -525,8 +607,10 @@ func main() {
 			cpm := int(float64(ncorrectWords) / (float64(t) / 60e9))
 			wpm := cpm / 5
 			accuracy := float64(ncorrectChars) / float64(nerrorsChars+ncorrectChars) * 100
+			timestamp := time.Now().Unix()
 
-			results = append(results, result{wpm, cpm, accuracy, time.Now().Unix(), mistakes})
+			results = append(results, result{wpm, cpm, accuracy, timestamp, mistakes})
+			savePersistedResult(wpm, accuracy, timestamp)
 			if !noReport {
 				attribution := ""
 				if len(tests[idx]) == 1 {
