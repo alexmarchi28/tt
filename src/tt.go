@@ -19,6 +19,8 @@ import (
 var scr tcell.Screen
 var csvMode bool
 var jsonMode bool
+var themeToPersist string
+var persistThemeOnExit bool
 
 type result struct {
 	Wpm       int       `json:"wpm"`
@@ -57,7 +59,16 @@ func parseConfig(b []byte) map[string]string {
 }
 
 func exit(rc int) {
-	scr.Fini()
+	if scr != nil {
+		scr.Fini()
+		scr = nil
+	}
+
+	if persistThemeOnExit && themeToPersist != "" {
+		if err := writeAppConfig(appConfig{Theme: themeToPersist}); err != nil {
+			fmt.Fprintf(os.Stderr, "WARNING: could not save theme selection: %v\n", err)
+		}
+	}
 
 	if jsonMode {
 		//Avoid null in serialized JSON.
@@ -258,6 +269,24 @@ func saveMistakes(mistakes []mistake) {
 	writeValue(MISTAKE_DB, db)
 }
 
+func loadRememberedTheme(disableTransparentBg bool) string {
+	cfg, err := readAppConfig()
+	if err != nil {
+		return ""
+	}
+
+	themeName := strings.TrimSpace(cfg.Theme)
+	if themeName == "" {
+		return ""
+	}
+
+	if _, _, _, _, _, _, err := loadThemeColors(themeName, disableTransparentBg); err != nil {
+		return ""
+	}
+
+	return themeName
+}
+
 func main() {
 	var n int
 	var g int
@@ -326,6 +355,13 @@ func main() {
 	flag.Usage = func() { os.Stdout.Write([]byte(usage)) }
 	flag.Parse()
 
+	themeFlagExplicit := false
+	flag.Visit(func(f *flag.Flag) {
+		if f.Name == "theme" {
+			themeFlagExplicit = true
+		}
+	})
+
 	if listFlag != "" {
 		for _, name := range listResourceNames(listFlag) {
 			fmt.Println(name)
@@ -341,6 +377,10 @@ func main() {
 
 	if noTheme {
 		os.Setenv("TCELL_TRUECOLOR", "disable")
+	} else if !themeFlagExplicit {
+		if rememberedTheme := loadRememberedTheme(disableTransparentBg); rememberedTheme != "" {
+			themeName = rememberedTheme
+		}
 	}
 
 	reflow := func(s string) string {
@@ -397,6 +437,8 @@ func main() {
 		typer = createDefaultTyper(scr)
 	} else {
 		typer = createTyper(scr, boldFlag, themeName, disableTransparentBg)
+		themeToPersist = themeName
+		persistThemeOnExit = true
 	}
 
 	typer.SetHighlightMode(
@@ -433,6 +475,7 @@ func main() {
 				typer.SetTheme(fgcol, bgcol, hicol, hicol2, hicol3, errcol)
 				typer.RefreshScreen()
 				themeName = nextTheme
+				themeToPersist = nextTheme
 				return nextTheme, nil
 			}
 

@@ -59,6 +59,8 @@ usage: tt \[OPTION\]... \[FILE\]
 -theme *THEMEFILE*
 
 : The theme to use. 
+  If omitted, tt reuses the last selected theme saved in
+  ~/.config/tt/config.json when available.
 
 -notheme
 
@@ -199,6 +201,10 @@ Modify to taste.
   ~/.tt/themes\
   /etc/tt/words\
   /etc/tt/themes
+
+  The last selected theme is stored in:
+
+  ~/.config/tt/config.json
 
 # KEYS
 

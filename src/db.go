@@ -9,6 +9,11 @@ import (
 
 var FILE_STATE_DB string
 var MISTAKE_DB string
+var APP_CONFIG_PATH string
+
+type appConfig struct {
+	Theme string `json:"theme,omitempty"`
+}
 
 func init() {
 	var ok bool
@@ -25,10 +30,14 @@ func init() {
 		data = filepath.Join(home, "/.local/share/tt")
 	}
 
+	config := filepath.Join(home, ".config", "tt")
+
 	os.MkdirAll(data, 0700)
+	os.MkdirAll(config, 0700)
 
 	FILE_STATE_DB = filepath.Join(data, ".db")
 	MISTAKE_DB = filepath.Join(data, ".errors")
+	APP_CONFIG_PATH = filepath.Join(config, "config.json")
 }
 
 func readValue(path string, o interface{}) error {
@@ -51,4 +60,19 @@ func writeValue(path string, o interface{}) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func readAppConfig() (appConfig, error) {
+	var cfg appConfig
+	err := readValue(APP_CONFIG_PATH, &cfg)
+	return cfg, err
+}
+
+func writeAppConfig(cfg appConfig) error {
+	b, err := json.Marshal(cfg)
+	if err != nil {
+		return err
+	}
+
+	return ioutil.WriteFile(APP_CONFIG_PATH, b, 0600)
 }

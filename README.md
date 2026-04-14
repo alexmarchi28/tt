@@ -85,3 +85,6 @@ Custom themes and word lists can be defined in `~/.tt/themes` and `~/.tt/words`
 and used in conjunction with the `-theme` and `-words` flags. A list of
 preloaded themes and word lists can be found in `words/` and `themes/` and are
 accessible by default using the respective flags.
+
+When no `-theme` flag is supplied, tt reuses the last selected theme saved in
+`~/.config/tt/config.json`.
