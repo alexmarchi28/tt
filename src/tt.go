@@ -127,42 +127,67 @@ func createDefaultTyper(scr tcell.Screen) *typer {
 		tcell.ColorMaroon)
 }
 
-func createTyper(scr tcell.Screen, bold bool, themeName string, disableTransparentBg bool) *typer {
+func loadThemeColors(themeName string, disableTransparentBg bool) (fgcol, bgcol, hicol, hicol2, hicol3, errcol tcell.Color, err error) {
 	var theme map[string]string
 
 	if b := readResource("themes", themeName); b == nil {
-		die("%s does not appear to be a valid theme, try '-list themes' for a list of built in thems.", themeName)
+		return 0, 0, 0, 0, 0, 0, fmt.Errorf("%s does not appear to be a valid theme", themeName)
 	} else {
 		theme = parseConfig(b)
 	}
 
-	var fgcol, hicol, hicol2, hicol3, errcol tcell.Color
-	var err error
-
-	bgcol := tcell.ColorDefault
+	bgcol = tcell.ColorDefault
 
 	if disableTransparentBg {
 		if bgcol, err = newTcellColor(theme["bgcol"]); err != nil {
-			die("bgcol is not defined and/or a valid hex colour.")
+			return 0, 0, 0, 0, 0, 0, fmt.Errorf("bgcol is not defined and/or a valid hex colour")
 		}
 	}
 	if fgcol, err = newTcellColor(theme["fgcol"]); err != nil {
-		die("fgcol is not defined and/or a valid hex colour.")
+		return 0, 0, 0, 0, 0, 0, fmt.Errorf("fgcol is not defined and/or a valid hex colour")
 	}
 	if hicol, err = newTcellColor(theme["hicol"]); err != nil {
-		die("hicol is not defined and/or a valid hex colour.")
+		return 0, 0, 0, 0, 0, 0, fmt.Errorf("hicol is not defined and/or a valid hex colour")
 	}
 	if hicol2, err = newTcellColor(theme["hicol2"]); err != nil {
-		die("hicol2 is not defined and/or a valid hex colour.")
+		return 0, 0, 0, 0, 0, 0, fmt.Errorf("hicol2 is not defined and/or a valid hex colour")
 	}
 	if hicol3, err = newTcellColor(theme["hicol3"]); err != nil {
-		die("hicol3 is not defined and/or a valid hex colour.")
+		return 0, 0, 0, 0, 0, 0, fmt.Errorf("hicol3 is not defined and/or a valid hex colour")
 	}
 	if errcol, err = newTcellColor(theme["errcol"]); err != nil {
-		die("errcol is not defined and/or a valid hex colour.")
+		return 0, 0, 0, 0, 0, 0, fmt.Errorf("errcol is not defined and/or a valid hex colour")
+	}
+
+	return
+}
+
+func createTyper(scr tcell.Screen, bold bool, themeName string, disableTransparentBg bool) *typer {
+	fgcol, bgcol, hicol, hicol2, hicol3, errcol, err := loadThemeColors(themeName, disableTransparentBg)
+	if err != nil {
+		die("%s theme is invalid: %v", themeName, err)
 	}
 
 	return NewTyper(scr, bold, fgcol, bgcol, hicol, hicol2, hicol3, errcol)
+}
+
+func indexResourceName(names []string, name string) int {
+	for i, candidate := range names {
+		if candidate == name {
+			return i
+		}
+	}
+
+	base := filepath.Base(name)
+	if base != name {
+		for i, candidate := range names {
+			if candidate == base {
+				return i
+			}
+		}
+	}
+
+	return -1
 }
 
 var usage = `usage: tt [options] [file]
@@ -302,12 +327,8 @@ func main() {
 	flag.Parse()
 
 	if listFlag != "" {
-		prefix := listFlag + "/"
-		for path := range packedFiles {
-			if strings.Index(path, prefix) == 0 {
-				_, f := filepath.Split(path)
-				fmt.Println(f)
-			}
+		for _, name := range listResourceNames(listFlag) {
+			fmt.Println(name)
 		}
 
 		os.Exit(0)
@@ -378,13 +399,45 @@ func main() {
 		typer = createTyper(scr, boldFlag, themeName, disableTransparentBg)
 	}
 
-	if noHighlightNext || noHighlight {
-		typer.currentWordStyle = typer.nextWordStyle
-		typer.nextWordStyle = typer.defaultStyle
-	}
+	typer.SetHighlightMode(
+		!(noHighlightCurrent || noHighlight),
+		!(noHighlightNext || noHighlight),
+	)
 
-	if noHighlightCurrent || noHighlight {
-		typer.currentWordStyle = typer.defaultStyle
+	if !noTheme {
+		themeNames := listResourceNames("themes")
+		themeIdx := indexResourceName(themeNames, themeName)
+
+		typer.CycleTheme = func(direction int) (string, error) {
+			if len(themeNames) == 0 {
+				return "", nil
+			}
+
+			for attempts := 0; attempts < len(themeNames); attempts++ {
+				if themeIdx == -1 {
+					if direction < 0 {
+						themeIdx = len(themeNames) - 1
+					} else {
+						themeIdx = 0
+					}
+				} else {
+					themeIdx = (themeIdx + direction + len(themeNames)) % len(themeNames)
+				}
+
+				nextTheme := themeNames[themeIdx]
+				fgcol, bgcol, hicol, hicol2, hicol3, errcol, err := loadThemeColors(nextTheme, disableTransparentBg)
+				if err != nil {
+					continue
+				}
+
+				typer.SetTheme(fgcol, bgcol, hicol, hicol2, hicol3, errcol)
+				typer.RefreshScreen()
+				themeName = nextTheme
+				return nextTheme, nil
+			}
+
+			return "", fmt.Errorf("no valid themes available")
+		}
 	}
 
 	typer.SkipWord = !noSkip

@@ -56,6 +56,8 @@ options.
 - `C-c` exits the test.
 - `right` moves to the next test.
 - `left` moves to the previous test.
+- `C-n` switches to the next theme and briefly shows its name.
+- `C-p` switches to the previous theme and briefly shows its name.
 
 ## Examples
 

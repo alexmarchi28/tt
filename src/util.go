@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"sort"
 	"strings"
 	"time"
 
@@ -25,7 +26,7 @@ func init() {
 }
 
 type cell struct {
-	c	  rune
+	c     rune
 	style tcell.Style
 }
 
@@ -219,4 +220,39 @@ func readResource(typ, name string) []byte {
 	}
 
 	return readPackedFile(filepath.Join(typ, name))
+}
+
+func listResourceNames(typ string) []string {
+	names := map[string]struct{}{}
+	prefix := typ + "/"
+
+	for path := range packedFiles {
+		if strings.Index(path, prefix) == 0 {
+			_, name := filepath.Split(path)
+			names[name] = struct{}{}
+		}
+	}
+
+	for _, d := range CONFIG_DIRS {
+		entries, err := os.ReadDir(filepath.Join(d, typ))
+		if err != nil {
+			continue
+		}
+
+		for _, entry := range entries {
+			if entry.IsDir() {
+				continue
+			}
+
+			names[entry.Name()] = struct{}{}
+		}
+	}
+
+	list := make([]string, 0, len(names))
+	for name := range names {
+		list = append(list, name)
+	}
+
+	sort.Strings(list)
+	return list
 }

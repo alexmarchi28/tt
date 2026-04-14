@@ -206,7 +206,9 @@ Modify to taste.
   **C-c: ** Terminates tt\
   **C-backspace: ** Deletes the previous word\
   **right** Move to the next test.\
-  **left** Move to the previous test.
+  **left** Move to the previous test.\
+  **C-n: ** Switch to the next theme and briefly show its name\
+  **C-p: ** Switch to the previous theme and briefly show its name.
 
 # AUTHOR
 

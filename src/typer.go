@@ -38,21 +38,30 @@ type typer struct {
 	ShowAccuracy     bool
 	DisableBackspace bool
 	BlockCursor      bool
+	CycleTheme       func(direction int) (string, error)
 	tty              io.Writer
 
+	emboldenTypedText   bool
+	highlightCurrent    bool
+	highlightNext       bool
+	fgcol               tcell.Color
+	bgcol               tcell.Color
+	hicol               tcell.Color
+	hicol2              tcell.Color
+	hicol3              tcell.Color
+	errcol              tcell.Color
 	currentWordStyle    tcell.Style
 	nextWordStyle       tcell.Style
 	incorrectSpaceStyle tcell.Style
 	incorrectStyle      tcell.Style
 	correctStyle        tcell.Style
 	defaultStyle        tcell.Style
+	statusMessage       string
+	statusMessageUntil  time.Time
 }
 
 func NewTyper(scr tcell.Screen, emboldenTypedText bool, fgcol, bgcol, hicol, hicol2, hicol3, errcol tcell.Color) *typer {
 	var tty io.Writer
-	def := tcell.StyleDefault.
-		Foreground(fgcol).
-		Background(bgcol)
 
 	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
 	//Will fail on windows, but tt is still mostly usable via tcell
@@ -60,23 +69,91 @@ func NewTyper(scr tcell.Screen, emboldenTypedText bool, fgcol, bgcol, hicol, hic
 		tty = io.Discard
 	}
 
-	correctStyle := def.Foreground(hicol)
-	if emboldenTypedText {
-		correctStyle = correctStyle.Bold(true)
-	}
-
-	return &typer{
+	t := &typer{
 		Scr:      scr,
 		SkipWord: true,
 		tty:      tty,
 
-		defaultStyle:        def,
-		correctStyle:        correctStyle,
-		currentWordStyle:    def.Foreground(hicol2),
-		nextWordStyle:       def.Foreground(hicol3),
-		incorrectStyle:      def.Foreground(errcol),
-		incorrectSpaceStyle: def.Background(errcol),
+		emboldenTypedText: emboldenTypedText,
+		highlightCurrent:  true,
+		highlightNext:     true,
 	}
+
+	t.SetTheme(fgcol, bgcol, hicol, hicol2, hicol3, errcol)
+	return t
+}
+
+func (t *typer) applyStyles() {
+	def := tcell.StyleDefault.
+		Foreground(t.fgcol).
+		Background(t.bgcol)
+
+	correctStyle := def.Foreground(t.hicol)
+	if t.emboldenTypedText {
+		correctStyle = correctStyle.Bold(true)
+	}
+
+	currentWordStyle := def.Foreground(t.hicol2)
+	nextWordStyle := def.Foreground(t.hicol3)
+	if !t.highlightNext {
+		currentWordStyle = nextWordStyle
+		nextWordStyle = def
+	}
+	if !t.highlightCurrent {
+		currentWordStyle = def
+	}
+
+	t.defaultStyle = def
+	t.correctStyle = correctStyle
+	t.currentWordStyle = currentWordStyle
+	t.nextWordStyle = nextWordStyle
+	t.incorrectStyle = def.Foreground(t.errcol)
+	t.incorrectSpaceStyle = def.Background(t.errcol)
+}
+
+func (t *typer) SetTheme(fgcol, bgcol, hicol, hicol2, hicol3, errcol tcell.Color) {
+	t.fgcol = fgcol
+	t.bgcol = bgcol
+	t.hicol = hicol
+	t.hicol2 = hicol2
+	t.hicol3 = hicol3
+	t.errcol = errcol
+	t.applyStyles()
+}
+
+func (t *typer) SetHighlightMode(highlightCurrent, highlightNext bool) {
+	t.highlightCurrent = highlightCurrent
+	t.highlightNext = highlightNext
+	t.applyStyles()
+}
+
+func (t *typer) RefreshScreen() {
+	t.Scr.SetStyle(t.defaultStyle)
+	t.Scr.Clear()
+}
+
+func (t *typer) ShowStatusMessage(message string, duration time.Duration) {
+	t.statusMessage = message
+	if duration <= 0 {
+		t.statusMessageUntil = time.Time{}
+		return
+	}
+
+	t.statusMessageUntil = time.Now().Add(duration)
+}
+
+func (t *typer) statusMessageActive() string {
+	if t.statusMessage == "" {
+		return ""
+	}
+
+	if !t.statusMessageUntil.IsZero() && time.Now().After(t.statusMessageUntil) {
+		t.statusMessage = ""
+		t.statusMessageUntil = time.Time{}
+		return ""
+	}
+
+	return t.statusMessage
 }
 
 func (t *typer) Start(text []segment, timeout time.Duration) (ncorrect int, duration time.Duration, rc int, mistakes []mistake, correct int, errors int) {
@@ -275,6 +352,23 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 			}
 		}
 
+		statusY := 0
+		if sh > 1 {
+			statusY = 1
+		}
+		for i := 0; i < sw; i++ {
+			t.Scr.SetContent(i, statusY, ' ', nil, t.defaultStyle)
+		}
+
+		if msg := t.statusMessageActive(); msg != "" {
+			msgW, _ := calcStringDimensions(msg)
+			msgX := (sw - msgW) / 2
+			if msgX < 0 {
+				msgX = 0
+			}
+			drawString(t.Scr, msgX, statusY, msg, -1, t.currentWordStyle.Bold(true))
+		}
+
 		//Potentially inefficient, but seems to be good enough
 
 		t.Scr.Show()
@@ -337,13 +431,12 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 		case *tcell.EventKey:
 			if runtime.GOOS != "windows" && ev.Key() == tcell.KeyBackspace { //Control+backspace on unix terms
 				if !t.DisableBackspace {
+					if startTime.IsZero() {
+						startTime = time.Now()
+					}
 					deleteWord()
 				}
 				continue
-			}
-
-			if startTime.IsZero() {
-				startTime = time.Now()
 			}
 
 			switch key := ev.Key(); key {
@@ -358,6 +451,26 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 			case tcell.KeyCtrlL:
 				t.Scr.Sync()
 
+			case tcell.KeyCtrlN:
+				if t.CycleTheme != nil {
+					themeName, err := t.CycleTheme(1)
+					if err != nil {
+						t.ShowStatusMessage(err.Error(), 2*time.Second)
+					} else if themeName != "" {
+						t.ShowStatusMessage(fmt.Sprintf("Theme: %s", themeName), 2*time.Second)
+					}
+				}
+
+			case tcell.KeyCtrlP:
+				if t.CycleTheme != nil {
+					themeName, err := t.CycleTheme(-1)
+					if err != nil {
+						t.ShowStatusMessage(err.Error(), 2*time.Second)
+					} else if themeName != "" {
+						t.ShowStatusMessage(fmt.Sprintf("Theme: %s", themeName), 2*time.Second)
+					}
+				}
+
 			case tcell.KeyRight:
 				rc = TyperNext
 				return
@@ -368,11 +481,17 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 
 			case tcell.KeyCtrlW:
 				if !t.DisableBackspace {
+					if startTime.IsZero() {
+						startTime = time.Now()
+					}
 					deleteWord()
 				}
 
 			case tcell.KeyBackspace, tcell.KeyBackspace2:
 				if !t.DisableBackspace {
+					if startTime.IsZero() {
+						startTime = time.Now()
+					}
 					if ev.Modifiers() == tcell.ModAlt || ev.Modifiers() == tcell.ModCtrl {
 						deleteWord()
 					} else {
@@ -389,6 +508,9 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 				}
 			case tcell.KeyRune:
 				if idx < len(text) {
+					if startTime.IsZero() {
+						startTime = time.Now()
+					}
 					if t.SkipWord && ev.Rune() == ' ' {
 						if idx > 0 && text[idx-1] == ' ' && text[idx] != ' ' { //Do nothing on word boundaries.
 							break
