@@ -231,6 +231,53 @@ func extractMistypedWords(text []rune, typed []rune) (mistakes []mistake) {
 	return
 }
 
+func isWordSeparator(r rune) bool {
+	return r == ' ' || r == '\n'
+}
+
+func highlightWordPositions(text []rune, idx int) []int {
+	positions := make([]int, len(text))
+	for i := range positions {
+		positions[i] = -1
+	}
+
+	if idx < 0 || idx >= len(text) {
+		return positions
+	}
+
+	wordPos := -1
+	insideWord := false
+
+	for i, r := range text {
+		if i == idx {
+			if isWordSeparator(r) {
+				wordPos = 1
+				insideWord = false
+			} else {
+				wordPos = 0
+				insideWord = true
+			}
+		}
+
+		if i < idx || wordPos == -1 {
+			continue
+		}
+
+		if isWordSeparator(r) {
+			if insideWord {
+				wordPos++
+				insideWord = false
+			}
+			continue
+		}
+
+		insideWord = true
+		positions[i] = wordPos
+	}
+
+	return positions
+}
+
 func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, attribution string) (ncorrect int, rc int, duration time.Duration, mistakes []mistake, correctChar int, errorChar int) {
 	var startTime time.Time
 	text := []rune(s)
@@ -272,7 +319,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 	redraw := func() {
 		cx := x
 		cy := y
-		inword := -1
+		wordPositions := highlightWordPositions(text, idx)
 
 		for i := range text {
 			style := t.defaultStyle
@@ -280,23 +327,17 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 			if text[i] == '\n' {
 				cy++
 				cx = x
-				if inword != -1 {
-					inword++
-				}
 				continue
 			}
 
 			if i == idx {
 				scr.ShowCursor(cx, cy)
-				inword = 0
 			}
 
 			if i >= idx {
-				if text[i] == ' ' {
-					inword++
-				} else if inword == 0 {
+				if wordPositions[i] == 0 {
 					style = t.currentWordStyle
-				} else if inword == 1 {
+				} else if wordPositions[i] == 1 {
 					style = t.nextWordStyle
 				} else {
 					style = t.defaultStyle
