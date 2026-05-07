@@ -1,3 +1,6 @@
+
+https://github.com/user-attachments/assets/f8582968-4dd2-4ee1-930c-8107469b3cfd
+
 # What
 
 A terminal based typing test.
