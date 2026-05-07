@@ -2,7 +2,7 @@
 
 A terminal based typing test.
 
-![](demo.gif)
+![](video_demo.mp4)
 
 # Installation
 
