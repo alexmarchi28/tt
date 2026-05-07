@@ -2,8 +2,6 @@
 
 A terminal based typing test.
 
-![](video_demo.mp4)
-
 # Installation
 
 ## Linux
