@@ -217,9 +217,13 @@ Modify to taste.
 
 # KEYS
 
+  **?: ** Shows or hides the keyboard shortcuts help\
   **esc: ** Restarts the test\
   **C-c: ** Terminates tt\
-  **C-backspace: ** Deletes the previous word\
+  **C-l: ** Redraws the terminal\
+  **C-backspace: ** Deletes the previous word when backspace is enabled\
+  **Alt-backspace: ** Deletes the previous word when backspace is enabled\
+  **C-w: ** Deletes the previous word when backspace is enabled\
   **right** Move to the next test.\
   **left** Move to the previous test.\
   **C-n: ** Switch to the next theme and briefly show its name\

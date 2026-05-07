@@ -58,6 +58,22 @@ type typer struct {
 	defaultStyle        tcell.Style
 	statusMessage       string
 	statusMessageUntil  time.Time
+	showKeyboardHelp    bool
+}
+
+var keyboardHelpLines = []string{
+	"Help",
+	"? - show/hide this help",
+	"Esc - restart the current test",
+	"C-c - quit",
+	"C-l - redraw the terminal",
+	"Right - next test",
+	"Left - previous test",
+	"C-n - next theme",
+	"C-p - previous theme",
+	"Backspace - delete previous character if enabled",
+	"C-w / C-backspace / Alt-backspace - delete previous word if enabled",
+	"Space - skip current word if enabled",
 }
 
 func NewTyper(scr tcell.Screen, emboldenTypedText bool, fgcol, bgcol, hicol, hicol2, hicol3, errcol tcell.Color) *typer {
@@ -154,6 +170,53 @@ func (t *typer) statusMessageActive() string {
 	}
 
 	return t.statusMessage
+}
+
+func keyboardHelpDimensions() (width, height int) {
+	height = len(keyboardHelpLines)
+	for _, line := range keyboardHelpLines {
+		if len([]rune(line)) > width {
+			width = len([]rune(line))
+		}
+	}
+
+	return
+}
+
+func (t *typer) clearKeyboardHelpArea(sw, sh int) {
+	width, height := keyboardHelpDimensions()
+	if width > sw {
+		width = sw
+	}
+	if height > sh {
+		height = sh
+	}
+
+	for y := 0; y < height; y++ {
+		for x := 0; x < width; x++ {
+			t.Scr.SetContent(x, y, ' ', nil, t.defaultStyle)
+		}
+	}
+}
+
+func (t *typer) drawKeyboardHelp(sw, sh int) {
+	for y, line := range keyboardHelpLines {
+		if y >= sh {
+			return
+		}
+
+		style := t.defaultStyle
+		if y == 0 {
+			style = t.currentWordStyle.Bold(true)
+		}
+
+		for x, r := range line {
+			if x >= sw {
+				break
+			}
+			t.Scr.SetContent(x, y, r, nil, style)
+		}
+	}
 }
 
 func (t *typer) Start(text []segment, timeout time.Duration) (ncorrect int, duration time.Duration, rc int, mistakes []mistake, correct int, errors int) {
@@ -321,6 +384,8 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 		cy := y
 		wordPositions := highlightWordPositions(text, idx)
 
+		t.clearKeyboardHelpArea(sw, sh)
+
 		for i := range text {
 			style := t.defaultStyle
 
@@ -408,6 +473,10 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 				msgX = 0
 			}
 			drawString(t.Scr, msgX, statusY, msg, -1, t.currentWordStyle.Bold(true))
+		}
+
+		if t.showKeyboardHelp {
+			t.drawKeyboardHelp(sw, sh)
 		}
 
 		//Potentially inefficient, but seems to be good enough
@@ -548,6 +617,13 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 					}
 				}
 			case tcell.KeyRune:
+				if ev.Rune() == '?' {
+					t.showKeyboardHelp = !t.showKeyboardHelp
+					if idx >= len(text) || text[idx] != '?' {
+						continue
+					}
+				}
+
 				if idx < len(text) {
 					if startTime.IsZero() {
 						startTime = time.Now()

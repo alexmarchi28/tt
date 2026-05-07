@@ -52,8 +52,11 @@ options.
 
 ## Keys
 
+- `?` shows or hides the keyboard shortcuts help.
 - Pressing `escape` at any point restarts the test.
 - `C-c` exits the test.
+- `C-l` redraws the terminal.
+- `C-backspace`, `Alt-backspace`, or `C-w` delete the previous word when backspace is enabled.
 - `right` moves to the next test.
 - `left` moves to the previous test.
 - `C-n` switches to the next theme and briefly shows its name.
