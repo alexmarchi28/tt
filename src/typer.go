@@ -32,7 +32,6 @@ type mistake struct {
 
 type typer struct {
 	Scr              tcell.Screen
-	OnStart          func()
 	SkipWord         bool
 	ShowWpm          bool
 	ShowAccuracy     bool
@@ -424,12 +423,12 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 		}
 
 		aw, ah := calcStringDimensions(attribution)
-		drawString(t.Scr, x+nc-aw, y+nr+1, attribution, -1, t.defaultStyle)
+		drawString(t.Scr, x+nc-aw, y+nr+1, attribution, t.defaultStyle)
 
 		if timeLimit != -1 && !startTime.IsZero() {
 			remaining := timeLimit - time.Since(startTime)
-			drawString(t.Scr, x+nc/2, y+nr+ah+1, "      ", -1, t.defaultStyle)
-			drawString(t.Scr, x+nc/2, y+nr+ah+1, strconv.Itoa(int(remaining/1e9)+1), -1, t.defaultStyle)
+			drawString(t.Scr, x+nc/2, y+nr+ah+1, "      ", t.defaultStyle)
+			drawString(t.Scr, x+nc/2, y+nr+ah+1, strconv.Itoa(int(remaining/1e9)+1), t.defaultStyle)
 		}
 
 		formatAccuracy := func(accuracy float64) string {
@@ -450,11 +449,11 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 			}
 			if duration > 1e7 { //Avoid flashing large numbers on test start.
 				if t.ShowAccuracy {
-					drawString(t.Scr, accuracyX, accuracyY, formatAccuracy(calcAccuracy(correctChar, errorChar)), -1, t.defaultStyle)
+					drawString(t.Scr, accuracyX, accuracyY, formatAccuracy(calcAccuracy(correctChar, errorChar)), t.defaultStyle)
 				}
 				if t.ShowWpm {
 					wpm := int((float64(ncorrect) / 5) / (float64(duration) / 60e9))
-					drawString(t.Scr, wpmX, wpmY, fmt.Sprintf("WPM: %-10d\n", wpm), -1, t.defaultStyle)
+					drawString(t.Scr, wpmX, wpmY, fmt.Sprintf("WPM: %-10d\n", wpm), t.defaultStyle)
 				}
 			}
 		}
@@ -473,7 +472,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 			if msgX < 0 {
 				msgX = 0
 			}
-			drawString(t.Scr, msgX, statusY, msg, -1, t.currentWordStyle.Bold(true))
+			drawString(t.Scr, msgX, statusY, msg, t.currentWordStyle.Bold(true))
 		}
 
 		if t.showKeyboardHelp {

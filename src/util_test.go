@@ -288,7 +288,7 @@ func TestDrawString(t *testing.T) {
 	sim := newSimScreen(t)
 	sim.SetSize(20, 5)
 
-	drawString(sim, 2, 1, "ab\ncd", -1, tcell.StyleDefault)
+	drawString(sim, 2, 1, "ab\ncd", tcell.StyleDefault)
 
 	if got := screenLine(sim, 1); got != "  ab" {
 		t.Errorf("line 1 = %q, want %q", got, "  ab")
