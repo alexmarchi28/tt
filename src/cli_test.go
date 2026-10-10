@@ -212,3 +212,17 @@ func TestCLIEmptyResources(t *testing.T) {
 		t.Errorf("tt -quotes <empty file> = %+v, want %+v", got, want)
 	}
 }
+
+func TestCLIHelpDescribesLineWidth(t *testing.T) {
+	got := runCLI(t, t.TempDir(), nil, "-help")
+
+	want := "" +
+		"    -w                  The maximum line length in characters. This option is\n" +
+		"                        ignored if -raw is present.\n"
+	if !strings.Contains(got.stdout, want) {
+		t.Errorf("tt -help does not describe -w correctly:\n%s", got.stdout)
+	}
+	if strings.Contains(got.stdout, "Embolden typed text.\n                        ignored") {
+		t.Errorf("tt -help attaches part of the -w description to -bold:\n%s", got.stdout)
+	}
+}

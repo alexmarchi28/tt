@@ -219,18 +219,20 @@ Word Mode
 File Mode
     -start PARAGRAPH    The offset of the starting paragraph, set this to 0 to
                         reset progress on a given file.
+
 Aesthetics
     -showwpm            Display WPM whilst typing.
     -showaccuracy       Display accuracy whilst typing.
-    -theme THEMEFILE    The theme to use. 
-    -w                  The maximum line length in characters. This option is 
-    -notheme            Attempt to use the default terminal theme. 
-                        This may produce odd results depending 
+    -theme THEMEFILE    The theme to use.
+    -w                  The maximum line length in characters. This option is
+                        ignored if -raw is present.
+    -notheme            Attempt to use the default terminal theme.
+                        This may produce odd results depending
                         on the theme colours.
     -notransparent      Disable transparent background.
     -blockcursor        Use the default cursor style.
     -bold               Embolden typed text.
-                        ignored if -raw is present.
+
 Test Parameters
     -t SECONDS          Terminate the test after the given number of seconds.
     -noskip             Disable word skipping when space is pressed.
