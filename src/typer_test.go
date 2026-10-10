@@ -686,3 +686,12 @@ func TestTyperShowsLiveStats(t *testing.T) {
 	sendKeys(t, sim, tcell.KeyEscape)
 	waitOutcome(t, done)
 }
+
+func TestTyperCountsKeystrokesOfAllSegments(t *testing.T) {
+	ty, sim := newTestTyper(t)
+
+	done := startTyper(ty, []segment{{"ab", ""}, {"cd", ""}}, -1)
+	sendKeys(t, sim, "xb", "cd")
+
+	assertOutcome(t, waitOutcome(t, done), TyperComplete, 3, 3, 1, []mistake{{"ab", "xb"}})
+}

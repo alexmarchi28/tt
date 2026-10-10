@@ -225,18 +225,20 @@ func (t *typer) Start(text []segment, timeout time.Duration) (ncorrect int, dura
 	for i, s := range text {
 		startImmediately := true
 		var d time.Duration
-		var c int
+		var c, sc, se int
 		var m []mistake
 
 		if i == 0 {
 			startImmediately = false
 		}
 
-		c, rc, d, m, correct, errors = t.start(s.Text, timeLeft, startImmediately, s.Attribution)
+		c, rc, d, m, sc, se = t.start(s.Text, timeLeft, startImmediately, s.Attribution)
 
 		ncorrect += c
 		duration += d
 		mistakes = append(mistakes, m...)
+		correct += sc
+		errors += se
 
 		if timeout != -1 {
 			timeLeft -= d
