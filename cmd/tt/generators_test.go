@@ -581,3 +581,16 @@ func TestGenerateQuoteTestIgnoresBlankQuotes(t *testing.T) {
 		}
 	}
 }
+
+func TestGenerateQuoteTestReturnsCopies(t *testing.T) {
+	dir := useTempStorage(t)
+	writeUserResource(t, dir, "quotes", "one", `[{"text": "the only quote"}]`)
+
+	// The app reflows the text of the tests it is given.
+	gen := mustGen(generateQuoteTest("one"))
+	gen()[0].Text = "reflowed"
+
+	if got := gen()[0].Text; got != "the only quote" {
+		t.Errorf("second draw = %q, want the quote unchanged", got)
+	}
+}

@@ -233,8 +233,7 @@ func generateQuoteTest(name string) (func() []segment, error) {
 	}
 
 	return func() []segment {
-		idx := rand.Int() % len(quotes)
-		return quotes[idx : idx+1]
+		return []segment{quotes[rand.Intn(len(quotes))]}
 	}, nil
 }
 
