@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"math/rand"
 	"os"
@@ -32,6 +33,46 @@ func (k testKind) String() string {
 		return k.mode
 	default:
 		return k.mode + " " + k.source
+	}
+}
+
+// newTestGenerator returns a function producing the successive tests
+// requested on the command line, or nil once there are no more, and what they
+// are made of. Text piped to stdin is used unless stdin is a terminal.
+func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func() []segment, testKind, error) {
+	words := wordOptions{n: opts.n, g: opts.g, punctuation: opts.punct, numbers: opts.numbers}
+
+	switch {
+	case opts.adaptive:
+		list := opts.wordFile
+		if list == "" {
+			list = "1000en"
+		}
+		gen, err := generateAdaptiveTest(list, words)
+		return gen, testKind{"adaptive", filepath.Base(list)}, err
+	case opts.wordFile != "":
+		gen, err := generateWordTest(opts.wordFile, words)
+		return gen, testKind{"words", filepath.Base(opts.wordFile)}, err
+	case opts.quoteFile != "":
+		gen, err := generateQuoteTest(opts.quoteFile)
+		return gen, testKind{"quotes", filepath.Base(opts.quoteFile)}, err
+	case opts.mistakes:
+		gen, err := generateMistakesTest(words)
+		return gen, testKind{"mistakes", ""}, err
+	case !stdinIsTerminal:
+		b, err := io.ReadAll(stdin)
+		if err != nil {
+			return nil, testKind{}, err
+		}
+
+		gen, err := generateTestFromData(b, opts.raw, opts.multi)
+		return gen, testKind{"text", ""}, err
+	case len(opts.files) > 0:
+		gen, err := generateTestFromFile(opts.files[0], opts.startParagraph)
+		return gen, testKind{"file", filepath.Base(opts.files[0])}, err
+	default:
+		gen, err := generateWordTest("1000en", words)
+		return gen, testKind{"words", "1000en"}, err
 	}
 }
 
