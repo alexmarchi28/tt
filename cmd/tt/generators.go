@@ -18,7 +18,7 @@ import (
 
 // testKind describes where the text of the tests comes from.
 type testKind struct {
-	mode   string // words, quotes, file or text.
+	mode   string // words, quotes, mistakes, file or text.
 	source string // The word list, quote file or file used, if any.
 }
 
