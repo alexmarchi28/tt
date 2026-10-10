@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"reflect"
 	"strings"
 	"sync"
@@ -67,6 +69,7 @@ func TestQuestionMarkTogglesKeyboardHelp(t *testing.T) {
 	defer sim.Fini()
 
 	typer := NewTyper(sim, true, testTheme)
+	typer.tty = io.Discard
 	done := make(chan int, 1)
 	go func() {
 		done <- typer.start("alpha beta", -1, false, "").rc
@@ -105,7 +108,11 @@ func newTestTyper(t *testing.T) (*typer, tcell.SimulationScreen) {
 	t.Helper()
 
 	sim := newSimScreen(t)
-	return NewTyper(sim, true, testTheme), sim
+
+	ty := NewTyper(sim, true, testTheme)
+	ty.tty = io.Discard
+
+	return ty, sim
 }
 
 // startTyper runs a test in the background; the outcome is delivered on the
@@ -706,6 +713,27 @@ func TestTestResultStats(t *testing.T) {
 	for _, tc := range tests {
 		if cpm, wpm, accuracy := tc.r.cpm(), tc.r.wpm(), tc.r.accuracy(); cpm != tc.cpm || wpm != tc.wpm || accuracy != tc.accuracy {
 			t.Errorf("%+v: cpm %d, wpm %d, accuracy %v, want %d, %d, %v", tc.r, cpm, wpm, accuracy, tc.cpm, tc.wpm, tc.accuracy)
+		}
+	}
+}
+
+func TestTyperCursorShape(t *testing.T) {
+	for _, blockCursor := range []bool{false, true} {
+		ty, sim := newTestTyper(t)
+		ty.BlockCursor = blockCursor
+
+		var tty bytes.Buffer
+		ty.tty = &tty
+
+		typeText(t, ty, sim, "ab", "ab")
+
+		// A bar cursor is used while typing unless -blockcursor is given.
+		want := "\033[5 q\033[2 q"
+		if blockCursor {
+			want = ""
+		}
+		if tty.String() != want {
+			t.Errorf("with BlockCursor %t the terminal got %q, want %q", blockCursor, tty.String(), want)
 		}
 	}
 }

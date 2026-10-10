@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"reflect"
 	"strings"
 	"testing"
@@ -14,9 +15,11 @@ func newTestApp(t *testing.T, opts options) (*app, tcell.SimulationScreen) {
 
 	useTempStorage(t)
 	sim := newSimScreen(t)
-	opts.blockCursor = true
 
-	return newApp(sim, opts), sim
+	a := newApp(sim, opts)
+	a.typer.tty = io.Discard
+
+	return a, sim
 }
 
 // testSequence returns a test generator producing the given texts, one test
@@ -233,11 +236,11 @@ func TestAppWithoutTheme(t *testing.T) {
 }
 
 func TestNewAppAppliesOptions(t *testing.T) {
-	opts := parseFlags([]string{"-noskip", "-nobackspace", "-showwpm", "-showaccuracy", "-nohighlight"})
+	opts := parseFlags([]string{"-noskip", "-nobackspace", "-showwpm", "-showaccuracy", "-nohighlight", "-blockcursor"})
 	a, _ := newTestApp(t, opts)
 
 	ty := a.typer
-	if ty.SkipWord || !ty.DisableBackspace || !ty.ShowWpm || !ty.ShowAccuracy || ty.highlightCurrent || ty.highlightNext {
+	if ty.SkipWord || !ty.DisableBackspace || !ty.ShowWpm || !ty.ShowAccuracy || ty.highlightCurrent || ty.highlightNext || !ty.BlockCursor {
 		t.Errorf("options not applied to the typer: %+v", ty)
 	}
 	if a.theme != "default" {
