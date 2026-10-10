@@ -46,3 +46,22 @@ func TestWriteResults(t *testing.T) {
 		})
 	}
 }
+
+func TestWriteResultsEscapesCSV(t *testing.T) {
+	results := []result{{Wpm: 40, Cpm: 200, Accuracy: 90, Timestamp: 3000, Mistakes: []mistake{
+		{"world,", "worl,"},
+		{`"quoted"`, `"quoted_`},
+	}}}
+
+	var b bytes.Buffer
+	if err := writeResults(&b, results, false, true); err != nil {
+		t.Fatal(err)
+	}
+
+	want := "test,40,200,90.00,3000\n" +
+		"mistake,\"world,\",\"worl,\"\n" +
+		"mistake,\"\"\"quoted\"\"\",\"\"\"quoted_\"\n"
+	if b.String() != want {
+		t.Errorf("got\n%s\nwant\n%s", b.String(), want)
+	}
+}

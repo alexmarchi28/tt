@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/csv"
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
 
 	"github.com/gdamore/tcell"
 )
@@ -71,12 +73,22 @@ func writeResults(w io.Writer, results []result, asJSON, asCSV bool) error {
 	}
 
 	if asCSV {
+		cw := csv.NewWriter(w)
 		for _, r := range results {
-			fmt.Fprintf(w, "test,%d,%d,%.2f,%d\n", r.Wpm, r.Cpm, r.Accuracy, r.Timestamp)
+			cw.Write([]string{
+				"test",
+				strconv.Itoa(r.Wpm),
+				strconv.Itoa(r.Cpm),
+				strconv.FormatFloat(r.Accuracy, 'f', 2, 64),
+				strconv.FormatInt(r.Timestamp, 10),
+			})
 			for _, m := range r.Mistakes {
-				fmt.Fprintf(w, "mistake,%s,%s\n", m.Word, m.Typed)
+				cw.Write([]string{"mistake", m.Word, m.Typed})
 			}
 		}
+
+		cw.Flush()
+		return cw.Error()
 	}
 
 	return nil
