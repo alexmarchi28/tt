@@ -84,7 +84,7 @@ func (a *app) run(testFn func() []segment) int {
 			}
 		}
 
-		if a.kind.mode == "adaptive" {
+		if a.kind.mode == modeAdaptive {
 			a.typer.ShowStatusMessage(adaptiveFocus(loadKeyStats()), 0)
 		}
 
