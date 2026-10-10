@@ -4,6 +4,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 )
 
 func assertWordPosition(t *testing.T, positions []int, text, word string, want int) {
@@ -197,5 +198,34 @@ func TestTypingStateTabs(t *testing.T) {
 				t.Errorf("mistakes() = %q, want %q", got, tc.mistakes)
 			}
 		})
+	}
+}
+
+func TestPaceIndex(t *testing.T) {
+	// At 60 wpm a pacer types 5 characters per second.
+	text := []rune("ab \ncd")
+
+	tests := []struct {
+		elapsed time.Duration
+		want    int
+	}{
+		{0, 0},
+		{199 * time.Millisecond, 0},
+		{200 * time.Millisecond, 1},
+		{400 * time.Millisecond, 2},
+		{600 * time.Millisecond, 4}, // The line break is not typed.
+		{800 * time.Millisecond, 5},
+		{time.Second, 6},
+		{time.Hour, 6},
+	}
+
+	for _, tc := range tests {
+		if got := paceIndex(text, tc.elapsed, 60); got != tc.want {
+			t.Errorf("paceIndex(%v) = %d, want %d", tc.elapsed, got, tc.want)
+		}
+	}
+
+	if got := paceIndex(text, time.Second, 120); got != 6 {
+		t.Errorf("at 120 wpm paceIndex(1s) = %d, want the end of the text", got)
 	}
 }

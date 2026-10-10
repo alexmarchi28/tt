@@ -1,5 +1,7 @@
 package main
 
+import "time"
+
 // typingState tracks the progress through the text of a single segment,
 // independently of how it is displayed.
 type typingState struct {
@@ -212,4 +214,23 @@ func highlightWordPositions(text []rune, idx int) []int {
 	}
 
 	return positions
+}
+
+// paceIndex returns the position in text of a typist starting at its
+// beginning and typing at wpm (5 characters per word) for the elapsed time.
+// Line breaks, which are never typed, are skipped.
+func paceIndex(text []rune, elapsed time.Duration, wpm int) int {
+	chars := int(int64(elapsed) * int64(wpm) * 5 / int64(time.Minute))
+
+	for i, r := range text {
+		if r == '\n' {
+			continue
+		}
+		if chars == 0 {
+			return i
+		}
+		chars--
+	}
+
+	return len(text)
 }

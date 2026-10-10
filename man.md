@@ -122,6 +122,11 @@ mistyped ones coming up more often. -n and -g apply.
 : Don't show mistakes while typing, they are still reported at the end of the
 test.
 
+-pace *WPM*
+
+: Show a pacer going through the text at the given speed, starting with the
+first key press.
+
 -nohighlight
 
 : Disable highlighting.

@@ -69,6 +69,7 @@ Test Parameters
     -nobackspace        Disable the backspace key.
     -blind              Don't show mistakes while typing, they are still
                         reported at the end of the test.
+    -pace WPM           Show a pacer going through the text at the given speed.
     -nohighlight        Disable current and next word highlighting.
     -highlight1         Only highlight the current word.
     -highlight2         Only highlight the next word.
@@ -102,6 +103,7 @@ type options struct {
 	startParagraph int
 	maxLineLen     int
 	timeout        time.Duration // -1 for no time limit.
+	pace           int           // 0 for no pacer.
 
 	listType  string
 	wordFile  string
@@ -162,6 +164,7 @@ func parseFlags(args []string) options {
 	fs.BoolVar(&opts.blockCursor, "blockcursor", false, "")
 	fs.BoolVar(&opts.noBackspace, "nobackspace", false, "")
 	fs.BoolVar(&opts.blind, "blind", false, "")
+	fs.IntVar(&opts.pace, "pace", 0, "")
 	fs.BoolVar(&opts.noTheme, "notheme", false, "")
 	fs.BoolVar(&opts.opaqueBg, "notransparent", false, "")
 	fs.BoolVar(&opts.oneShot, "oneshot", false, "")

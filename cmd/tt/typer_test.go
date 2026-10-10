@@ -863,3 +863,93 @@ func TestTyperTimeLimitWithFakeClock(t *testing.T) {
 		t.Errorf("got %+v, want the test to end after 10s with 2 characters", got)
 	}
 }
+
+// reversedCells returns the offsets of the reversed characters of the text
+// drawn at (x, y).
+func reversedCells(sim tcell.SimulationScreen, x, y, n int) []int {
+	var reversed []int
+
+	readScreen(sim, func(cells []tcell.SimCell, width, _ int) {
+		for i := 0; i < n; i++ {
+			if _, _, attr := cells[y*width+x+i].Style.Decompose(); attr&tcell.AttrReverse != 0 {
+				reversed = append(reversed, i)
+			}
+		}
+	})
+
+	return reversed
+}
+
+func waitForReversed(t *testing.T, sim tcell.SimulationScreen, x, y, n int, want []int) {
+	t.Helper()
+
+	waitFor(t, sim, func() bool { return reflect.DeepEqual(reversedCells(sim, x, y, n), want) })
+}
+
+func TestTyperPacer(t *testing.T) {
+	ty, sim := newTestTyper(t)
+	ty.Pace = 60
+	clock := useFakeClock(ty)
+
+	done := startTyper(ty, []segment{{"abcdefghij", ""}}, -1)
+	x, y := textOrigin(t, sim, "abcdefghij")
+
+	// The pacer starts with the test.
+	clock.advance(time.Second)
+	time.Sleep(50 * time.Millisecond)
+	waitForReversed(t, sim, x, y, 10, nil)
+
+	sendKeys(t, sim, "a")
+	waitForReversed(t, sim, x, y, 10, []int{0})
+
+	// 60 wpm is 5 characters per second.
+	clock.advance(time.Second)
+	waitForReversed(t, sim, x, y, 10, []int{5})
+
+	clock.advance(400 * time.Millisecond)
+	waitForReversed(t, sim, x, y, 10, []int{7})
+
+	clock.advance(time.Second)
+	waitForReversed(t, sim, x, y, 10, nil)
+
+	sendKeys(t, sim, tcell.KeyEscape)
+	waitOutcome(t, done)
+}
+
+func TestTyperWithoutPacer(t *testing.T) {
+	ty, sim := newTestTyper(t)
+	clock := useFakeClock(ty)
+
+	done := startTyper(ty, []segment{{"abcdefghij", ""}}, -1)
+	x, y := textOrigin(t, sim, "abcdefghij")
+
+	sendKeys(t, sim, "a")
+	waitForColors(t, sim, x, y, map[int]cellWant{0: {testHi, testBg, true}})
+	clock.advance(time.Second)
+	time.Sleep(50 * time.Millisecond)
+
+	if got := reversedCells(sim, x, y, 10); got != nil {
+		t.Errorf("reversed characters %v without a pacer", got)
+	}
+
+	sendKeys(t, sim, tcell.KeyEscape)
+	waitOutcome(t, done)
+}
+
+func TestTyperRefreshInterval(t *testing.T) {
+	ty, _ := newTestTyper(t)
+
+	if got := ty.refreshInterval(); got != 500*time.Millisecond {
+		t.Errorf("without a pacer the screen is updated every %v, want 500ms", got)
+	}
+
+	ty.Pace = 60
+	if got := ty.refreshInterval(); got != paceTick {
+		t.Errorf("with a pacer the screen is updated every %v, want %v", got, paceTick)
+	}
+
+	ty.tick = 10 * time.Millisecond
+	if got := ty.refreshInterval(); got != 10*time.Millisecond {
+		t.Errorf("refreshInterval() = %v, want the shorter configured interval", got)
+	}
+}

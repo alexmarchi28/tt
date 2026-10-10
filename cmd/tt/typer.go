@@ -30,6 +30,9 @@ type mistake struct {
 	Typed string `json:"typed"`
 }
 
+// paceTick is the longest interval between screen updates with a pacer.
+const paceTick = 50 * time.Millisecond
+
 type typer struct {
 	Scr              tcell.Screen
 	SkipWord         bool
@@ -38,6 +41,7 @@ type typer struct {
 	DisableBackspace bool
 	BlockCursor      bool
 	Blind            bool // Show mistakes like correctly typed characters.
+	Pace             int  // Speed in WPM of a pacer shown through the text, 0 for none.
 	CycleTheme       func(direction int) (string, error)
 	tty              io.Writer
 	now              func() time.Time // The clock, replaced in tests.
@@ -312,8 +316,13 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 	}
 
 	redraw := func() {
+		pace := -1
+		if t.Pace > 0 && !startTime.IsZero() {
+			pace = paceIndex(state.text, t.now().Sub(startTime), t.Pace)
+		}
+
 		t.clearKeyboardHelpArea(sw, sh)
-		t.drawText(state, x, y)
+		t.drawText(state, x, y, pace)
 
 		aw, ah := calcStringDimensions(attribution)
 		drawString(t.Scr, x+nc-aw, y+nr+1, attribution, t.defaultStyle)
@@ -341,6 +350,8 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 
 	tickerCloser := make(chan bool)
 
+	tick := t.refreshInterval()
+
 	//Inject nil events into the main event loop at regular invervals to force an update
 	ticker := func() {
 		for {
@@ -350,7 +361,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 			default:
 			}
 
-			time.Sleep(t.tick)
+			time.Sleep(tick)
 			t.Scr.PostEventWait(nil)
 		}
 	}
@@ -431,9 +442,19 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 	}
 }
 
+// refreshInterval returns the interval between screen updates. The pacer
+// moves smoothly only if the screen is updated often.
+func (t *typer) refreshInterval() time.Duration {
+	if t.Pace > 0 && t.tick > paceTick {
+		return paceTick
+	}
+
+	return t.tick
+}
+
 // drawText draws the text of the test at (x, y), styling each character
-// according to what was typed.
-func (t *typer) drawText(state *typingState, x, y int) {
+// according to what was typed. The character at pace is reversed.
+func (t *typer) drawText(state *typingState, x, y int, pace int) {
 	cx := x
 	cy := y
 	wordPositions := highlightWordPositions(state.text, state.idx)
@@ -463,6 +484,10 @@ func (t *typer) drawText(state *typingState, x, y int) {
 			style = t.incorrectSpaceStyle
 		default:
 			style = t.incorrectStyle
+		}
+
+		if i == pace {
+			style = style.Reverse(true)
 		}
 
 		glyph := r

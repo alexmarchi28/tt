@@ -57,6 +57,7 @@ func newApp(scr tcell.Screen, opts options, kind testKind) *app {
 	a.typer.ShowWpm = opts.showWpm
 	a.typer.ShowAccuracy = opts.showAccuracy
 	a.typer.Blind = opts.blind
+	a.typer.Pace = opts.pace
 
 	return a
 }
