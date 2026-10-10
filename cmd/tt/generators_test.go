@@ -225,6 +225,7 @@ func TestGenerateTestFromFileTracksFilesSeparately(t *testing.T) {
 func TestNewTestGenerator(t *testing.T) {
 	useTempStorage(t)
 	book := writeTextFile(t, "first paragraph\n\nsecond paragraph\n")
+	saveTestMistakes(t, "ab")
 
 	tests := []struct {
 		name            string
@@ -245,6 +246,8 @@ func TestNewTestGenerator(t *testing.T) {
 		{"word list over stdin", []string{"-words", "200en", "-n", "4"}, "piped text", false, wordsPerSegment(4), testKind{"words", "200en"}},
 		{"file", []string{book}, "", true, exactly("first paragraph"), testKind{"file", "book.txt"}},
 		{"stdin over file", []string{book}, "piped text", false, exactly("piped text"), testKind{"text", ""}},
+		{"mistakes", []string{"-mistakes", "-n", "3"}, "", true, exactly("ab ab ab"), testKind{"mistakes", ""}},
+		{"mistakes over stdin", []string{"-mistakes", "-n", "2"}, "piped text", false, exactly("ab ab"), testKind{"mistakes", ""}},
 	}
 
 	for _, tc := range tests {
@@ -302,5 +305,70 @@ func TestTestKindString(t *testing.T) {
 
 	if got := (persistedResult{Mode: "quotes", Source: "en"}).kind(); got != (testKind{"quotes", "en"}) {
 		t.Errorf("kind() = %+v, want quotes en", got)
+	}
+}
+
+func saveTestMistakes(t *testing.T, words ...string) {
+	t.Helper()
+
+	var mistakes []mistake
+	for _, w := range words {
+		mistakes = append(mistakes, mistake{w, "x"})
+	}
+	if err := writeValue(mistakeDB, mistakes); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestWeightedMistakes(t *testing.T) {
+	mistakes := []mistake{{"a", "x"}, {"b", "x"}, {"a", "x"}, {"c", "x"}, {"a", "x"}}
+
+	got := weightedMistakes(mistakes, 10)
+	want := []string{"a", "a", "a", "b", "c"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("weightedMistakes() = %q, want %q", got, want)
+	}
+
+	// Only the most recent mistakes count.
+	if got := weightedMistakes(mistakes, 2); !reflect.DeepEqual(got, []string{"a", "c"}) {
+		t.Errorf("weightedMistakes(2) = %q, want [a c]", got)
+	}
+}
+
+func TestGenerateMistakesTest(t *testing.T) {
+	useTempStorage(t)
+
+	var words []string
+	for i := 0; i < 100; i++ {
+		words = append(words, "old")
+	}
+	for i := 0; i < recentMistakes/10; i++ {
+		words = append(words, "often", "often", "often", "often", "often", "often", "often", "often", "rarely", "seldom")
+	}
+	saveTestMistakes(t, words...)
+
+	gen := generateMistakesTest(50, 2)
+	counts := map[string]int{}
+	for i := 0; i < 50; i++ {
+		segments := gen()
+		if len(segments) != 2 {
+			t.Fatalf("got %d segments, want 2", len(segments))
+		}
+
+		for _, s := range segments {
+			assertWords(t, s.Text, 50)
+			for _, w := range strings.Fields(s.Text) {
+				counts[w]++
+			}
+		}
+	}
+
+	if counts["old"] != 0 {
+		t.Errorf("%d words come from old mistakes", counts["old"])
+	}
+
+	// Without weights "often" would make a third of the words.
+	if share := float64(counts["often"]) / 5000; share < 0.4 {
+		t.Errorf("often makes %.2f of the words, want frequent mistakes to come up more often (%v)", share, counts)
 	}
 }

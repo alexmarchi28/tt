@@ -36,7 +36,10 @@ Modes
 
                         [{"text": "foo", attribution: "bar"}]
 
-Word Mode
+    -mistakes           Practice the recently mistyped words, the most
+                        frequently mistyped ones coming up more often.
+
+Word Mode (also applies to -mistakes)
     -n GROUPSZ          Sets the number of words which constitute a group.
     -g NGROUPS          Sets the number of groups which constitute a test.
 
@@ -102,6 +105,7 @@ type options struct {
 	files     []string
 
 	themeExplicit      bool // Whether -theme was given.
+	mistakes           bool
 	showWpm            bool
 	showAccuracy       bool
 	noSkip             bool
@@ -140,6 +144,7 @@ func parseFlags(args []string) options {
 
 	fs.StringVar(&opts.wordFile, "words", "", "")
 	fs.StringVar(&opts.quoteFile, "quotes", "", "")
+	fs.BoolVar(&opts.mistakes, "mistakes", false, "")
 
 	fs.BoolVar(&opts.showWpm, "showwpm", false, "")
 	fs.BoolVar(&opts.showAccuracy, "showaccuracy", false, "")
@@ -190,6 +195,8 @@ func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func
 		return generateWordTest(opts.wordFile, opts.n, opts.g), testKind{"words", filepath.Base(opts.wordFile)}
 	case opts.quoteFile != "":
 		return generateQuoteTest(opts.quoteFile), testKind{"quotes", filepath.Base(opts.quoteFile)}
+	case opts.mistakes:
+		return generateMistakesTest(opts.n, opts.g), testKind{"mistakes", ""}
 	case !stdinIsTerminal:
 		b, err := io.ReadAll(stdin)
 		if err != nil {

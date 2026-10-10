@@ -41,6 +41,49 @@ func generateWordTest(name string, n int, g int) func() []segment {
 		die("%s does not contain any words.", name)
 	}
 
+	return wordTest(words, n, g)
+}
+
+// recentMistakes is the number of most recent mistakes practiced with
+// -mistakes, so that words which have since been mastered eventually stop
+// coming up.
+const recentMistakes = 500
+
+// weightedMistakes returns the words of the last n mistakes, each repeated as
+// many times as it was mistyped.
+func weightedMistakes(mistakes []mistake, n int) []string {
+	if len(mistakes) > n {
+		mistakes = mistakes[len(mistakes)-n:]
+	}
+
+	var words []string
+	for _, w := range mostMistyped(mistakes, len(mistakes)) {
+		for i := 0; i < w.count; i++ {
+			words = append(words, w.word)
+		}
+	}
+
+	return words
+}
+
+// generateMistakesTest practices the recently mistyped words, the most
+// frequently mistyped ones coming up more often.
+func generateMistakesTest(n int, g int) func() []segment {
+	var mistakes []mistake
+	if err := readValue(mistakeDB, &mistakes); err != nil && !os.IsNotExist(err) {
+		die("Could not read the recorded mistakes: %v", err)
+	}
+
+	words := weightedMistakes(mistakes, recentMistakes)
+	if len(words) == 0 {
+		die("There are no recorded mistakes to practice yet.")
+	}
+
+	return wordTest(words, n, g)
+}
+
+// wordTest makes tests of g segments of n words randomly drawn from words.
+func wordTest(words []string, n int, g int) func() []segment {
 	return func() []segment {
 		segments := make([]segment, g)
 		for i := 0; i < g; i++ {

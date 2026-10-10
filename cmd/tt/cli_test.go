@@ -285,3 +285,12 @@ func TestCLIDoesNotCreateDirectoriesNeedlessly(t *testing.T) {
 		t.Errorf("unexpected %s in the home directory", e.Name())
 	}
 }
+
+func TestCLIMistakesWithoutMistakes(t *testing.T) {
+	got := runCLI(t, t.TempDir(), nil, "-mistakes")
+
+	want := cliResult{"", "ERROR: There are no recorded mistakes to practice yet.\n", 1}
+	if got != want {
+		t.Errorf("tt -mistakes = %+v, want %+v", got, want)
+	}
+}

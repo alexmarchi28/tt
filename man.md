@@ -39,6 +39,11 @@ usage: tt \[OPTION\]... \[FILE\]
 
     [{"text": "foo", attribution: "bar"}]
 
+-mistakes
+
+: Practice the words mistyped in the last 500 mistakes, the most frequently
+mistyped ones coming up more often. -n and -g apply.
+
 ## Word Mode
 
 -n *GROUPSZ*
