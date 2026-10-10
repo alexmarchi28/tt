@@ -107,12 +107,12 @@ func generateWordTest(name string, o wordOptions) (func() []segment, error) {
 func loadWords(name string) ([]string, error) {
 	b := readResource("words", name)
 	if b == nil {
-		return nil, fmt.Errorf("%s does not appear to be a valid word list. See '-list words' for a list of builtin word lists.", name)
+		return nil, fmt.Errorf("%s does not appear to be a valid word list, see '-list words' for a list of builtin word lists", name)
 	}
 
 	words := strings.Fields(string(b))
 	if len(words) == 0 {
-		return nil, fmt.Errorf("%s does not contain any words.", name)
+		return nil, fmt.Errorf("%s does not contain any words", name)
 	}
 
 	return words, nil
@@ -145,12 +145,12 @@ func weightedMistakes(mistakes []mistake, n int) []string {
 func generateMistakesTest(o wordOptions) (func() []segment, error) {
 	var mistakes []mistake
 	if err := readValue(mistakeDB, &mistakes); err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("Could not read the recorded mistakes: %v", err)
+		return nil, fmt.Errorf("could not read the recorded mistakes: %v", err)
 	}
 
 	words := weightedMistakes(mistakes, recentMistakes)
 	if len(words) == 0 {
-		return nil, errors.New("There are no recorded mistakes to practice yet.")
+		return nil, errors.New("there are no recorded mistakes to practice yet")
 	}
 
 	return wordTest(func(n int) []string { return randomWords(n, words) }, o), nil
@@ -266,9 +266,9 @@ func generateQuoteTest(name string) (func() []segment, error) {
 	var quotes []segment
 
 	if b := readResource("quotes", name); b == nil {
-		return nil, fmt.Errorf("%s does not appear to be a valid quote file. See '-list quotes' for a list of builtin quotes.", name)
+		return nil, fmt.Errorf("%s does not appear to be a valid quote file, see '-list quotes' for a list of builtin quotes", name)
 	} else if err := json.Unmarshal(b, &quotes); err != nil {
-		return nil, fmt.Errorf("Improperly formatted quote file: %v", err)
+		return nil, fmt.Errorf("improperly formatted quote file: %v", err)
 	}
 
 	var withText []segment
@@ -280,7 +280,7 @@ func generateQuoteTest(name string) (func() []segment, error) {
 	quotes = withText
 
 	if len(quotes) == 0 {
-		return nil, fmt.Errorf("%s does not contain any quotes.", name)
+		return nil, fmt.Errorf("%s does not contain any quotes", name)
 	}
 
 	return func() []segment {
@@ -291,7 +291,7 @@ func generateQuoteTest(name string) (func() []segment, error) {
 func generateTestFromData(data []byte, raw bool, split bool) (func() []segment, error) {
 	paragraphs := getParagraphs(string(data))
 	if len(paragraphs) == 0 {
-		return nil, errors.New("There is no text to type.")
+		return nil, errors.New("there is no text to type")
 	}
 
 	if raw {
@@ -344,11 +344,11 @@ func generateTestFromFile(path string, startParagraph int) (func() []segment, er
 
 	b, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("Failed to read %s.", path)
+		return nil, fmt.Errorf("failed to read %s", path)
 	}
 	paragraphs := getParagraphs(string(b))
 	if len(paragraphs) == 0 {
-		return nil, fmt.Errorf("%s does not contain any text.", path)
+		return nil, fmt.Errorf("%s does not contain any text", path)
 	}
 
 	return func() []segment {

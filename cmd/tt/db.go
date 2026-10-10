@@ -38,7 +38,7 @@ func init() {
 	var home string
 
 	if home, ok = os.LookupEnv("HOME"); !ok {
-		die("Could not resolve home directory.")
+		die("could not resolve the home directory")
 	}
 
 	if data, ok = os.LookupEnv("XDG_DATA_HOME"); ok {
@@ -112,7 +112,7 @@ func writeAppConfig(cfg appConfig) error {
 
 // unreadableResults describes the error of reading the saved results.
 func unreadableResults(err error) error {
-	return fmt.Errorf("Could not read the saved results in %s: %v. Fix or remove the file.", resultsDB, err)
+	return fmt.Errorf("could not read the saved results in %s: %v, fix or remove the file", resultsDB, err)
 }
 
 func readPersistedResults() ([]persistedResult, error) {
@@ -147,7 +147,7 @@ func savePersistedResult(r persistedResult) []persistedResult {
 	}
 
 	if err := writePersistedResults(append(stored, r)); err != nil {
-		die("Could not save the result: %v", err)
+		die("could not save the result: %v", err)
 	}
 
 	return stored

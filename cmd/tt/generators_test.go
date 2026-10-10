@@ -554,11 +554,11 @@ func TestGeneratorsRejectEmptyText(t *testing.T) {
 		gen  func() (func() []segment, error)
 		want string
 	}{
-		{"raw", func() (func() []segment, error) { return generateTestFromData([]byte(" \n"), true, false) }, "There is no text to type."},
-		{"paragraphs", func() (func() []segment, error) { return generateTestFromData([]byte(" \n\n "), false, false) }, "There is no text to type."},
-		{"multi", func() (func() []segment, error) { return generateTestFromData(nil, false, true) }, "There is no text to type."},
-		{"file", func() (func() []segment, error) { return generateTestFromFile(blankFile, -1) }, blankFile + " does not contain any text."},
-		{"quotes", func() (func() []segment, error) { return generateQuoteTest("blank") }, "blank does not contain any quotes."},
+		{"raw", func() (func() []segment, error) { return generateTestFromData([]byte(" \n"), true, false) }, "there is no text to type"},
+		{"paragraphs", func() (func() []segment, error) { return generateTestFromData([]byte(" \n\n "), false, false) }, "there is no text to type"},
+		{"multi", func() (func() []segment, error) { return generateTestFromData(nil, false, true) }, "there is no text to type"},
+		{"file", func() (func() []segment, error) { return generateTestFromFile(blankFile, -1) }, blankFile + " does not contain any text"},
+		{"quotes", func() (func() []segment, error) { return generateQuoteTest("blank") }, "blank does not contain any quotes"},
 	}
 
 	for _, tc := range tests {

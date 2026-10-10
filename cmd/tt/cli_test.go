@@ -168,7 +168,7 @@ func TestCLIStatsWithCorruptResults(t *testing.T) {
 	writeFile(t, filepath.Join(home, ".local", "share", "tt", ".results"), "not json")
 
 	got := runCLI(t, home, nil, "-stats")
-	if got.code != 1 || !strings.HasPrefix(got.stderr, "ERROR: Could not read the saved results in ") || !strings.HasSuffix(got.stderr, "Fix or remove the file.\n") {
+	if got.code != 1 || !strings.HasPrefix(got.stderr, "ERROR: could not read the saved results in ") || !strings.HasSuffix(got.stderr, "fix or remove the file\n") {
 		t.Errorf("tt -stats = %+v, want an error", got)
 	}
 }
@@ -184,15 +184,15 @@ func TestCLIInvalidResources(t *testing.T) {
 	}{
 		{
 			[]string{"-words", "nope"},
-			"ERROR: nope does not appear to be a valid word list. See '-list words' for a list of builtin word lists.\n",
+			"ERROR: nope does not appear to be a valid word list, see '-list words' for a list of builtin word lists\n",
 		},
 		{
 			[]string{"-quotes", "nope"},
-			"ERROR: nope does not appear to be a valid quote file. See '-list quotes' for a list of builtin quotes.\n",
+			"ERROR: nope does not appear to be a valid quote file, see '-list quotes' for a list of builtin quotes\n",
 		},
 		{
 			[]string{"-quotes", badQuotes},
-			"ERROR: Improperly formatted quote file: invalid character 'o' in literal null (expecting 'u')\n",
+			"ERROR: improperly formatted quote file: invalid character 'o' in literal null (expecting 'u')\n",
 		},
 	}
 
@@ -212,12 +212,12 @@ func TestCLIEmptyResources(t *testing.T) {
 	writeFile(t, quotes, "[]")
 
 	got := runCLI(t, home, nil, "-words", words)
-	if want := (cliResult{"", "ERROR: " + words + " does not contain any words.\n", 1}); got != want {
+	if want := (cliResult{"", "ERROR: " + words + " does not contain any words\n", 1}); got != want {
 		t.Errorf("tt -words <empty file> = %+v, want %+v", got, want)
 	}
 
 	got = runCLI(t, home, nil, "-quotes", quotes)
-	if want := (cliResult{"", "ERROR: " + quotes + " does not contain any quotes.\n", 1}); got != want {
+	if want := (cliResult{"", "ERROR: " + quotes + " does not contain any quotes\n", 1}); got != want {
 		t.Errorf("tt -quotes <empty file> = %+v, want %+v", got, want)
 	}
 }
@@ -254,7 +254,7 @@ func TestCLIDoesNotCreateDirectoriesNeedlessly(t *testing.T) {
 func TestCLIMistakesWithoutMistakes(t *testing.T) {
 	got := runCLI(t, t.TempDir(), nil, "-mistakes")
 
-	want := cliResult{"", "ERROR: There are no recorded mistakes to practice yet.\n", 1}
+	want := cliResult{"", "ERROR: there are no recorded mistakes to practice yet\n", 1}
 	if got != want {
 		t.Errorf("tt -mistakes = %+v, want %+v", got, want)
 	}
@@ -307,7 +307,7 @@ func TestCLIWithoutText(t *testing.T) {
 	// runCLI pipes nothing to stdin.
 	got := runCLI(t, t.TempDir(), nil)
 
-	if want := (cliResult{"", "ERROR: There is no text to type.\n", 1}); got != want {
+	if want := (cliResult{"", "ERROR: there is no text to type\n", 1}); got != want {
 		t.Errorf("tt < /dev/null = %+v, want %+v", got, want)
 	}
 }
@@ -320,7 +320,7 @@ func TestCLIRefusesToStartWithCorruptResults(t *testing.T) {
 	// Checked before typing a test whose result could not be saved.
 	got := runCLI(t, home, nil, "-n", "5")
 
-	want := "ERROR: Could not read the saved results in " + results + ": unexpected end of JSON input. Fix or remove the file.\n"
+	want := "ERROR: could not read the saved results in " + results + ": unexpected end of JSON input, fix or remove the file\n"
 	if got.code != 1 || got.stderr != want {
 		t.Errorf("tt with corrupt results = %+v, want the error %q", got, want)
 	}
