@@ -344,3 +344,20 @@ func TestRandomTextWithoutAlternatives(t *testing.T) {
 		})
 	}
 }
+
+func TestWordWrapCountsCharacters(t *testing.T) {
+	tests := []struct {
+		in   string
+		n    int
+		want string
+	}{
+		{"абв где жзи", 7, "абв где\nжзи"},
+		{"città più già", 9, "città più\ngià"},
+	}
+
+	for _, tc := range tests {
+		if got := wordWrap(tc.in, tc.n); got != tc.want {
+			t.Errorf("wordWrap(%q, %d) = %q, want %q", tc.in, tc.n, got, tc.want)
+		}
+	}
+}

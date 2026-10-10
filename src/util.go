@@ -45,7 +45,7 @@ func getParagraphs(s string) []string {
 	return strings.Split(strings.Trim(s, "\n"), "\n\n")
 }
 
-func wordWrapBytes(s []byte, n int) {
+func wordWrapRunes(s []rune, n int) {
 	sp := 0
 	sz := 0
 
@@ -72,8 +72,8 @@ func wordWrapBytes(s []byte, n int) {
 }
 
 func wordWrap(s string, n int) string {
-	r := []byte(s)
-	wordWrapBytes(r, n)
+	r := []rune(s)
+	wordWrapRunes(r, n)
 	return string(r)
 }
 
