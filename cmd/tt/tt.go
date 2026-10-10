@@ -78,8 +78,9 @@ Scripting
 Misc
     -list TYPE          Lists internal resources of the given type.
                         TYPE=[themes|quotes|words]
-    -stats              Print average WPM and accuracy over the last hour,
-                        day and week.
+    -stats              Print statistics about the saved results: number of
+                        tests, personal best, averages over time, weekly trend
+                        and most mistyped words.
 
 Version
     -v                  Print the current version.

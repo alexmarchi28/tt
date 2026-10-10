@@ -148,7 +148,9 @@ code, are typed with the tab key.
 
 **-stats**\
 
-    Print average WPM and accuracy over the last hour, day and week.
+    Print statistics about the saved results: number of tests, personal best,
+    average WPM and accuracy over the last hour, day, week and all time, trend
+    compared to the previous week and most mistyped words.
 
 **-v**\
 
@@ -168,7 +170,7 @@ words.txt
 tt -words words.txt -n 10
 ```
 
-Prints the average WPM and accuracy over the last hour, day and week.
+Prints statistics about the saved results.
 ```
 tt -stats
 ```

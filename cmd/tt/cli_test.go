@@ -130,13 +130,21 @@ func TestCLIStats(t *testing.T) {
 		`[{"wpm":60,"accuracy":95,"timestamp":%d},{"wpm":40,"accuracy":85,"timestamp":%d}]`,
 		now-60, now-3*3600))
 
-	got := runCLI(t, home, nil, "-stats")
+	writeFile(t, filepath.Join(home, ".local", "share", "tt", ".errors"), `[{"word":"the","typed":"teh"}]`)
+
+	got := runCLI(t, home, []string{"TZ=UTC"}, "-stats")
 
 	want := cliResult{
 		"Typing stats\n" +
+			"Tests      2\n" +
+			"Best       60 wpm (" + time.Unix(now-60, 0).UTC().Format("2006-01-02") + ")\n" +
 			"Last hour  avg wpm 60.00, avg accuracy 95.00% (1 tests)\n" +
 			"Last day   avg wpm 50.00, avg accuracy 90.00% (2 tests)\n" +
-			"Last week  avg wpm 50.00, avg accuracy 90.00% (2 tests)\n",
+			"Last week  avg wpm 50.00, avg accuracy 90.00% (2 tests)\n" +
+			"All time   avg wpm 50.00, avg accuracy 90.00% (2 tests)\n" +
+			"\n" +
+			"Most mistyped words\n" +
+			"the        1\n",
 		"", 0,
 	}
 	if got != want {
