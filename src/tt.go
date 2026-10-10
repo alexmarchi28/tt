@@ -448,8 +448,8 @@ func main() {
 	}
 
 	if versionFlag {
-		fmt.Fprintf(os.Stderr, "tt version 0.4.4\n")
-		os.Exit(1)
+		fmt.Println("tt version 0.4.4")
+		os.Exit(0)
 	}
 
 	if statsFlag {
