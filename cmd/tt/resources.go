@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"tt"
+	"github.com/alexmarchi28/tt"
 )
 
 var configDirs []string

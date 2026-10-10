@@ -1,4 +1,4 @@
-module tt
+module github.com/alexmarchi28/tt
 
 go 1.20
 
