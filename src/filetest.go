@@ -20,7 +20,9 @@ func generateTestFromFile(path string, startParagraph int) func() []segment {
 
 	if startParagraph != -1 {
 		db[path] = startParagraph
-		writeValue(FILE_STATE_DB, db)
+		if err := writeValue(FILE_STATE_DB, db); err != nil {
+			panic(err)
+		}
 	}
 
 	idx := db[path] - 1
@@ -34,7 +36,9 @@ func generateTestFromFile(path string, startParagraph int) func() []segment {
 	return func() []segment {
 		idx++
 		db[path] = idx
-		writeValue(FILE_STATE_DB, db)
+		if err := writeValue(FILE_STATE_DB, db); err != nil {
+			panic(err)
+		}
 
 		if idx >= len(paragraphs) {
 			return nil

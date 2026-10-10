@@ -38,9 +38,6 @@ func init() {
 
 	config := filepath.Join(home, ".config", "tt")
 
-	os.MkdirAll(data, 0700)
-	os.MkdirAll(config, 0700)
-
 	FILE_STATE_DB = filepath.Join(data, ".db")
 	MISTAKE_DB = filepath.Join(data, ".errors")
 	RESULTS_DB = filepath.Join(data, ".results")
@@ -57,16 +54,18 @@ func readValue(path string, o interface{}) error {
 	return json.Unmarshal(b, o)
 }
 
-func writeValue(path string, o interface{}) {
+// writeValue stores o as JSON in path, creating its directory if needed.
+func writeValue(path string, o interface{}) error {
 	b, err := json.Marshal(o)
 	if err != nil {
-		panic(err)
+		return err
 	}
 
-	err = os.WriteFile(path, b, 0600)
-	if err != nil {
-		panic(err)
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		return err
 	}
+
+	return os.WriteFile(path, b, 0600)
 }
 
 func readAppConfig() (appConfig, error) {
@@ -76,12 +75,7 @@ func readAppConfig() (appConfig, error) {
 }
 
 func writeAppConfig(cfg appConfig) error {
-	b, err := json.Marshal(cfg)
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(APP_CONFIG_PATH, b, 0600)
+	return writeValue(APP_CONFIG_PATH, cfg)
 }
 
 func readPersistedResults() ([]persistedResult, error) {
@@ -91,12 +85,7 @@ func readPersistedResults() ([]persistedResult, error) {
 }
 
 func writePersistedResults(stored []persistedResult) error {
-	b, err := json.Marshal(stored)
-	if err != nil {
-		return err
-	}
-
-	return os.WriteFile(RESULTS_DB, b, 0600)
+	return writeValue(RESULTS_DB, stored)
 }
 
 func saveMistakes(mistakes []mistake) {
@@ -107,7 +96,9 @@ func saveMistakes(mistakes []mistake) {
 	}
 
 	db = append(db, mistakes...)
-	writeValue(MISTAKE_DB, db)
+	if err := writeValue(MISTAKE_DB, db); err != nil {
+		panic(err)
+	}
 }
 
 func savePersistedResult(wpm int, accuracy float64, timestamp int64) {

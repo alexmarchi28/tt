@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
@@ -123,5 +124,18 @@ func TestSavePersistedResultWithoutKeystrokes(t *testing.T) {
 	}
 	if want := []persistedResult{{Wpm: 0, Accuracy: 0, Timestamp: 1000}}; !reflect.DeepEqual(got, want) {
 		t.Errorf("stored results = %+v, want %+v", got, want)
+	}
+}
+
+func TestWriteValueCreatesDirectories(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "a", "b", "value.json")
+
+	if err := writeValue(path, map[string]int{"x": 1}); err != nil {
+		t.Fatal(err)
+	}
+
+	var got map[string]int
+	if err := readValue(path, &got); err != nil || got["x"] != 1 {
+		t.Errorf("read back %v (%v), want x = 1", got, err)
 	}
 }

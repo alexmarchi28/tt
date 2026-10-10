@@ -262,3 +262,18 @@ func TestParseFlags(t *testing.T) {
 		t.Error("-theme default should count as an explicit theme")
 	}
 }
+
+func TestCLIDoesNotCreateDirectoriesNeedlessly(t *testing.T) {
+	home := t.TempDir()
+
+	runCLI(t, home, nil, "-v")
+	runCLI(t, home, nil, "-stats")
+
+	entries, err := os.ReadDir(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		t.Errorf("unexpected %s in the home directory", e.Name())
+	}
+}
