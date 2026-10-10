@@ -132,3 +132,33 @@ func TestReadResultsOfOlderVersions(t *testing.T) {
 		t.Errorf("readPersistedResults() = %+v, %v, want %+v", got, err, want)
 	}
 }
+
+func TestWriteValueReplacesFilesAtomically(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "value.json")
+
+	for _, v := range []int{1, 2} {
+		if err := writeValue(path, v); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	var got int
+	if err := readValue(path, &got); err != nil || got != 2 {
+		t.Errorf("read back %v (%v), want 2", got, err)
+	}
+
+	// The value is written to a temporary file then moved in place, so that an
+	// interrupted write never leaves a truncated file behind.
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 {
+		t.Errorf("files left in the directory: %v", entries)
+	}
+
+	if info, err := os.Stat(path); err != nil || info.Mode().Perm() != 0600 {
+		t.Errorf("file mode = %v (%v), want 0600", info.Mode().Perm(), err)
+	}
+}

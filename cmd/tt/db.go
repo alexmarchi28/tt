@@ -65,7 +65,9 @@ func readValue(path string, o interface{}) error {
 	return json.Unmarshal(b, o)
 }
 
-// writeValue stores o as JSON in path, creating its directory if needed.
+// writeValue stores o as JSON in path, creating its directory if needed. The
+// value is written to a temporary file which then replaces path, so that an
+// interrupted write never leaves a truncated file behind.
 func writeValue(path string, o interface{}) error {
 	b, err := json.Marshal(o)
 	if err != nil {
@@ -76,7 +78,25 @@ func writeValue(path string, o interface{}) error {
 		return err
 	}
 
-	return os.WriteFile(path, b, 0600)
+	f, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".*.tmp")
+	if err != nil {
+		return err
+	}
+	defer os.Remove(f.Name()) //Fails harmlessly once the file is renamed.
+
+	if _, err := f.Write(b); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		f.Close()
+		return err
+	}
+	if err := f.Close(); err != nil {
+		return err
+	}
+
+	return os.Rename(f.Name(), path)
 }
 
 func readAppConfig() (appConfig, error) {
