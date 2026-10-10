@@ -1,12 +1,19 @@
 package main
 
 import (
+	"embed"
 	"io"
 	"os"
+	"path"
 	"path/filepath"
 	"sort"
-	"strings"
 )
+
+// builtin holds the resources shipped with tt. Explicit patterns are used so
+// that files starting with an underscore (e.g. themes/_base) are included.
+//
+//go:embed themes/* words/* quotes/*
+var builtin embed.FS
 
 var configDirs []string
 
@@ -39,17 +46,19 @@ func readResource(typ, name string) []byte {
 		}
 	}
 
-	return readPackedFile(filepath.Join(typ, name))
+	if b, err := builtin.ReadFile(path.Join(typ, name)); err == nil {
+		return b
+	}
+
+	return nil
 }
 
 func listResourceNames(typ string) []string {
 	names := map[string]struct{}{}
-	prefix := typ + "/"
 
-	for path := range packedFiles {
-		if strings.Index(path, prefix) == 0 {
-			_, name := filepath.Split(path)
-			names[name] = struct{}{}
+	if entries, err := builtin.ReadDir(typ); err == nil {
+		for _, entry := range entries {
+			names[entry.Name()] = struct{}{}
 		}
 	}
 

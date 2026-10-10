@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -263,6 +264,32 @@ func TestLineWidth(t *testing.T) {
 	for _, tc := range tests {
 		if got := lineWidth(tc.maxLineLen, tc.sw); got != tc.want {
 			t.Errorf("lineWidth(%d, %d) = %d, want %d", tc.maxLineLen, tc.sw, got, tc.want)
+		}
+	}
+}
+
+func TestBuiltinResourcesMatchFiles(t *testing.T) {
+	useTempStorage(t)
+
+	for _, typ := range []string{"themes", "words", "quotes"} {
+		entries, err := os.ReadDir(typ)
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if names := listResourceNames(typ); len(names) != len(entries) {
+			t.Errorf("%d builtin %s, want %d", len(names), typ, len(entries))
+		}
+
+		for _, e := range entries {
+			want, err := os.ReadFile(filepath.Join(typ, e.Name()))
+			if err != nil {
+				t.Fatal(err)
+			}
+
+			if got := readResource(typ, e.Name()); !bytes.Equal(got, want) {
+				t.Errorf("builtin %s/%s differs from the file in the repository", typ, e.Name())
+			}
 		}
 	}
 }

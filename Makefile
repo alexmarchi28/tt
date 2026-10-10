@@ -20,7 +20,6 @@ uninstall:
 .PHONY: assets
 assets:
 	python3 ./scripts/themegen.py
-	./scripts/pack themes/ words/ quotes/ > packed.go
 	pandoc -s -t man -o - man.md|gzip > tt.1.gz
 
 .PHONY: rel
