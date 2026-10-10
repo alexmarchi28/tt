@@ -180,15 +180,16 @@ func parseFlags(args []string) options {
 }
 
 // newTestGenerator returns a function producing the successive tests
-// requested on the command line, or nil once there are no more.
-func newTestGenerator(opts options) func() []segment {
+// requested on the command line, or nil once there are no more. Text piped to
+// stdin is used unless stdin is a terminal.
+func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) func() []segment {
 	switch {
 	case opts.wordFile != "":
 		return generateWordTest(opts.wordFile, opts.n, opts.g)
 	case opts.quoteFile != "":
 		return generateQuoteTest(opts.quoteFile)
-	case !isatty.IsTerminal(os.Stdin.Fd()):
-		b, err := io.ReadAll(os.Stdin)
+	case !stdinIsTerminal:
+		b, err := io.ReadAll(stdin)
 		if err != nil {
 			panic(err)
 		}
@@ -230,7 +231,7 @@ func main() {
 		}
 	}
 
-	testFn := newTestGenerator(opts)
+	testFn := newTestGenerator(opts, os.Stdin, isatty.IsTerminal(os.Stdin.Fd()))
 
 	var err error
 	scr, err = tcell.NewScreen()

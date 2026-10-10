@@ -221,3 +221,63 @@ func TestGenerateTestFromFileTracksFilesSeparately(t *testing.T) {
 	assertNextParagraph(t, generateTestFromFile(b, -1), "b0")
 	assertNextParagraph(t, generateTestFromFile(a, -1), "a1")
 }
+
+func TestNewTestGenerator(t *testing.T) {
+	useTempStorage(t)
+	book := writeTextFile(t, "first paragraph\n\nsecond paragraph\n")
+
+	tests := []struct {
+		name            string
+		args            []string
+		stdin           string
+		stdinIsTerminal bool
+		check           func(t *testing.T, segments []segment)
+	}{
+		{"default", nil, "", true, wordsPerSegment(50)},
+		{"word list", []string{"-words", "200en", "-n", "3", "-g", "2"}, "", true, wordsPerSegment(3, 3)},
+		{"quotes", []string{"-quotes", "en"}, "", true, func(t *testing.T, segments []segment) {
+			if len(segments) != 1 || segments[0].Text == "" {
+				t.Errorf("got %q, want a quote", segments)
+			}
+		}},
+		{"stdin", nil, "piped text\n\nmore", false, exactly("piped text", "more")},
+		{"word list over stdin", []string{"-words", "200en", "-n", "4"}, "piped text", false, wordsPerSegment(4)},
+		{"file", []string{book}, "", true, exactly("first paragraph")},
+		{"stdin over file", []string{book}, "piped text", false, exactly("piped text")},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			gen := newTestGenerator(parseFlags(tc.args), strings.NewReader(tc.stdin), tc.stdinIsTerminal)
+			tc.check(t, gen())
+		})
+	}
+}
+
+// wordsPerSegment checks that there is a segment of n words for each given n.
+func wordsPerSegment(n ...int) func(t *testing.T, segments []segment) {
+	return func(t *testing.T, segments []segment) {
+		t.Helper()
+
+		if len(segments) != len(n) {
+			t.Fatalf("got %d segments, want %d", len(segments), len(n))
+		}
+		for i, s := range segments {
+			assertWords(t, s.Text, n[i])
+		}
+	}
+}
+
+func exactly(texts ...string) func(t *testing.T, segments []segment) {
+	return func(t *testing.T, segments []segment) {
+		t.Helper()
+
+		var want []segment
+		for _, text := range texts {
+			want = append(want, segment{text, ""})
+		}
+		if !reflect.DeepEqual(segments, want) {
+			t.Errorf("got %q, want %q", segments, want)
+		}
+	}
+}
