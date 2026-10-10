@@ -50,6 +50,8 @@ Best served on a terminal with truecolor and cursor shape support (e.g kitty, it
 By default 50 words from the top 1000 words in the English language are used to
 constitute the test. Custom text can be supplied by piping arbitrary text to the
 program. Each paragraph in the input is shown as a separate segment of the text.
+At the end of each test a report shows your speed, accuracy and mistakes, and
+whether you set a new personal best for that kind of test.
 See `man tt` or `man.md` for a complete description and a comprehensive set of
 options.
 

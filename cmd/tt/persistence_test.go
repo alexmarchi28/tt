@@ -14,8 +14,15 @@ func TestSavePersistedResult(t *testing.T) {
 		t.Fatalf("reading missing results: err = %v, want a not-exist error", err)
 	}
 
-	savePersistedResult(persistedResult{Wpm: 60, Accuracy: 95.5, Timestamp: 1000})
-	savePersistedResult(persistedResult{Wpm: 72, Accuracy: 100, Timestamp: 2000, Mode: "quotes", Source: "en", Duration: 12.5})
+	first := persistedResult{Wpm: 60, Accuracy: 95.5, Timestamp: 1000}
+	if previous := savePersistedResult(first); previous != nil {
+		t.Errorf("results saved before the first one: %+v", previous)
+	}
+
+	second := persistedResult{Wpm: 72, Accuracy: 100, Timestamp: 2000, Mode: "quotes", Source: "en", Duration: 12.5}
+	if previous := savePersistedResult(second); !reflect.DeepEqual(previous, []persistedResult{first}) {
+		t.Errorf("results saved before the second one: %+v, want the first one", previous)
+	}
 
 	got, err := readPersistedResults()
 	if err != nil {

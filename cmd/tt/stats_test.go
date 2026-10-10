@@ -189,3 +189,21 @@ func TestFormatStatsByTest(t *testing.T) {
 		t.Errorf("got\n%s\nwant\n%s", got, want)
 	}
 }
+
+func TestBestWpm(t *testing.T) {
+	stored := []persistedResult{
+		{Wpm: 90},
+		{Wpm: 50, Mode: "words", Source: "1000en"},
+		{Wpm: 70, Mode: "words", Source: "1000en"},
+		{Wpm: 80, Mode: "words", Source: "200en"},
+		{Wpm: 60, Mode: "words", Source: "1000en"},
+	}
+
+	if best, ok := bestWpm(stored, testKind{"words", "1000en"}); best != 70 || !ok {
+		t.Errorf("bestWpm(words 1000en) = %d, %t, want 70, true", best, ok)
+	}
+
+	if best, ok := bestWpm(stored, testKind{"quotes", "en"}); ok {
+		t.Errorf("bestWpm(quotes en) = %d, %t, want no result", best, ok)
+	}
+}

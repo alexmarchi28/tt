@@ -19,9 +19,20 @@ type result struct {
 	Mistakes  []mistake `json:"mistakes"`
 }
 
+// personalBest tells whether a test beat the best WPM previously achieved on
+// the same kind of test.
+type personalBest struct {
+	beaten   bool
+	previous int
+}
+
 // formatReport describes the outcome of a completed test.
-func formatReport(res testResult, attribution string) string {
+func formatReport(res testResult, attribution string, best personalBest) string {
 	var b strings.Builder
+
+	if best.beaten {
+		fmt.Fprintf(&b, "New personal best! (previous best: %d wpm)\n\n", best.previous)
+	}
 
 	fmt.Fprintf(&b, "WPM:         %d\nCPM:         %d\nAccuracy:    %.2f%%", res.wpm(), res.cpm(), res.accuracy())
 

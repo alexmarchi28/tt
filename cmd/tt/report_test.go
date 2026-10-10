@@ -81,24 +81,32 @@ func TestFormatReport(t *testing.T) {
 		name        string
 		res         testResult
 		attribution string
+		best        personalBest
 		want        string
 	}{
-		{"plain", testResult{duration: time.Minute, correctChars: 250, correctKeys: 10}, "", "" +
+		{"plain", testResult{duration: time.Minute, correctChars: 250, correctKeys: 10}, "", personalBest{}, "" +
 			"WPM:         50\n" +
 			"CPM:         250\n" +
 			"Accuracy:    100.00%"},
-		{"mistakes and attribution", res, "Someone", "" +
+		{"mistakes and attribution", res, "Someone", personalBest{}, "" +
 			"WPM:         60\n" +
 			"CPM:         300\n" +
 			"Accuracy:    97.50%\n" +
 			"Mistakes:    alpha, beta\n" +
 			"\n" +
 			"Attribution: Someone"},
+		{"personal best", res, "", personalBest{beaten: true, previous: 55}, "" +
+			"New personal best! (previous best: 55 wpm)\n" +
+			"\n" +
+			"WPM:         60\n" +
+			"CPM:         300\n" +
+			"Accuracy:    97.50%\n" +
+			"Mistakes:    alpha, beta"},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := formatReport(tc.res, tc.attribution); got != tc.want {
+			if got := formatReport(tc.res, tc.attribution, tc.best); got != tc.want {
 				t.Errorf("got\n%s\nwant\n%s", got, tc.want)
 			}
 		})

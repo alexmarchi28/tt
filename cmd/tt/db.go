@@ -110,7 +110,9 @@ func saveMistakes(mistakes []mistake) {
 	}
 }
 
-func savePersistedResult(r persistedResult) {
+// savePersistedResult adds r to the saved results and returns the ones saved
+// before it.
+func savePersistedResult(r persistedResult) []persistedResult {
 	stored, err := readPersistedResults()
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -120,9 +122,9 @@ func savePersistedResult(r persistedResult) {
 		}
 	}
 
-	stored = append(stored, r)
-
-	if err := writePersistedResults(stored); err != nil {
+	if err := writePersistedResults(append(stored, r)); err != nil {
 		panic(err)
 	}
+
+	return stored
 }

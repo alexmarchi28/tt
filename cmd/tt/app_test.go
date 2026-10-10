@@ -252,3 +252,37 @@ func TestNewAppAppliesOptions(t *testing.T) {
 		t.Errorf("theme to remember = %q, want default", a.theme)
 	}
 }
+
+func TestAppReportsPersonalBest(t *testing.T) {
+	tests := []struct {
+		name     string
+		previous []persistedResult
+		want     bool
+	}{
+		{"first test", nil, false},
+		{"beaten", []persistedResult{{Wpm: 1, Mode: "words", Source: "test"}}, true},
+		{"not beaten", []persistedResult{{Wpm: 1_000_000_000, Mode: "words", Source: "test"}}, false},
+		{"other kind of test", []persistedResult{{Wpm: 1, Mode: "quotes", Source: "en"}}, false},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			a, sim := newTestApp(t, parseFlags(nil))
+			if err := writePersistedResults(tc.previous); err != nil {
+				t.Fatal(err)
+			}
+
+			var calls int
+			done := startApp(a, testSequence(&calls, "ab"))
+			sendKeys(t, sim, "ab")
+			waitForScreenText(t, sim, "WPM:", true)
+
+			if got := strings.Contains(simulationScreenText(sim), "New personal best!"); got != tc.want {
+				t.Errorf("personal best shown = %t, want %t:\n%s", got, tc.want, simulationScreenText(sim))
+			}
+
+			sendKeys(t, sim, tcell.KeyCtrlC)
+			waitExitCode(t, done)
+		})
+	}
+}

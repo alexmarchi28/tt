@@ -21,6 +21,10 @@ usage: tt \[OPTION\]... \[FILE\]
   test. Each paragraph of the input is treated as a segment unless '-multi' is
   supplied in which case each paragraph is treated as a separate test. 
 
+  At the end of each test a report shows the speed, accuracy and mistakes, and
+  whether a new personal best was set for that kind of test (word list, quote
+  file, file...).
+
 # OPTIONS
 
 ## Modes

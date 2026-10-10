@@ -41,11 +41,11 @@ func summarize(results []persistedResult) summary {
 	return s
 }
 
-// since returns the results saved at or after t.
-func since(results []persistedResult, t time.Time) []persistedResult {
+// filterResults returns the results for which keep returns true.
+func filterResults(results []persistedResult, keep func(persistedResult) bool) []persistedResult {
 	var out []persistedResult
 	for _, r := range results {
-		if r.Timestamp >= t.Unix() {
+		if keep(r) {
 			out = append(out, r)
 		}
 	}
@@ -53,16 +53,21 @@ func since(results []persistedResult, t time.Time) []persistedResult {
 	return out
 }
 
+// since returns the results saved at or after t.
+func since(results []persistedResult, t time.Time) []persistedResult {
+	return filterResults(results, func(r persistedResult) bool { return r.Timestamp >= t.Unix() })
+}
+
 // before returns the results saved before t.
 func before(results []persistedResult, t time.Time) []persistedResult {
-	var out []persistedResult
-	for _, r := range results {
-		if r.Timestamp < t.Unix() {
-			out = append(out, r)
-		}
-	}
+	return filterResults(results, func(r persistedResult) bool { return r.Timestamp < t.Unix() })
+}
 
-	return out
+// bestWpm returns the best WPM achieved on the given kind of test, and false
+// if no such test was completed.
+func bestWpm(results []persistedResult, kind testKind) (int, bool) {
+	s := summarize(filterResults(results, func(r persistedResult) bool { return r.kind() == kind }))
+	return s.best.Wpm, s.count > 0
 }
 
 type kindSummary struct {

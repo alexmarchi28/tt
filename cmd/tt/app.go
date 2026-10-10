@@ -92,14 +92,14 @@ func (a *app) run(testFn func() []segment) int {
 				idx--
 			}
 		case TyperComplete:
-			a.record(res)
+			best := a.record(res)
 
 			if !a.opts.noReport {
 				attribution := ""
 				if len(tests[idx]) == 1 {
 					attribution = tests[idx][0].Attribution
 				}
-				if quit := showReport(a.scr, formatReport(res, attribution)); quit {
+				if quit := showReport(a.scr, formatReport(res, attribution, best)); quit {
 					return 1
 				}
 			}
@@ -120,12 +120,13 @@ func (a *app) run(testFn func() []segment) int {
 	}
 }
 
-// record stores the outcome of a completed test.
-func (a *app) record(res testResult) {
+// record stores the outcome of a completed test and tells whether it is a
+// new personal best.
+func (a *app) record(res testResult) personalBest {
 	timestamp := time.Now().Unix()
 
 	a.results = append(a.results, result{res.wpm(), res.cpm(), res.accuracy(), timestamp, res.mistakes})
-	savePersistedResult(persistedResult{
+	previous := savePersistedResult(persistedResult{
 		Wpm:       res.wpm(),
 		Accuracy:  res.accuracy(),
 		Timestamp: timestamp,
@@ -134,6 +135,12 @@ func (a *app) record(res testResult) {
 		Duration:  res.duration.Seconds(),
 	})
 	saveMistakes(res.mistakes)
+
+	if best, ok := bestWpm(previous, a.kind); ok && res.wpm() > best {
+		return personalBest{beaten: true, previous: best}
+	}
+
+	return personalBest{}
 }
 
 // exit restores the terminal, remembers the selected theme, prints the
