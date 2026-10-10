@@ -73,6 +73,10 @@ mistyped ones coming up more often. -n and -g apply.
 
 : Display WPM whilst typing.
 
+-showaccuracy
+
+: Display accuracy whilst typing.
+
 -theme *THEMEFILE*
 
 : The theme to use. 
@@ -82,6 +86,10 @@ mistyped ones coming up more often. -n and -g apply.
 -notheme
 
 : Attempt to use the default terminal theme. This may produce odd results depending on the theme colours.
+
+-notransparent
+
+: Disable transparent background.
 
 -blockcursor
 
@@ -104,6 +112,10 @@ mistyped ones coming up more often. -n and -g apply.
 -noskip
 
 : Disable word skipping when space is pressed.
+
+-nobackspace
+
+: Disable the backspace key.
 
 -blind
 
@@ -215,7 +227,7 @@ prints the output of each test to STDOUT in csv format.
 ```
 curl https://api.quotable.io/quotes|\
     jq '[.results[]|.text=.content|.attribution=.author][:2]'|\
-    tt -quotes - -norreport -csv
+    tt -quotes - -noreport -csv
 ```
 
 Starts a new typing test which uses the tt source as input:
