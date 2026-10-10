@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/gdamore/tcell"
@@ -79,8 +80,9 @@ Misc
     -list TYPE          Lists internal resources of the given type.
                         TYPE=[themes|quotes|words]
     -stats              Print statistics about the saved results: number of
-                        tests, personal best, averages over time, weekly trend
-                        and most mistyped words.
+                        tests, time spent typing, personal best, averages over
+                        time, weekly trend, results by kind of test and most
+                        mistyped words.
 
 Version
     -v                  Print the current version.
@@ -180,25 +182,25 @@ func parseFlags(args []string) options {
 }
 
 // newTestGenerator returns a function producing the successive tests
-// requested on the command line, or nil once there are no more. Text piped to
-// stdin is used unless stdin is a terminal.
-func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) func() []segment {
+// requested on the command line, or nil once there are no more, and what they
+// are made of. Text piped to stdin is used unless stdin is a terminal.
+func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func() []segment, testKind) {
 	switch {
 	case opts.wordFile != "":
-		return generateWordTest(opts.wordFile, opts.n, opts.g)
+		return generateWordTest(opts.wordFile, opts.n, opts.g), testKind{"words", filepath.Base(opts.wordFile)}
 	case opts.quoteFile != "":
-		return generateQuoteTest(opts.quoteFile)
+		return generateQuoteTest(opts.quoteFile), testKind{"quotes", filepath.Base(opts.quoteFile)}
 	case !stdinIsTerminal:
 		b, err := io.ReadAll(stdin)
 		if err != nil {
 			panic(err)
 		}
 
-		return generateTestFromData(b, opts.raw, opts.multi)
+		return generateTestFromData(b, opts.raw, opts.multi), testKind{"text", ""}
 	case len(opts.files) > 0:
-		return generateTestFromFile(opts.files[0], opts.startParagraph)
+		return generateTestFromFile(opts.files[0], opts.startParagraph), testKind{"file", filepath.Base(opts.files[0])}
 	default:
-		return generateWordTest("1000en", opts.n, opts.g)
+		return generateWordTest("1000en", opts.n, opts.g), testKind{"words", "1000en"}
 	}
 }
 
@@ -231,7 +233,7 @@ func main() {
 		}
 	}
 
-	testFn := newTestGenerator(opts, os.Stdin, isatty.IsTerminal(os.Stdin.Fd()))
+	testFn, kind := newTestGenerator(opts, os.Stdin, isatty.IsTerminal(os.Stdin.Fd()))
 
 	var err error
 	scr, err = tcell.NewScreen()
@@ -250,6 +252,6 @@ func main() {
 		}
 	}()
 
-	a := newApp(scr, opts)
+	a := newApp(scr, opts, kind)
 	a.exit(a.run(testFn))
 }

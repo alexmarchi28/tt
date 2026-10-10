@@ -11,14 +11,15 @@ import (
 // app runs the sequence of tests requested on the command line.
 type app struct {
 	opts    options
+	kind    testKind
 	scr     tcell.Screen
 	typer   *typer
 	results []result
 	theme   string // Theme to remember on exit, empty if none.
 }
 
-func newApp(scr tcell.Screen, opts options) *app {
-	a := &app{opts: opts, scr: scr}
+func newApp(scr tcell.Screen, opts options, kind testKind) *app {
+	a := &app{opts: opts, kind: kind, scr: scr}
 
 	if opts.noTheme {
 		a.typer = NewTyper(scr, true, terminalTheme)
@@ -124,7 +125,14 @@ func (a *app) record(res testResult) {
 	timestamp := time.Now().Unix()
 
 	a.results = append(a.results, result{res.wpm(), res.cpm(), res.accuracy(), timestamp, res.mistakes})
-	savePersistedResult(res.wpm(), res.accuracy(), timestamp)
+	savePersistedResult(persistedResult{
+		Wpm:       res.wpm(),
+		Accuracy:  res.accuracy(),
+		Timestamp: timestamp,
+		Mode:      a.kind.mode,
+		Source:    a.kind.source,
+		Duration:  res.duration.Seconds(),
+	})
 	saveMistakes(res.mistakes)
 }
 

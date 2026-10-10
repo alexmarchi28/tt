@@ -232,24 +232,29 @@ func TestNewTestGenerator(t *testing.T) {
 		stdin           string
 		stdinIsTerminal bool
 		check           func(t *testing.T, segments []segment)
+		kind            testKind
 	}{
-		{"default", nil, "", true, wordsPerSegment(50)},
-		{"word list", []string{"-words", "200en", "-n", "3", "-g", "2"}, "", true, wordsPerSegment(3, 3)},
+		{"default", nil, "", true, wordsPerSegment(50), testKind{"words", "1000en"}},
+		{"word list", []string{"-words", "200en", "-n", "3", "-g", "2"}, "", true, wordsPerSegment(3, 3), testKind{"words", "200en"}},
 		{"quotes", []string{"-quotes", "en"}, "", true, func(t *testing.T, segments []segment) {
 			if len(segments) != 1 || segments[0].Text == "" {
 				t.Errorf("got %q, want a quote", segments)
 			}
-		}},
-		{"stdin", nil, "piped text\n\nmore", false, exactly("piped text", "more")},
-		{"word list over stdin", []string{"-words", "200en", "-n", "4"}, "piped text", false, wordsPerSegment(4)},
-		{"file", []string{book}, "", true, exactly("first paragraph")},
-		{"stdin over file", []string{book}, "piped text", false, exactly("piped text")},
+		}, testKind{"quotes", "en"}},
+		{"stdin", nil, "piped text\n\nmore", false, exactly("piped text", "more"), testKind{"text", ""}},
+		{"word list over stdin", []string{"-words", "200en", "-n", "4"}, "piped text", false, wordsPerSegment(4), testKind{"words", "200en"}},
+		{"file", []string{book}, "", true, exactly("first paragraph"), testKind{"file", "book.txt"}},
+		{"stdin over file", []string{book}, "piped text", false, exactly("piped text"), testKind{"text", ""}},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			gen := newTestGenerator(parseFlags(tc.args), strings.NewReader(tc.stdin), tc.stdinIsTerminal)
+			gen, kind := newTestGenerator(parseFlags(tc.args), strings.NewReader(tc.stdin), tc.stdinIsTerminal)
 			tc.check(t, gen())
+
+			if kind != tc.kind {
+				t.Errorf("kind = %+v, want %+v", kind, tc.kind)
+			}
 		})
 	}
 }
@@ -279,5 +284,23 @@ func exactly(texts ...string) func(t *testing.T, segments []segment) {
 		if !reflect.DeepEqual(segments, want) {
 			t.Errorf("got %q, want %q", segments, want)
 		}
+	}
+}
+
+func TestTestKindString(t *testing.T) {
+	tests := map[testKind]string{
+		{"words", "1000en"}: "words 1000en",
+		{"text", ""}:        "text",
+		{}:                  "unknown",
+	}
+
+	for kind, want := range tests {
+		if got := kind.String(); got != want {
+			t.Errorf("%+v.String() = %q, want %q", kind, got, want)
+		}
+	}
+
+	if got := (persistedResult{Mode: "quotes", Source: "en"}).kind(); got != (testKind{"quotes", "en"}) {
+		t.Errorf("kind() = %+v, want quotes en", got)
 	}
 }

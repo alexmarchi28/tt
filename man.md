@@ -148,9 +148,10 @@ code, are typed with the tab key.
 
 **-stats**\
 
-    Print statistics about the saved results: number of tests, personal best,
-    average WPM and accuracy over the last hour, day, week and all time, trend
-    compared to the previous week and most mistyped words.
+    Print statistics about the saved results: number of tests, time spent
+    typing, personal best, average WPM and accuracy over the last hour, day,
+    week and all time, trend compared to the previous week, results by kind of
+    test (word list, quotes, file...) and most mistyped words.
 
 **-v**\
 

@@ -14,8 +14,8 @@ func TestSavePersistedResult(t *testing.T) {
 		t.Fatalf("reading missing results: err = %v, want a not-exist error", err)
 	}
 
-	savePersistedResult(60, 95.5, 1000)
-	savePersistedResult(72, 100, 2000)
+	savePersistedResult(persistedResult{Wpm: 60, Accuracy: 95.5, Timestamp: 1000})
+	savePersistedResult(persistedResult{Wpm: 72, Accuracy: 100, Timestamp: 2000, Mode: "quotes", Source: "en", Duration: 12.5})
 
 	got, err := readPersistedResults()
 	if err != nil {
@@ -24,7 +24,7 @@ func TestSavePersistedResult(t *testing.T) {
 
 	want := []persistedResult{
 		{Wpm: 60, Accuracy: 95.5, Timestamp: 1000},
-		{Wpm: 72, Accuracy: 100, Timestamp: 2000},
+		{Wpm: 72, Accuracy: 100, Timestamp: 2000, Mode: "quotes", Source: "en", Duration: 12.5},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("stored results = %+v, want %+v", got, want)
@@ -89,7 +89,7 @@ func TestRememberedTheme(t *testing.T) {
 func TestSavePersistedResultWithoutKeystrokes(t *testing.T) {
 	useTempStorage(t)
 
-	savePersistedResult(0, calcAccuracy(0, 0), 1000)
+	savePersistedResult(persistedResult{Wpm: 0, Accuracy: calcAccuracy(0, 0), Timestamp: 1000})
 
 	got, err := readPersistedResults()
 	if err != nil {
@@ -110,5 +110,18 @@ func TestWriteValueCreatesDirectories(t *testing.T) {
 	var got map[string]int
 	if err := readValue(path, &got); err != nil || got["x"] != 1 {
 		t.Errorf("read back %v (%v), want x = 1", got, err)
+	}
+}
+
+func TestReadResultsOfOlderVersions(t *testing.T) {
+	useTempStorage(t)
+
+	if err := os.WriteFile(resultsDB, []byte(`[{"wpm":60,"accuracy":95,"timestamp":1000}]`), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := readPersistedResults()
+	if want := []persistedResult{{Wpm: 60, Accuracy: 95, Timestamp: 1000}}; err != nil || !reflect.DeepEqual(got, want) {
+		t.Errorf("readPersistedResults() = %+v, %v, want %+v", got, err, want)
 	}
 }

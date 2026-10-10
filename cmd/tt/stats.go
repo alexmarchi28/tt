@@ -13,8 +13,9 @@ const week = 7 * 24 * time.Hour
 // summary aggregates a set of results.
 type summary struct {
 	count    int
-	wpm      float64 // Average WPM.
-	accuracy float64 // Average accuracy.
+	wpm      float64       // Average WPM.
+	accuracy float64       // Average accuracy.
+	duration time.Duration // Total time spent typing, as far as it is known.
 	best     persistedResult
 }
 
@@ -29,6 +30,7 @@ func summarize(results []persistedResult) summary {
 		s.count++
 		s.wpm += float64(r.Wpm)
 		s.accuracy += r.Accuracy
+		s.duration += time.Duration(r.Duration * float64(time.Second))
 	}
 
 	if s.count > 0 {
@@ -61,6 +63,46 @@ func before(results []persistedResult, t time.Time) []persistedResult {
 	}
 
 	return out
+}
+
+type kindSummary struct {
+	kind testKind
+	summary
+}
+
+// summarizeByKind summarizes the results of each kind of test, the most
+// frequent first.
+func summarizeByKind(results []persistedResult) []kindSummary {
+	groups := map[testKind][]persistedResult{}
+	for _, r := range results {
+		groups[r.kind()] = append(groups[r.kind()], r)
+	}
+
+	summaries := make([]kindSummary, 0, len(groups))
+	for kind, group := range groups {
+		summaries = append(summaries, kindSummary{kind, summarize(group)})
+	}
+
+	sort.Slice(summaries, func(i, j int) bool {
+		if summaries[i].count != summaries[j].count {
+			return summaries[i].count > summaries[j].count
+		}
+		return summaries[i].kind.String() < summaries[j].kind.String()
+	})
+
+	return summaries
+}
+
+// formatTypingTime formats d with a precision suited to its magnitude.
+func formatTypingTime(d time.Duration) string {
+	switch {
+	case d < time.Minute:
+		return fmt.Sprintf("%ds", int(d/time.Second))
+	case d < time.Hour:
+		return fmt.Sprintf("%dm %02ds", int(d/time.Minute), int(d%time.Minute/time.Second))
+	default:
+		return fmt.Sprintf("%dh %02dm", int(d/time.Hour), int(d%time.Hour/time.Minute))
+	}
 }
 
 type wordCount struct {
@@ -110,9 +152,19 @@ func formatStats(stored []persistedResult, mistakes []mistake, now time.Time) st
 	all := summarize(stored)
 	bestDate := time.Unix(all.best.Timestamp, 0).In(now.Location())
 
+	tests := fmt.Sprint(all.count)
+	if all.duration > 0 {
+		tests += fmt.Sprintf(" (%s of typing)", formatTypingTime(all.duration))
+	}
+
+	best := bestDate.Format("2006-01-02")
+	if all.best.Mode != "" {
+		best += ", " + all.best.kind().String()
+	}
+
 	fmt.Fprintln(&b, "Typing stats")
-	fmt.Fprintf(&b, "%-10s %d\n", "Tests", all.count)
-	fmt.Fprintf(&b, "%-10s %d wpm (%s)\n", "Best", all.best.Wpm, bestDate.Format("2006-01-02"))
+	fmt.Fprintf(&b, "%-10s %s\n", "Tests", tests)
+	fmt.Fprintf(&b, "%-10s %d wpm (%s)\n", "Best", all.best.Wpm, best)
 	fmt.Fprintln(&b, formatSummaryLine("Last hour", summarize(since(stored, now.Add(-time.Hour)))))
 	fmt.Fprintln(&b, formatSummaryLine("Last day", summarize(since(stored, now.Add(-24*time.Hour)))))
 	lastWeek := summarize(since(stored, now.Add(-week)))
@@ -122,6 +174,21 @@ func formatStats(stored []persistedResult, mistakes []mistake, now time.Time) st
 	previousWeek := summarize(before(since(stored, now.Add(-2*week)), now.Add(-week)))
 	if lastWeek.count > 0 && previousWeek.count > 0 {
 		fmt.Fprintf(&b, "%-10s %+.2f wpm compared to the previous week\n", "Trend", lastWeek.wpm-previousWeek.wpm)
+	}
+
+	if kinds := summarizeByKind(stored); len(kinds) > 1 {
+		width := 0
+		for _, k := range kinds {
+			if l := len(k.kind.String()); l > width {
+				width = l
+			}
+		}
+
+		fmt.Fprintln(&b, "\nBy test")
+		for _, k := range kinds {
+			fmt.Fprintf(&b, "%-*s  avg wpm %.2f, avg accuracy %.2f%% (%d tests), best %d wpm\n",
+				width, k.kind, k.wpm, k.accuracy, k.count, k.best.Wpm)
+		}
 	}
 
 	if words := mostMistyped(mistakes, 10); len(words) > 0 {

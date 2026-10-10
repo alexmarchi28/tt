@@ -16,7 +16,7 @@ func newTestApp(t *testing.T, opts options) (*app, tcell.SimulationScreen) {
 	useTempStorage(t)
 	sim := newSimScreen(t)
 
-	a := newApp(sim, opts)
+	a := newApp(sim, opts, testKind{"words", "test"})
 	a.typer.tty = io.Discard
 
 	return a, sim
@@ -73,7 +73,12 @@ func TestAppRecordsCompletedTests(t *testing.T) {
 
 	stored, err := readPersistedResults()
 	if err != nil || len(stored) != 2 {
-		t.Errorf("persisted results = %+v (%v), want 2", stored, err)
+		t.Fatalf("persisted results = %+v (%v), want 2", stored, err)
+	}
+	for _, r := range stored {
+		if r.Mode != "words" || r.Source != "test" || r.Duration <= 0 || r.Duration > 5 {
+			t.Errorf("persisted result %+v, want the kind of test and its duration", r)
+		}
 	}
 
 	// The mistake of the restarted attempt is not recorded.

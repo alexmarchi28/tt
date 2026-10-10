@@ -19,6 +19,15 @@ type persistedResult struct {
 	Wpm       int     `json:"wpm"`
 	Accuracy  float64 `json:"accuracy"`
 	Timestamp int64   `json:"timestamp"`
+
+	//The fields below are empty for results saved by older versions.
+	Mode     string  `json:"mode,omitempty"`     //See testKind.
+	Source   string  `json:"source,omitempty"`   //See testKind.
+	Duration float64 `json:"duration,omitempty"` //Seconds spent typing.
+}
+
+func (r persistedResult) kind() testKind {
+	return testKind{r.Mode, r.Source}
 }
 
 func init() {
@@ -101,7 +110,7 @@ func saveMistakes(mistakes []mistake) {
 	}
 }
 
-func savePersistedResult(wpm int, accuracy float64, timestamp int64) {
+func savePersistedResult(r persistedResult) {
 	stored, err := readPersistedResults()
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -111,11 +120,7 @@ func savePersistedResult(wpm int, accuracy float64, timestamp int64) {
 		}
 	}
 
-	stored = append(stored, persistedResult{
-		Wpm:       wpm,
-		Accuracy:  accuracy,
-		Timestamp: timestamp,
-	})
+	stored = append(stored, r)
 
 	if err := writePersistedResults(stored); err != nil {
 		panic(err)

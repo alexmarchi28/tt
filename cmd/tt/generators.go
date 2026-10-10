@@ -12,6 +12,23 @@ import (
 // session, each made of one or more segments. They return nil once there are
 // no more tests.
 
+// testKind describes where the text of the tests comes from.
+type testKind struct {
+	mode   string // words, quotes, file or text.
+	source string // The word list, quote file or file used, if any.
+}
+
+func (k testKind) String() string {
+	switch {
+	case k.mode == "":
+		return "unknown"
+	case k.source == "":
+		return k.mode
+	default:
+		return k.mode + " " + k.source
+	}
+}
+
 func generateWordTest(name string, n int, g int) func() []segment {
 	var b []byte
 
