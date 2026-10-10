@@ -618,11 +618,9 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 					}
 				}
 			case tcell.KeyRune:
-				if ev.Rune() == '?' {
+				if ev.Rune() == '?' && (idx >= len(text) || text[idx] != '?') {
 					t.showKeyboardHelp = !t.showKeyboardHelp
-					if idx >= len(text) || text[idx] != '?' {
-						continue
-					}
+					continue
 				}
 
 				if idx < len(text) {

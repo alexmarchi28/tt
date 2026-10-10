@@ -735,3 +735,19 @@ func TestTyperSpaceAtLineStartIsIgnored(t *testing.T) {
 	got = typeText(t, ty, sim, "ab\ncd", "ab cd")
 	assertOutcome(t, got, TyperComplete, 4, 4, 0, nil)
 }
+
+func TestTyperTypingQuestionMarkDoesNotToggleHelp(t *testing.T) {
+	ty, sim := newTestTyper(t)
+
+	done := startTyper(ty, []segment{{"why? because", ""}}, -1)
+	x, y := textOrigin(t, sim, "why? because")
+
+	sendKeys(t, sim, "why?")
+	waitForColors(t, sim, x, y, map[int]cellWant{3: {testHi, testBg, true}})
+	if strings.Contains(simulationScreenText(sim), "C-n - next theme") {
+		t.Error("typing a '?' that is part of the text toggled the help")
+	}
+
+	sendKeys(t, sim, tcell.KeyEscape)
+	waitOutcome(t, done)
+}
