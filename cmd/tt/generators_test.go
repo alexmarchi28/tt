@@ -13,7 +13,7 @@ import (
 )
 
 func TestGenerateTestFromDataRaw(t *testing.T) {
-	gen := generateTestFromData([]byte("one\n\ntwo  three\n"), true, false)
+	gen := mustGen(generateTestFromData([]byte("one\n\ntwo  three\n"), true, false))
 
 	for i := 0; i < 2; i++ {
 		want := []segment{{"one\n\ntwo  three\n", ""}}
@@ -24,7 +24,7 @@ func TestGenerateTestFromDataRaw(t *testing.T) {
 }
 
 func TestGenerateTestFromDataMulti(t *testing.T) {
-	gen := generateTestFromData([]byte("one\n\ntwo\nthree\n"), false, true)
+	gen := mustGen(generateTestFromData([]byte("one\n\ntwo\nthree\n"), false, true))
 
 	for _, want := range [][]segment{{{"one", ""}}, {{"two\nthree", ""}}, nil, nil} {
 		if got := gen(); !reflect.DeepEqual(got, want) {
@@ -34,7 +34,7 @@ func TestGenerateTestFromDataMulti(t *testing.T) {
 }
 
 func TestGenerateTestFromDataParagraphs(t *testing.T) {
-	gen := generateTestFromData([]byte("one\n\ntwo\nthree\n"), false, false)
+	gen := mustGen(generateTestFromData([]byte("one\n\ntwo\nthree\n"), false, false))
 
 	want := []segment{{"one", ""}, {"two\nthree", ""}}
 	for i := 0; i < 2; i++ {
@@ -48,7 +48,7 @@ func TestGenerateWordTest(t *testing.T) {
 	dir := useTempStorage(t)
 	writeUserResource(t, dir, "words", "greek", "alpha beta\tgamma\ndelta")
 
-	gen := generateWordTest("greek", wordOptions{n: 3, g: 2})
+	gen := mustGen(generateWordTest("greek", wordOptions{n: 3, g: 2}))
 	allowed := map[string]bool{"alpha": true, "beta": true, "gamma": true, "delta": true}
 
 	for i := 0; i < 20; i++ {
@@ -78,7 +78,7 @@ func TestGenerateWordTest(t *testing.T) {
 func TestGenerateWordTestUsesBuiltinLists(t *testing.T) {
 	useTempStorage(t)
 
-	gen := generateWordTest("1000en", wordOptions{n: 50, g: 1})
+	gen := mustGen(generateWordTest("1000en", wordOptions{n: 50, g: 1}))
 	for i := 0; i < 100; i++ {
 		segments := gen()
 		if len(segments) != 1 {
@@ -92,7 +92,7 @@ func TestGenerateWordTestIgnoresBlankEntries(t *testing.T) {
 	dir := useTempStorage(t)
 	writeUserResource(t, dir, "words", "blanks", "\n  alpha beta\n\ngamma\t\n")
 
-	gen := generateWordTest("blanks", wordOptions{n: 10, g: 1})
+	gen := mustGen(generateWordTest("blanks", wordOptions{n: 10, g: 1}))
 	for i := 0; i < 100; i++ {
 		assertWords(t, gen()[0].Text, 10)
 	}
@@ -121,7 +121,7 @@ func TestGenerateQuoteTest(t *testing.T) {
 		{"text": "second quote", "attribution": "someone else"}
 	]`)
 
-	gen := generateQuoteTest("mine")
+	gen := mustGen(generateQuoteTest("mine"))
 	seen := map[string]bool{}
 
 	for i := 0; i < 50; i++ {
@@ -147,7 +147,7 @@ func TestBuiltinQuotesAreValid(t *testing.T) {
 	useTempStorage(t)
 
 	for i := 0; i < 20; i++ {
-		if got := generateQuoteTest("en")(); len(got) != 1 || got[0].Text == "" {
+		if got := mustGen(generateQuoteTest("en"))(); len(got) != 1 || got[0].Text == "" {
 			t.Fatalf("unexpected builtin quote %q", got)
 		}
 	}
@@ -184,7 +184,7 @@ func TestGenerateTestFromFile(t *testing.T) {
 	useTempStorage(t)
 	path := writeTextFile(t, "p0\n\np1\nstill p1\n\np2\n")
 
-	gen := generateTestFromFile(path, -1)
+	gen := mustGen(generateTestFromFile(path, -1))
 	assertNextParagraph(t, gen, "p0")
 	assertNextParagraph(t, gen, "p1\nstill p1")
 	assertNextParagraph(t, gen, "p2")
@@ -195,24 +195,24 @@ func TestGenerateTestFromFileRemembersPosition(t *testing.T) {
 	useTempStorage(t)
 	path := writeTextFile(t, "p0\n\np1\n\np2\n")
 
-	gen := generateTestFromFile(path, -1)
+	gen := mustGen(generateTestFromFile(path, -1))
 	assertNextParagraph(t, gen, "p0")
 	assertNextParagraph(t, gen, "p1")
 
 	// A new run resumes from the paragraph that was last shown.
-	gen = generateTestFromFile(path, -1)
+	gen = mustGen(generateTestFromFile(path, -1))
 	assertNextParagraph(t, gen, "p1")
 	assertNextParagraph(t, gen, "p2")
 	assertNextParagraph(t, gen, "")
 
-	gen = generateTestFromFile(path, -1)
+	gen = mustGen(generateTestFromFile(path, -1))
 	assertNextParagraph(t, gen, "")
 
 	// -start overrides (and resets) the stored position.
-	gen = generateTestFromFile(path, 0)
+	gen = mustGen(generateTestFromFile(path, 0))
 	assertNextParagraph(t, gen, "p0")
 
-	gen = generateTestFromFile(path, 2)
+	gen = mustGen(generateTestFromFile(path, 2))
 	assertNextParagraph(t, gen, "p2")
 }
 
@@ -221,9 +221,9 @@ func TestGenerateTestFromFileTracksFilesSeparately(t *testing.T) {
 	a := writeTextFile(t, "a0\n\na1\n")
 	b := writeTextFile(t, "b0\n\nb1\n")
 
-	assertNextParagraph(t, generateTestFromFile(a, 1), "a1")
-	assertNextParagraph(t, generateTestFromFile(b, -1), "b0")
-	assertNextParagraph(t, generateTestFromFile(a, -1), "a1")
+	assertNextParagraph(t, mustGen(generateTestFromFile(a, 1)), "a1")
+	assertNextParagraph(t, mustGen(generateTestFromFile(b, -1)), "b0")
+	assertNextParagraph(t, mustGen(generateTestFromFile(a, -1)), "a1")
 }
 
 func TestNewTestGenerator(t *testing.T) {
@@ -263,7 +263,10 @@ func TestNewTestGenerator(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			gen, kind := newTestGenerator(parseFlags(tc.args), strings.NewReader(tc.stdin), tc.stdinIsTerminal)
+			gen, kind, err := newTestGenerator(parseFlags(tc.args), strings.NewReader(tc.stdin), tc.stdinIsTerminal)
+			if err != nil {
+				t.Fatal(err)
+			}
 			tc.check(t, gen())
 
 			if kind != tc.kind {
@@ -358,7 +361,7 @@ func TestGenerateMistakesTest(t *testing.T) {
 	}
 	saveTestMistakes(t, words...)
 
-	gen := generateMistakesTest(wordOptions{n: 50, g: 2})
+	gen := mustGen(generateMistakesTest(wordOptions{n: 50, g: 2}))
 	counts := map[string]int{}
 	for i := 0; i < 50; i++ {
 		segments := gen()
@@ -510,7 +513,7 @@ func TestGenerateWordTestDecorations(t *testing.T) {
 	dir := useTempStorage(t)
 	writeUserResource(t, dir, "words", "greek", "alpha beta gamma delta")
 
-	gen := generateWordTest("greek", wordOptions{n: 30, g: 2, punctuation: true, numbers: true})
+	gen := mustGen(generateWordTest("greek", wordOptions{n: 30, g: 2, punctuation: true, numbers: true}))
 	digits := false
 
 	for i := 0; i < 20; i++ {
@@ -529,4 +532,14 @@ func TestGenerateWordTestDecorations(t *testing.T) {
 	if !digits {
 		t.Error("no number in 40 segments")
 	}
+}
+
+// mustGen returns the generator made by a generate function, failing on
+// errors.
+func mustGen(gen func() []segment, err error) func() []segment {
+	if err != nil {
+		panic(err)
+	}
+
+	return gen
 }

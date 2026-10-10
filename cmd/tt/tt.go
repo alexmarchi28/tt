@@ -235,7 +235,7 @@ func (o options) validate() error {
 // newTestGenerator returns a function producing the successive tests
 // requested on the command line, or nil once there are no more, and what they
 // are made of. Text piped to stdin is used unless stdin is a terminal.
-func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func() []segment, testKind) {
+func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func() []segment, testKind, error) {
 	words := wordOptions{n: opts.n, g: opts.g, punctuation: opts.punct, numbers: opts.numbers}
 
 	switch {
@@ -244,24 +244,31 @@ func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func
 		if list == "" {
 			list = "1000en"
 		}
-		return generateAdaptiveTest(list, words), testKind{"adaptive", filepath.Base(list)}
+		gen, err := generateAdaptiveTest(list, words)
+		return gen, testKind{"adaptive", filepath.Base(list)}, err
 	case opts.wordFile != "":
-		return generateWordTest(opts.wordFile, words), testKind{"words", filepath.Base(opts.wordFile)}
+		gen, err := generateWordTest(opts.wordFile, words)
+		return gen, testKind{"words", filepath.Base(opts.wordFile)}, err
 	case opts.quoteFile != "":
-		return generateQuoteTest(opts.quoteFile), testKind{"quotes", filepath.Base(opts.quoteFile)}
+		gen, err := generateQuoteTest(opts.quoteFile)
+		return gen, testKind{"quotes", filepath.Base(opts.quoteFile)}, err
 	case opts.mistakes:
-		return generateMistakesTest(words), testKind{"mistakes", ""}
+		gen, err := generateMistakesTest(words)
+		return gen, testKind{"mistakes", ""}, err
 	case !stdinIsTerminal:
 		b, err := io.ReadAll(stdin)
 		if err != nil {
-			panic(err)
+			return nil, testKind{}, err
 		}
 
-		return generateTestFromData(b, opts.raw, opts.multi), testKind{"text", ""}
+		gen, err := generateTestFromData(b, opts.raw, opts.multi)
+		return gen, testKind{"text", ""}, err
 	case len(opts.files) > 0:
-		return generateTestFromFile(opts.files[0], opts.startParagraph), testKind{"file", filepath.Base(opts.files[0])}
+		gen, err := generateTestFromFile(opts.files[0], opts.startParagraph)
+		return gen, testKind{"file", filepath.Base(opts.files[0])}, err
 	default:
-		return generateWordTest("1000en", words), testKind{"words", "1000en"}
+		gen, err := generateWordTest("1000en", words)
+		return gen, testKind{"words", "1000en"}, err
 	}
 }
 
@@ -302,9 +309,11 @@ func main() {
 		}
 	}
 
-	testFn, kind := newTestGenerator(opts, os.Stdin, isatty.IsTerminal(os.Stdin.Fd()))
+	testFn, kind, err := newTestGenerator(opts, os.Stdin, isatty.IsTerminal(os.Stdin.Fd()))
+	if err != nil {
+		die("%v", err)
+	}
 
-	var err error
 	scr, err = tcell.NewScreen()
 	if err != nil {
 		panic(err)

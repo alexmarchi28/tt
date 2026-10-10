@@ -107,7 +107,7 @@ func TestGenerateAdaptiveTestFavoursWeakWords(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := drawShares(t, generateAdaptiveTest("list", wordOptions{n: 100, g: 4}))
+	got := drawShares(t, mustGen(generateAdaptiveTest("list", wordOptions{n: 100, g: 4})))
 
 	// Uniformly drawn every word would make a quarter of the test.
 	if got["the"] < 0.4 {
@@ -119,7 +119,7 @@ func TestGenerateAdaptiveTestWithoutStatistics(t *testing.T) {
 	dir := useTempStorage(t)
 	writeUserResource(t, dir, "words", "list", "the her err rare")
 
-	got := drawShares(t, generateAdaptiveTest("list", wordOptions{n: 100, g: 4}))
+	got := drawShares(t, mustGen(generateAdaptiveTest("list", wordOptions{n: 100, g: 4})))
 
 	for _, w := range []string{"the", "her", "err", "rare"} {
 		if got[w] < 0.18 || got[w] > 0.32 {

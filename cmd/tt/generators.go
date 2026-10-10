@@ -2,6 +2,8 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
+	"fmt"
 	"math"
 	"math/rand"
 	"os"
@@ -41,24 +43,28 @@ type wordOptions struct {
 	numbers     bool // Replace some of the words with numbers.
 }
 
-func generateWordTest(name string, o wordOptions) func() []segment {
-	words := loadWords(name)
-	return wordTest(func(n int) []string { return randomWords(n, words) }, o)
+func generateWordTest(name string, o wordOptions) (func() []segment, error) {
+	words, err := loadWords(name)
+	if err != nil {
+		return nil, err
+	}
+
+	return wordTest(func(n int) []string { return randomWords(n, words) }, o), nil
 }
 
 // loadWords returns the words of the named word list.
-func loadWords(name string) []string {
+func loadWords(name string) ([]string, error) {
 	b := readResource("words", name)
 	if b == nil {
-		die("%s does not appear to be a valid word list. See '-list words' for a list of builtin word lists.", name)
+		return nil, fmt.Errorf("%s does not appear to be a valid word list. See '-list words' for a list of builtin word lists.", name)
 	}
 
 	words := strings.Fields(string(b))
 	if len(words) == 0 {
-		die("%s does not contain any words.", name)
+		return nil, fmt.Errorf("%s does not contain any words.", name)
 	}
 
-	return words
+	return words, nil
 }
 
 // recentMistakes is the number of most recent mistakes practiced with
@@ -85,18 +91,18 @@ func weightedMistakes(mistakes []mistake, n int) []string {
 
 // generateMistakesTest practices the recently mistyped words, the most
 // frequently mistyped ones coming up more often.
-func generateMistakesTest(o wordOptions) func() []segment {
+func generateMistakesTest(o wordOptions) (func() []segment, error) {
 	var mistakes []mistake
 	if err := readValue(mistakeDB, &mistakes); err != nil && !os.IsNotExist(err) {
-		die("Could not read the recorded mistakes: %v", err)
+		return nil, fmt.Errorf("Could not read the recorded mistakes: %v", err)
 	}
 
 	words := weightedMistakes(mistakes, recentMistakes)
 	if len(words) == 0 {
-		die("There are no recorded mistakes to practice yet.")
+		return nil, errors.New("There are no recorded mistakes to practice yet.")
 	}
 
-	return wordTest(func(n int) []string { return randomWords(n, words) }, o)
+	return wordTest(func(n int) []string { return randomWords(n, words) }, o), nil
 }
 
 // wordTest makes tests of words drawn by draw.
@@ -205,31 +211,28 @@ func addNumbers(words []string) []string {
 	return out
 }
 
-func generateQuoteTest(name string) func() []segment {
+func generateQuoteTest(name string) (func() []segment, error) {
 	var quotes []segment
 
 	if b := readResource("quotes", name); b == nil {
-		die("%s does not appear to be a valid quote file. See '-list quotes' for a list of builtin quotes.", name)
-	} else {
-		err := json.Unmarshal(b, &quotes)
-		if err != nil {
-			die("Improperly formatted quote file: %v", err)
-		}
+		return nil, fmt.Errorf("%s does not appear to be a valid quote file. See '-list quotes' for a list of builtin quotes.", name)
+	} else if err := json.Unmarshal(b, &quotes); err != nil {
+		return nil, fmt.Errorf("Improperly formatted quote file: %v", err)
 	}
 
 	if len(quotes) == 0 {
-		die("%s does not contain any quotes.", name)
+		return nil, fmt.Errorf("%s does not contain any quotes.", name)
 	}
 
 	return func() []segment {
 		idx := rand.Int() % len(quotes)
 		return quotes[idx : idx+1]
-	}
+	}, nil
 }
 
-func generateTestFromData(data []byte, raw bool, split bool) func() []segment {
+func generateTestFromData(data []byte, raw bool, split bool) (func() []segment, error) {
 	if raw {
-		return func() []segment { return []segment{{string(data), ""}} }
+		return func() []segment { return []segment{{string(data), ""}} }, nil
 	} else if split {
 		paragraphs := getParagraphs(string(data))
 		i := 0
@@ -242,7 +245,7 @@ func generateTestFromData(data []byte, raw bool, split bool) func() []segment {
 			} else {
 				return nil
 			}
-		}
+		}, nil
 	} else {
 		return func() []segment {
 			var segments []segment
@@ -252,17 +255,16 @@ func generateTestFromData(data []byte, raw bool, split bool) func() []segment {
 			}
 
 			return segments
-		}
+		}, nil
 	}
 }
 
-func generateTestFromFile(path string, startParagraph int) func() []segment {
-	var paragraphs []string
+func generateTestFromFile(path string, startParagraph int) (func() []segment, error) {
 	var db map[string]int
 	var err error
 
 	if path, err = filepath.Abs(path); err != nil {
-		panic(err)
+		return nil, err
 	}
 
 	if err := readValue(fileStateDB, &db); err != nil {
@@ -272,17 +274,17 @@ func generateTestFromFile(path string, startParagraph int) func() []segment {
 	if startParagraph != -1 {
 		db[path] = startParagraph
 		if err := writeValue(fileStateDB, db); err != nil {
-			panic(err)
+			return nil, err
 		}
 	}
 
 	idx := db[path] - 1
 
-	if b, err := os.ReadFile(path); err != nil {
-		die("Failed to read %s.", path)
-	} else {
-		paragraphs = getParagraphs(string(b))
+	b, err := os.ReadFile(path)
+	if err != nil {
+		return nil, fmt.Errorf("Failed to read %s.", path)
 	}
+	paragraphs := getParagraphs(string(b))
 
 	return func() []segment {
 		idx++
@@ -296,5 +298,5 @@ func generateTestFromFile(path string, startParagraph int) func() []segment {
 		}
 
 		return []segment{{paragraphs[idx], ""}}
-	}
+	}, nil
 }

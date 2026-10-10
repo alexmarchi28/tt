@@ -124,8 +124,11 @@ func adaptiveFocus(ks keyStats) string {
 // generateAdaptiveTest draws words from the given word list, favouring those
 // with the pairs of letters typed the worst according to the latest key
 // statistics.
-func generateAdaptiveTest(name string, o wordOptions) func() []segment {
-	words := loadWords(name)
+func generateAdaptiveTest(name string, o wordOptions) (func() []segment, error) {
+	words, err := loadWords(name)
+	if err != nil {
+		return nil, err
+	}
 
 	return wordTest(func(n int) []string {
 		w := newWeaknesses(loadKeyStats())
@@ -140,5 +143,5 @@ func generateAdaptiveTest(name string, o wordOptions) func() []segment {
 		return drawWords(n, words, func() string {
 			return words[sort.SearchFloat64s(cumulative, rand.Float64()*total)]
 		})
-	}, o)
+	}, o), nil
 }
