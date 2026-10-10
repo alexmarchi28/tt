@@ -71,6 +71,7 @@ options.
 
  - `tt -quotes en` Starts quote mode with the builtin quote list 'en'.
  - `tt -mistakes` Practices the words you recently mistyped, the most frequent ones more often.
+ - `tt -adaptive` Practices the words containing the pairs of letters you miss or type slowly.
  - `tt -n 10 -g 5` produces a test consisting of 50 randomly drawn words in 5 groups of 10 words each.
  - `tt -punct -numbers` adds capital letters, punctuation and numbers to the words.
  - `tt -t 10` starts a timed test lasting 10 seconds.

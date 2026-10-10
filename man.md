@@ -44,7 +44,14 @@ usage: tt \[OPTION\]... \[FILE\]
 : Practice the words mistyped in the last 500 mistakes, the most frequently
 mistyped ones coming up more often. -n and -g apply.
 
-## Word Mode (also applies to -mistakes)
+-adaptive
+
+: Practice the words of the word list (see -words) containing the pairs of
+letters you miss the most or type the slowest compared to the others, as
+recorded during the previous tests. The pairs being practiced are shown at
+the top of the screen. -n and -g apply.
+
+## Word Mode (also applies to -mistakes and -adaptive)
 
 -n *GROUPSZ*
 

@@ -257,6 +257,8 @@ func TestNewTestGenerator(t *testing.T) {
 			}
 		}, testKind{"words", "1000en"}},
 		{"mistakes over stdin", []string{"-mistakes", "-n", "2"}, "piped text", false, exactly("ab ab"), testKind{"mistakes", ""}},
+		{"adaptive", []string{"-adaptive", "-n", "5"}, "", true, wordsPerSegment(5), testKind{"adaptive", "1000en"}},
+		{"adaptive word list", []string{"-adaptive", "-words", "200en", "-n", "5"}, "piped text", false, wordsPerSegment(5), testKind{"adaptive", "200en"}},
 	}
 
 	for _, tc := range tests {

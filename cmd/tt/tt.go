@@ -38,8 +38,11 @@ Modes
 
     -mistakes           Practice the recently mistyped words, the most
                         frequently mistyped ones coming up more often.
+    -adaptive           Practice the words of the word list (see -words) with
+                        the pairs of letters you type the slowest or miss the
+                        most.
 
-Word Mode (also applies to -mistakes)
+Word Mode (also applies to -mistakes and -adaptive)
     -n GROUPSZ          Sets the number of words which constitute a group.
     -g NGROUPS          Sets the number of groups which constitute a test.
     -punct              Turn the words into sentences with capital letters
@@ -118,6 +121,7 @@ type options struct {
 
 	themeExplicit      bool // Whether -theme was given.
 	mistakes           bool
+	adaptive           bool
 	punct              bool
 	numbers            bool
 	showWpm            bool
@@ -161,6 +165,7 @@ func parseFlags(args []string) options {
 	fs.StringVar(&opts.wordFile, "words", "", "")
 	fs.StringVar(&opts.quoteFile, "quotes", "", "")
 	fs.BoolVar(&opts.mistakes, "mistakes", false, "")
+	fs.BoolVar(&opts.adaptive, "adaptive", false, "")
 	fs.BoolVar(&opts.punct, "punct", false, "")
 	fs.BoolVar(&opts.numbers, "numbers", false, "")
 
@@ -215,6 +220,12 @@ func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func
 	words := wordOptions{n: opts.n, g: opts.g, punctuation: opts.punct, numbers: opts.numbers}
 
 	switch {
+	case opts.adaptive:
+		list := opts.wordFile
+		if list == "" {
+			list = "1000en"
+		}
+		return generateAdaptiveTest(list, words), testKind{"adaptive", filepath.Base(list)}
 	case opts.wordFile != "":
 		return generateWordTest(opts.wordFile, words), testKind{"words", filepath.Base(opts.wordFile)}
 	case opts.quoteFile != "":

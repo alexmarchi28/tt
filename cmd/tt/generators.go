@@ -18,7 +18,7 @@ import (
 
 // testKind describes where the text of the tests comes from.
 type testKind struct {
-	mode   string // words, quotes, mistakes, file or text.
+	mode   string // words, quotes, mistakes, adaptive, file or text.
 	source string // The word list, quote file or file used, if any.
 }
 
@@ -42,9 +42,14 @@ type wordOptions struct {
 }
 
 func generateWordTest(name string, o wordOptions) func() []segment {
-	var b []byte
+	words := loadWords(name)
+	return wordTest(func(n int) []string { return randomWords(n, words) }, o)
+}
 
-	if b = readResource("words", name); b == nil {
+// loadWords returns the words of the named word list.
+func loadWords(name string) []string {
+	b := readResource("words", name)
+	if b == nil {
 		die("%s does not appear to be a valid word list. See '-list words' for a list of builtin word lists.", name)
 	}
 
@@ -53,7 +58,7 @@ func generateWordTest(name string, o wordOptions) func() []segment {
 		die("%s does not contain any words.", name)
 	}
 
-	return wordTest(func(n int) []string { return randomWords(n, words) }, o)
+	return words
 }
 
 // recentMistakes is the number of most recent mistakes practiced with

@@ -84,6 +84,10 @@ func (a *app) run(testFn func() []segment) int {
 			}
 		}
 
+		if a.kind.mode == "adaptive" {
+			a.typer.ShowStatusMessage(adaptiveFocus(loadKeyStats()), 0)
+		}
+
 		res := a.typer.Start(tests[idx], a.opts.timeout)
 
 		switch res.rc {
