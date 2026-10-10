@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"runtime"
-	"strconv"
 	"time"
 
 	"github.com/gdamore/tcell"
@@ -278,14 +276,13 @@ func (t *typer) Start(text []segment, timeout time.Duration) (res testResult) {
 	return
 }
 
-func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, attribution string) testResult {
-	var startTime time.Time
-	state := newTypingState(s)
-
-	sw, sh := t.Scr.Size()
-	nc, nr := calcStringDimensions(s)
-	x := (sw - nc) / 2
-	y := (sh - nr) / 2
+// start runs the typing of a single segment. The timer starts with the first
+// key press, unless startImmediately is set.
+func (t *typer) start(text string, timeLimit time.Duration, startImmediately bool, attribution string) testResult {
+	s := t.newSession(text, timeLimit, attribution)
+	if startImmediately {
+		s.startTimer()
+	}
 
 	if !t.BlockCursor {
 		t.tty.Write([]byte("\033[5 q"))
@@ -297,82 +294,38 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 
 	t.Scr.SetStyle(t.defaultStyle)
 
-	result := func() testResult {
-		//The timer never starts if nothing had to be typed.
-		var duration time.Duration
-		if !startTime.IsZero() {
-			duration = t.now().Sub(startTime)
-		}
+	stopTicker := t.startTicker()
+	defer stopTicker()
 
-		return testResult{
-			rc:           TyperComplete,
-			duration:     duration,
-			correctChars: state.correctChars(),
-			correctKeys:  state.correctKeys,
-			wrongKeys:    state.wrongKeys,
-			mistakes:     state.mistakes(),
-			keystrokes:   state.keystrokes,
-		}
-	}
+	t.Scr.Clear()
+	for {
+		s.redraw()
 
-	startTimer := func() {
-		if startTime.IsZero() {
-			startTime = t.now()
+		switch ev := t.Scr.PollEvent().(type) {
+		case *tcell.EventResize:
+			return testResult{rc: TyperResize}
+		case *tcell.EventKey:
+			if res, ended := s.handleKey(ev); ended {
+				return res
+			}
+		default: //tick
+			if s.timeUp() {
+				return s.result()
+			}
 		}
 	}
+}
 
-	//handleRune types a character and reports whether the text is complete.
-	handleRune := func(r rune) bool {
-		if !state.done() {
-			startTimer()
-			state.typeRune(r, t.SkipWord, t.now().Sub(startTime))
-		}
-
-		return state.done()
-	}
-
-	redraw := func() {
-		pace := -1
-		if t.Pace > 0 && !startTime.IsZero() {
-			pace = paceIndex(state.text, t.now().Sub(startTime), t.Pace)
-		}
-
-		t.clearKeyboardHelpArea(sw, sh)
-		t.drawText(state, x, y, pace)
-
-		aw, ah := calcStringDimensions(attribution)
-		drawString(t.Scr, x+nc-aw, y+nr+1, attribution, t.defaultStyle)
-
-		if timeLimit != -1 && !startTime.IsZero() {
-			remaining := timeLimit - t.now().Sub(startTime)
-			drawString(t.Scr, x+nc/2, y+nr+ah+1, "      ", t.defaultStyle)
-			drawString(t.Scr, x+nc/2, y+nr+ah+1, strconv.Itoa(int(remaining/1e9)+1), t.defaultStyle)
-		}
-
-		if (t.ShowWpm || t.ShowAccuracy) && !startTime.IsZero() {
-			t.drawLiveStats(x+nc/2-4, y-2, result())
-		}
-
-		t.drawStatusMessage(sw, sh)
-
-		if t.showKeyboardHelp {
-			t.drawKeyboardHelp(sw, sh)
-		}
-
-		//Potentially inefficient, but seems to be good enough
-
-		t.Scr.Show()
-	}
-
-	tickerCloser := make(chan bool)
-
+// startTicker injects nil events into the event loop at regular intervals to
+// update the screen, until the returned function is called.
+func (t *typer) startTicker() (stop func()) {
+	done := make(chan struct{})
 	tick := t.refreshInterval()
 
-	//Inject nil events into the main event loop at regular invervals to force an update
-	ticker := func() {
+	go func() {
 		for {
 			select {
-			case <-tickerCloser:
+			case <-done:
 				return
 			default:
 			}
@@ -380,82 +333,9 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 			time.Sleep(tick)
 			t.Scr.PostEventWait(nil)
 		}
-	}
+	}()
 
-	go ticker()
-	defer close(tickerCloser)
-
-	if startImmediately {
-		startTime = t.now()
-	}
-
-	t.Scr.Clear()
-	for {
-		redraw()
-
-		switch ev := t.Scr.PollEvent().(type) {
-		case *tcell.EventResize:
-			return testResult{rc: TyperResize}
-		case *tcell.EventKey:
-			if runtime.GOOS != "windows" && ev.Key() == tcell.KeyBackspace { //Control+backspace on unix terms
-				if !t.DisableBackspace {
-					startTimer()
-					state.deleteWord()
-				}
-				continue
-			}
-
-			switch ev.Key() {
-			case tcell.KeyCtrlC:
-				return testResult{rc: TyperSigInt}
-			case tcell.KeyEscape:
-				return testResult{rc: TyperEscape}
-			case tcell.KeyRight:
-				return testResult{rc: TyperNext}
-			case tcell.KeyLeft:
-				return testResult{rc: TyperPrevious}
-			case tcell.KeyCtrlL:
-				t.Scr.Sync()
-			case tcell.KeyCtrlN:
-				t.cycleTheme(1)
-			case tcell.KeyCtrlP:
-				t.cycleTheme(-1)
-			case tcell.KeyCtrlW:
-				if !t.DisableBackspace {
-					startTimer()
-					state.deleteWord()
-				}
-			case tcell.KeyBackspace, tcell.KeyBackspace2:
-				if !t.DisableBackspace {
-					startTimer()
-					if ev.Modifiers() == tcell.ModAlt || ev.Modifiers() == tcell.ModCtrl {
-						state.deleteWord()
-					} else {
-						state.backspace()
-					}
-				}
-			case tcell.KeyTab:
-				if handleRune('\t') {
-					return result()
-				}
-			case tcell.KeyRune:
-				if ev.Rune() == '?' && !state.expects('?') {
-					t.showKeyboardHelp = !t.showKeyboardHelp
-					continue
-				}
-
-				if handleRune(ev.Rune()) {
-					return result()
-				}
-			}
-		default: //tick
-			if timeLimit != -1 && !startTime.IsZero() && timeLimit <= t.now().Sub(startTime) {
-				return result()
-			}
-
-			redraw()
-		}
-	}
+	return func() { close(done) }
 }
 
 // refreshInterval returns the interval between screen updates. The pacer
