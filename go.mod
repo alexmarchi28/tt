@@ -1,6 +1,6 @@
 module tt
 
-go 1.17
+go 1.20
 
 require (
 	github.com/gdamore/tcell v1.4.0
