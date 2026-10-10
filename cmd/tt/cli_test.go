@@ -66,9 +66,9 @@ func writeFile(t *testing.T, path, content string) {
 func TestCLIVersion(t *testing.T) {
 	got := runCLI(t, t.TempDir(), nil, "-v")
 
-	want := cliResult{"tt version 0.4.4\n", "", 0}
-	if got != want {
-		t.Errorf("tt -v = %+v, want %+v", got, want)
+	// The version itself comes from the build, see TestResolveVersion.
+	if got.code != 0 || got.stderr != "" || !strings.HasPrefix(got.stdout, "tt version ") {
+		t.Errorf("tt -v = %+v, want the version on stdout", got)
 	}
 }
 

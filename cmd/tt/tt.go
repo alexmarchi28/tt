@@ -36,7 +36,7 @@ func main() {
 	}
 
 	if opts.version {
-		fmt.Println("tt version 0.4.4")
+		fmt.Println("tt version " + versionString())
 		os.Exit(0)
 	}
 

@@ -1,9 +1,13 @@
 DESTDIR :=
 PREFIX := /usr/local
 
+# The version shown by tt -v, taken from the latest tag.
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null)
+GOBUILD := CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)"
+
 .PHONY: all
 all:
-	go build -o bin/tt ./cmd/tt
+	$(GOBUILD) -o bin/tt ./cmd/tt
 
 .PHONY: install
 install:
