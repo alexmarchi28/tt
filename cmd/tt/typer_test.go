@@ -359,46 +359,66 @@ func TestTyperMultipleSegments(t *testing.T) {
 
 func TestTyperTimeout(t *testing.T) {
 	ty, sim := newTestTyper(t)
+	clock := useFakeClock(ty)
 
-	done := startTyper(ty, []segment{{"alpha beta", ""}}, 300*time.Millisecond)
+	done := startTyper(ty, []segment{{"alpha beta", ""}}, 10*time.Second)
+	x, y := textOrigin(t, sim, "alpha beta")
+
 	sendKeys(t, sim, "alx")
-	got := waitOutcome(t, done)
+	waitForColors(t, sim, x, y, map[int]cellWant{2: {testErrCol, testBg, false}})
+	clock.advance(10 * time.Second)
 
+	got := waitOutcome(t, done)
 	assertOutcome(t, got, TyperComplete, 2, 2, 1, []mistake{{"alp", "alx"}})
-	if got.duration < 300*time.Millisecond {
-		t.Errorf("duration = %v, want at least the time limit", got.duration)
+	if got.duration != 10*time.Second {
+		t.Errorf("duration = %v, want the time limit", got.duration)
 	}
 }
 
 func TestTyperTimeoutSpansSegments(t *testing.T) {
 	ty, sim := newTestTyper(t)
+	clock := useFakeClock(ty)
 
 	// The time spent on the first segment is subtracted from the time
-	// available for the second one. The limit is only checked every 500ms,
-	// hence the generous margins.
-	timeout := 1500 * time.Millisecond
-	done := startTyper(ty, []segment{{"ab", ""}, {"cd ef", ""}}, timeout)
-	sendKeys(t, sim, "a")
-	time.Sleep(1100 * time.Millisecond)
-	sendKeys(t, sim, "b", "c")
-	got := waitOutcome(t, done)
+	// available for the second one.
+	done := startTyper(ty, []segment{{"ab", ""}, {"cd ef", ""}}, 10*time.Second)
+	x, y := textOrigin(t, sim, "ab")
 
-	if got.rc != TyperComplete || got.correctChars != 3 {
-		t.Errorf("got %+v, want rc %d and 3 correct characters", got, TyperComplete)
-	}
-	if got.duration < timeout || got.duration > timeout+600*time.Millisecond {
-		t.Errorf("duration = %v, want about %v", got.duration, timeout)
+	sendKeys(t, sim, "a")
+	waitForColors(t, sim, x, y, map[int]cellWant{0: {testHi, testBg, true}})
+	clock.advance(7 * time.Second)
+	sendKeys(t, sim, "b")
+
+	// Later segments start right away, not at their first key press.
+	x, y = textOrigin(t, sim, "cd ef")
+	clock.advance(time.Second)
+	sendKeys(t, sim, "c")
+	waitForColors(t, sim, x, y, map[int]cellWant{0: {testHi, testBg, true}})
+	clock.advance(2 * time.Second)
+
+	got := waitOutcome(t, done)
+	if got.rc != TyperComplete || got.correctChars != 3 || got.duration != 10*time.Second {
+		t.Errorf("got %+v, want the test to end after 10s with 3 characters", got)
 	}
 }
 
 func TestTyperTimerStartsOnFirstKey(t *testing.T) {
 	ty, sim := newTestTyper(t)
+	clock := useFakeClock(ty)
 
-	done := startTyper(ty, []segment{{"ab", ""}}, 200*time.Millisecond)
-	time.Sleep(700 * time.Millisecond)
+	done := startTyper(ty, []segment{{"ab", ""}}, 2*time.Second)
+	textOrigin(t, sim, "ab")
+
+	// Time passing before the first key doesn't count.
+	clock.advance(5 * time.Second)
+	time.Sleep(50 * time.Millisecond)
 	sendKeys(t, sim, "ab")
 
-	assertOutcome(t, waitOutcome(t, done), TyperComplete, 2, 2, 0, nil)
+	got := waitOutcome(t, done)
+	assertOutcome(t, got, TyperComplete, 2, 2, 0, nil)
+	if got.duration != 0 {
+		t.Errorf("duration = %v, want 0 as the clock didn't move while typing", got.duration)
+	}
 }
 
 // textOrigin returns the screen position of the first character of text.
@@ -612,22 +632,28 @@ func TestTyperShowsLiveStats(t *testing.T) {
 	ty, sim := newTestTyper(t)
 	ty.ShowWpm = true
 	ty.ShowAccuracy = true
+	clock := useFakeClock(ty)
 
 	done := startTyper(ty, []segment{{"ab cd ef", ""}}, -1)
-	waitForScreenText(t, sim, "ab cd ef", true)
+	x, y := textOrigin(t, sim, "ab cd ef")
 	if strings.Contains(simulationScreenText(sim), "WPM:") {
 		t.Error("WPM shown before the test started")
 	}
 
+	// One correct character in a second is 60 cpm, 12 wpm.
 	sendKeys(t, sim, "ax")
+	waitForColors(t, sim, x, y, map[int]cellWant{1: {testErrCol, testBg, false}})
+	clock.advance(time.Second)
 	waitForScreenText(t, sim, "Accuracy: 50.00%", true)
-	waitForScreenText(t, sim, "WPM: ", true)
+	waitForScreenText(t, sim, "WPM: 12 ", true)
 
 	sendKeys(t, sim, tcell.KeyEscape)
 	waitOutcome(t, done)
 
 	done = startTyper(ty, []segment{{"ab cd ef", ""}}, -1)
 	sendKeys(t, sim, "ab")
+	waitForColors(t, sim, x, y, map[int]cellWant{1: {testHi, testBg, true}})
+	clock.advance(time.Second)
 	waitForScreenText(t, sim, "Accuracy: 100%", true)
 
 	sendKeys(t, sim, tcell.KeyEscape)
@@ -844,23 +870,6 @@ func TestTyperMeasuresTimeWithItsClock(t *testing.T) {
 	got := waitOutcome(t, done)
 	if got.duration != time.Minute || got.cpm() != 5 || got.wpm() != 1 {
 		t.Errorf("duration %v, cpm %d, wpm %d, want 1m, 5 and 1", got.duration, got.cpm(), got.wpm())
-	}
-}
-
-func TestTyperTimeLimitWithFakeClock(t *testing.T) {
-	ty, sim := newTestTyper(t)
-	clock := useFakeClock(ty)
-
-	done := startTyper(ty, []segment{{"abcde", ""}}, 10*time.Second)
-	x, y := textOrigin(t, sim, "abcde")
-
-	sendKeys(t, sim, "ab")
-	waitForColors(t, sim, x, y, map[int]cellWant{1: {testHi, testBg, true}})
-	clock.advance(10 * time.Second)
-
-	got := waitOutcome(t, done)
-	if got.rc != TyperComplete || got.duration != 10*time.Second || got.correctChars != 2 {
-		t.Errorf("got %+v, want the test to end after 10s with 2 characters", got)
 	}
 }
 
