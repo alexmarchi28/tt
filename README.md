@@ -3,25 +3,34 @@ https://github.com/user-attachments/assets/f8582968-4dd2-4ee1-930c-8107469b3cfd
 
 # What
 
-A terminal based typing test.
+A terminal based typing test, to measure and improve your typing speed.
+
+tt was originally written by Aetnaeus ([lemnos/tt](https://github.com/lemnos/tt)).
 
 # Installation
+
+Binaries for Linux, macOS and Windows are attached to the [latest release](https://github.com/alexmarchi28/tt/releases/latest),
+along with the man page.
 
 ## Linux
 
 ```
-sudo curl -L https://github.com/lemnos/tt/releases/download/v0.4.2/tt-linux -o /usr/local/bin/tt && sudo chmod +x /usr/local/bin/tt
-sudo curl -o /usr/share/man/man1/tt.1.gz -L https://github.com/lemnos/tt/releases/download/v0.4.2/tt.1.gz
+sudo curl -L https://github.com/alexmarchi28/tt/releases/latest/download/tt-linux-amd64 -o /usr/local/bin/tt && sudo chmod +x /usr/local/bin/tt
+sudo curl -L https://github.com/alexmarchi28/tt/releases/latest/download/tt.1.gz -o /usr/share/man/man1/tt.1.gz
 ```
 
-## OSX
+On ARM machines (e.g. a Raspberry Pi) use `tt-linux-arm64` or `tt-linux-arm`.
+
+## macOS
 
 ```
 mkdir -p /usr/local/bin /usr/local/share/man/man1 # Usually created by brew
 
-sudo curl -L https://github.com/lemnos/tt/releases/download/v0.4.2/tt-osx -o /usr/local/bin/tt && sudo chmod +x /usr/local/bin/tt
-sudo curl -o /usr/local/share/man/man1/tt.1.gz -L https://github.com/lemnos/tt/releases/download/v0.4.2/tt.1.gz
+sudo curl -L https://github.com/alexmarchi28/tt/releases/latest/download/tt-darwin-arm64 -o /usr/local/bin/tt && sudo chmod +x /usr/local/bin/tt
+sudo curl -L https://github.com/alexmarchi28/tt/releases/latest/download/tt.1.gz -o /usr/local/share/man/man1/tt.1.gz
 ```
+
+On Intel Macs use `tt-darwin-amd64`.
 
 ## Uninstall
 
@@ -29,14 +38,24 @@ sudo curl -o /usr/local/share/man/man1/tt.1.gz -L https://github.com/lemnos/tt/r
 sudo rm /usr/local/bin/tt /usr/share/man/man1/tt.1.gz
 ```
 
+The man page is in `/usr/local/share/man/man1` on macOS.
+
+## With Go
+
+```
+go install github.com/alexmarchi28/tt/cmd/tt@latest
+```
+
 ## From source
+
+tt needs Go 1.20 or later.
 
 ```
 # debian dependencies
 sudo apt install golang
 
 # clone and make
-git clone https://github.com/lemnos/tt
+git clone https://github.com/alexmarchi28/tt
 cd tt
 make && sudo make install
 ```
