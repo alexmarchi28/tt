@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -213,6 +214,24 @@ func parseFlags(args []string) options {
 	return opts
 }
 
+// validate checks the numeric options.
+func (o options) validate() error {
+	switch {
+	case o.n < 1:
+		return errors.New("-n must be at least 1")
+	case o.g < 1:
+		return errors.New("-g must be at least 1")
+	case o.maxLineLen < 1:
+		return errors.New("-w must be at least 1")
+	case o.timeout != -1 && o.timeout < time.Second:
+		return errors.New("-t must be at least 1")
+	case o.pace < 0:
+		return errors.New("-pace can't be negative")
+	}
+
+	return nil
+}
+
 // newTestGenerator returns a function producing the successive tests
 // requested on the command line, or nil once there are no more, and what they
 // are made of. Text piped to stdin is used unless stdin is a terminal.
@@ -248,6 +267,9 @@ func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func
 
 func main() {
 	opts := parseFlags(os.Args[1:])
+	if err := opts.validate(); err != nil {
+		die("%v", err)
+	}
 
 	if opts.listType != "" {
 		for _, name := range listResourceNames(opts.listType) {

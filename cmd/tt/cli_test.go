@@ -315,3 +315,35 @@ func TestCLIKeys(t *testing.T) {
 		t.Errorf("tt -keys -layout nope = %+v, want an error", got)
 	}
 }
+
+func TestCLIRejectsInvalidNumbers(t *testing.T) {
+	tests := []struct {
+		args []string
+		want string
+	}{
+		{[]string{"-n", "-5"}, "-n must be at least 1"},
+		{[]string{"-n", "0"}, "-n must be at least 1"},
+		{[]string{"-g", "-1"}, "-g must be at least 1"},
+		{[]string{"-g", "0"}, "-g must be at least 1"},
+		{[]string{"-w", "0"}, "-w must be at least 1"},
+		{[]string{"-t", "0"}, "-t must be at least 1"},
+		{[]string{"-t", "-5"}, "-t must be at least 1"},
+		{[]string{"-pace", "-10"}, "-pace can't be negative"},
+	}
+
+	for _, tc := range tests {
+		got := runCLI(t, t.TempDir(), nil, tc.args...)
+		if want := (cliResult{"", "ERROR: " + tc.want + "\n", 1}); got != want {
+			t.Errorf("tt %s = %+v, want %+v", strings.Join(tc.args, " "), got, want)
+		}
+	}
+}
+
+func TestOptionsValidate(t *testing.T) {
+	valid := [][]string{nil, {"-n", "1", "-g", "1", "-w", "1", "-t", "1", "-pace", "0"}, {"-t", "-1"}}
+	for _, args := range valid {
+		if err := parseFlags(args).validate(); err != nil {
+			t.Errorf("%q: unexpected error %v", args, err)
+		}
+	}
+}
