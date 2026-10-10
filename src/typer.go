@@ -244,98 +244,9 @@ func (t *typer) Start(text []segment, timeout time.Duration) (ncorrect int, dura
 	return
 }
 
-func extractMistypedWords(text []rune, typed []rune) (mistakes []mistake) {
-	var w []rune
-	var t []rune
-	f := false
-
-	for i := range text {
-		if isWordSeparator(text[i]) {
-			if f {
-				mistakes = append(mistakes, mistake{string(w), string(t)})
-			}
-
-			w = w[:0]
-			t = t[:0]
-			f = false
-			continue
-		}
-
-		if text[i] != typed[i] {
-			f = true
-		}
-
-		if text[i] == 0 {
-			w = append(w, '_')
-		} else {
-			w = append(w, text[i])
-		}
-
-		if typed[i] == 0 {
-			t = append(t, '_')
-		} else {
-			t = append(t, typed[i])
-		}
-	}
-
-	if f {
-		mistakes = append(mistakes, mistake{string(w), string(t)})
-	}
-
-	return
-}
-
-func isWordSeparator(r rune) bool {
-	return r == ' ' || r == '\n'
-}
-
-func highlightWordPositions(text []rune, idx int) []int {
-	positions := make([]int, len(text))
-	for i := range positions {
-		positions[i] = -1
-	}
-
-	if idx < 0 || idx >= len(text) {
-		return positions
-	}
-
-	wordPos := -1
-	insideWord := false
-
-	for i, r := range text {
-		if i == idx {
-			if isWordSeparator(r) {
-				wordPos = 1
-				insideWord = false
-			} else {
-				wordPos = 0
-				insideWord = true
-			}
-		}
-
-		if i < idx || wordPos == -1 {
-			continue
-		}
-
-		if isWordSeparator(r) {
-			if insideWord {
-				wordPos++
-				insideWord = false
-			}
-			continue
-		}
-
-		insideWord = true
-		positions[i] = wordPos
-	}
-
-	return positions
-}
-
 func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, attribution string) (ncorrect int, rc int, duration time.Duration, mistakes []mistake, correctChar int, errorChar int) {
 	var startTime time.Time
-	text := []rune(s)
-	typed := make([]rune, len(text))
+	state := newTypingState(s)
 
 	sw, sh := t.Scr.Size()
 	nc, nr := calcStringDimensions(s)
@@ -351,66 +262,25 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 	}
 
 	t.Scr.SetStyle(t.defaultStyle)
-	idx := 0
 
 	calcStats := func() {
-		ncorrect = 0
-
-		mistakes = extractMistypedWords(text[:idx], typed[:idx])
-
-		for i := 0; i < idx; i++ {
-			if text[i] != '\n' {
-				if text[i] == typed[i] {
-					ncorrect++
-				}
-			}
-		}
-
+		ncorrect = state.correctChars()
+		mistakes = state.mistakes()
+		correctChar = state.correctKeys
+		errorChar = state.wrongKeys
 		rc = TyperComplete
 		duration = time.Since(startTime)
 	}
 
-	redraw := func() {
-		cx := x
-		cy := y
-		wordPositions := highlightWordPositions(text, idx)
-
-		t.clearKeyboardHelpArea(sw, sh)
-
-		for i := range text {
-			style := t.defaultStyle
-
-			if text[i] == '\n' {
-				cy++
-				cx = x
-				continue
-			}
-
-			if i == idx {
-				t.Scr.ShowCursor(cx, cy)
-			}
-
-			if i >= idx {
-				if wordPositions[i] == 0 {
-					style = t.currentWordStyle
-				} else if wordPositions[i] == 1 {
-					style = t.nextWordStyle
-				} else {
-					style = t.defaultStyle
-				}
-			} else if text[i] != typed[i] {
-				if text[i] == ' ' {
-					style = t.incorrectSpaceStyle
-				} else {
-					style = t.incorrectStyle
-				}
-			} else {
-				style = t.correctStyle
-			}
-
-			t.Scr.SetContent(cx, cy, text[i], nil, style)
-			cx++
+	startTimer := func() {
+		if startTime.IsZero() {
+			startTime = time.Now()
 		}
+	}
+
+	redraw := func() {
+		t.clearKeyboardHelpArea(sw, sh)
+		t.drawText(state, x, y)
 
 		aw, ah := calcStringDimensions(attribution)
 		drawString(t.Scr, x+nc-aw, y+nr+1, attribution, t.defaultStyle)
@@ -421,49 +291,12 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 			drawString(t.Scr, x+nc/2, y+nr+ah+1, strconv.Itoa(int(remaining/1e9)+1), t.defaultStyle)
 		}
 
-		formatAccuracy := func(accuracy float64) string {
-			if accuracy == 100 {
-				return fmt.Sprintf("Accuracy: %.0f%%\n", accuracy)
-			}
-			return fmt.Sprintf("Accuracy: %.2f%%\n", accuracy)
-		}
-
 		if (t.ShowWpm || t.ShowAccuracy) && !startTime.IsZero() {
 			calcStats()
-			accuracyX := x + nc/2 - 4
-			accuracyY := y - 2
-			wpmX := accuracyX
-			wpmY := accuracyY
-			if t.ShowAccuracy {
-				wpmY -= 1
-			}
-			if duration > 1e7 { //Avoid flashing large numbers on test start.
-				if t.ShowAccuracy {
-					drawString(t.Scr, accuracyX, accuracyY, formatAccuracy(calcAccuracy(correctChar, errorChar)), t.defaultStyle)
-				}
-				if t.ShowWpm {
-					wpm := int((float64(ncorrect) / 5) / (float64(duration) / 60e9))
-					drawString(t.Scr, wpmX, wpmY, fmt.Sprintf("WPM: %-10d\n", wpm), t.defaultStyle)
-				}
-			}
+			t.drawLiveStats(x+nc/2-4, y-2, ncorrect, duration, correctChar, errorChar)
 		}
 
-		statusY := 0
-		if sh > 1 {
-			statusY = 1
-		}
-		for i := 0; i < sw; i++ {
-			t.Scr.SetContent(i, statusY, ' ', nil, t.defaultStyle)
-		}
-
-		if msg := t.statusMessageActive(); msg != "" {
-			msgW, _ := calcStringDimensions(msg)
-			msgX := (sw - msgW) / 2
-			if msgX < 0 {
-				msgX = 0
-			}
-			drawString(t.Scr, msgX, statusY, msg, t.currentWordStyle.Bold(true))
-		}
+		t.drawStatusMessage(sw, sh)
 
 		if t.showKeyboardHelp {
 			t.drawKeyboardHelp(sw, sh)
@@ -472,27 +305,6 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 		//Potentially inefficient, but seems to be good enough
 
 		t.Scr.Show()
-	}
-
-	deleteWord := func() {
-		if idx == 0 {
-			return
-		}
-
-		idx--
-
-		for idx > 0 && (text[idx] == ' ' || text[idx] == '\n') {
-			idx--
-		}
-
-		for idx > 0 && text[idx] != ' ' && text[idx] != '\n' {
-			idx--
-		}
-
-		if text[idx] == ' ' || text[idx] == '\n' {
-			typed[idx] = text[idx]
-			idx++
-		}
 	}
 
 	tickerCloser := make(chan bool)
@@ -522,131 +334,64 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 	for {
 		redraw()
 
-		ev := t.Scr.PollEvent()
-
-		switch ev := ev.(type) {
+		switch ev := t.Scr.PollEvent().(type) {
 		case *tcell.EventResize:
 			rc = TyperResize
 			return
 		case *tcell.EventKey:
 			if runtime.GOOS != "windows" && ev.Key() == tcell.KeyBackspace { //Control+backspace on unix terms
 				if !t.DisableBackspace {
-					if startTime.IsZero() {
-						startTime = time.Now()
-					}
-					deleteWord()
+					startTimer()
+					state.deleteWord()
 				}
 				continue
 			}
 
-			switch key := ev.Key(); key {
+			switch ev.Key() {
 			case tcell.KeyCtrlC:
 				rc = TyperSigInt
-
 				return
 			case tcell.KeyEscape:
 				rc = TyperEscape
-
 				return
-			case tcell.KeyCtrlL:
-				t.Scr.Sync()
-
-			case tcell.KeyCtrlN:
-				if t.CycleTheme != nil {
-					themeName, err := t.CycleTheme(1)
-					if err != nil {
-						t.ShowStatusMessage(err.Error(), 2*time.Second)
-					} else if themeName != "" {
-						t.ShowStatusMessage(fmt.Sprintf("Theme: %s", themeName), 2*time.Second)
-					}
-				}
-
-			case tcell.KeyCtrlP:
-				if t.CycleTheme != nil {
-					themeName, err := t.CycleTheme(-1)
-					if err != nil {
-						t.ShowStatusMessage(err.Error(), 2*time.Second)
-					} else if themeName != "" {
-						t.ShowStatusMessage(fmt.Sprintf("Theme: %s", themeName), 2*time.Second)
-					}
-				}
-
 			case tcell.KeyRight:
 				rc = TyperNext
 				return
-
 			case tcell.KeyLeft:
 				rc = TyperPrevious
 				return
-
+			case tcell.KeyCtrlL:
+				t.Scr.Sync()
+			case tcell.KeyCtrlN:
+				t.cycleTheme(1)
+			case tcell.KeyCtrlP:
+				t.cycleTheme(-1)
 			case tcell.KeyCtrlW:
 				if !t.DisableBackspace {
-					if startTime.IsZero() {
-						startTime = time.Now()
-					}
-					deleteWord()
+					startTimer()
+					state.deleteWord()
 				}
-
 			case tcell.KeyBackspace, tcell.KeyBackspace2:
 				if !t.DisableBackspace {
-					if startTime.IsZero() {
-						startTime = time.Now()
-					}
+					startTimer()
 					if ev.Modifiers() == tcell.ModAlt || ev.Modifiers() == tcell.ModCtrl {
-						deleteWord()
+						state.deleteWord()
 					} else {
-						if idx == 0 {
-							break
-						}
-
-						idx--
-
-						for idx > 0 && text[idx] == '\n' {
-							idx--
-						}
+						state.backspace()
 					}
 				}
 			case tcell.KeyRune:
-				if ev.Rune() == '?' && (idx >= len(text) || text[idx] != '?') {
+				if ev.Rune() == '?' && !state.expects('?') {
 					t.showKeyboardHelp = !t.showKeyboardHelp
 					continue
 				}
 
-				if idx < len(text) {
-					if startTime.IsZero() {
-						startTime = time.Now()
-					}
-					if t.SkipWord && ev.Rune() == ' ' {
-						if idx > 0 && isWordSeparator(text[idx-1]) && text[idx] != ' ' { //Do nothing on word boundaries.
-							break
-						}
-
-						for idx < len(text) && text[idx] != ' ' && text[idx] != '\n' {
-							typed[idx] = 0
-							idx++
-						}
-
-						if idx < len(text) {
-							typed[idx] = text[idx]
-							idx++
-						}
-					} else {
-						typed[idx] = ev.Rune()
-						if ev.Rune() == text[idx] {
-							correctChar++
-						} else {
-							errorChar++
-						}
-						idx++
-					}
-
-					for idx < len(text) && text[idx] == '\n' {
-						typed[idx] = text[idx]
-						idx++
-					}
+				if !state.done() {
+					startTimer()
+					state.typeRune(ev.Rune(), t.SkipWord)
 				}
 
-				if idx == len(text) {
+				if state.done() {
 					calcStats()
 					return
 				}
@@ -659,6 +404,107 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 
 			redraw()
 		}
+	}
+}
+
+// drawText draws the text of the test at (x, y), styling each character
+// according to what was typed.
+func (t *typer) drawText(state *typingState, x, y int) {
+	cx := x
+	cy := y
+	wordPositions := highlightWordPositions(state.text, state.idx)
+
+	for i, r := range state.text {
+		if r == '\n' {
+			cy++
+			cx = x
+			continue
+		}
+
+		if i == state.idx {
+			t.Scr.ShowCursor(cx, cy)
+		}
+
+		var style tcell.Style
+		switch {
+		case i >= state.idx && wordPositions[i] == 0:
+			style = t.currentWordStyle
+		case i >= state.idx && wordPositions[i] == 1:
+			style = t.nextWordStyle
+		case i >= state.idx:
+			style = t.defaultStyle
+		case r != state.typed[i] && r == ' ':
+			style = t.incorrectSpaceStyle
+		case r != state.typed[i]:
+			style = t.incorrectStyle
+		default:
+			style = t.correctStyle
+		}
+
+		t.Scr.SetContent(cx, cy, r, nil, style)
+		cx++
+	}
+}
+
+// drawLiveStats draws the enabled live statistics above the text.
+func (t *typer) drawLiveStats(x, y int, ncorrect int, duration time.Duration, correctChar, errorChar int) {
+	if duration <= 1e7 { //Avoid flashing large numbers on test start.
+		return
+	}
+
+	wpmY := y
+	if t.ShowAccuracy {
+		drawString(t.Scr, x, y, formatLiveAccuracy(calcAccuracy(correctChar, errorChar)), t.defaultStyle)
+		wpmY--
+	}
+
+	if t.ShowWpm {
+		wpm := int((float64(ncorrect) / 5) / (float64(duration) / 60e9))
+		drawString(t.Scr, x, wpmY, fmt.Sprintf("WPM: %-10d\n", wpm), t.defaultStyle)
+	}
+}
+
+func formatLiveAccuracy(accuracy float64) string {
+	if accuracy == 100 {
+		return fmt.Sprintf("Accuracy: %.0f%%\n", accuracy)
+	}
+
+	return fmt.Sprintf("Accuracy: %.2f%%\n", accuracy)
+}
+
+// drawStatusMessage draws the current status message, if any, centered on
+// the second line of the screen.
+func (t *typer) drawStatusMessage(sw, sh int) {
+	statusY := 0
+	if sh > 1 {
+		statusY = 1
+	}
+	for i := 0; i < sw; i++ {
+		t.Scr.SetContent(i, statusY, ' ', nil, t.defaultStyle)
+	}
+
+	if msg := t.statusMessageActive(); msg != "" {
+		msgW, _ := calcStringDimensions(msg)
+		msgX := (sw - msgW) / 2
+		if msgX < 0 {
+			msgX = 0
+		}
+		drawString(t.Scr, msgX, statusY, msg, t.currentWordStyle.Bold(true))
+	}
+}
+
+// cycleTheme switches to the next (direction > 0) or previous theme and
+// briefly shows its name.
+func (t *typer) cycleTheme(direction int) {
+	if t.CycleTheme == nil {
+		return
+	}
+
+	themeName, err := t.CycleTheme(direction)
+	if err != nil {
+		t.ShowStatusMessage(err.Error(), 2*time.Second)
+	} else if themeName != "" {
+		t.ShowStatusMessage(fmt.Sprintf("Theme: %s", themeName), 2*time.Second)
 	}
 }
 

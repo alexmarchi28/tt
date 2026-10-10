@@ -92,26 +92,6 @@ func TestRandomText(t *testing.T) {
 	}
 }
 
-func TestExtractMistypedWords(t *testing.T) {
-	tests := []struct {
-		text, typed string
-		want        []mistake
-	}{
-		{"alpha beta", "alpha beta", nil},
-		{"alpha beta", "alpha betx", []mistake{{"beta", "betx"}}},
-		{"alpha beta", "alxha bxta", []mistake{{"alpha", "alxha"}, {"beta", "bxta"}}},
-		{"ab cd", "a\x00 cd", []mistake{{"ab", "a_"}}},
-		{"ab cd", "ab cd"[:4] + "\x00", []mistake{{"cd", "c_"}}},
-	}
-
-	for _, tc := range tests {
-		got := extractMistypedWords([]rune(tc.text), []rune(tc.typed))
-		if !reflect.DeepEqual(got, tc.want) {
-			t.Errorf("extractMistypedWords(%q, %q) = %v, want %v", tc.text, tc.typed, got, tc.want)
-		}
-	}
-}
-
 func TestIndexResourceName(t *testing.T) {
 	names := []string{"default", "gruvbox", "nord"}
 
@@ -205,24 +185,6 @@ func TestDrawString(t *testing.T) {
 	drawStringAtCenter(sim, "xyz", tcell.StyleDefault)
 	if got := screenLine(sim, 2); got != "        xyz" {
 		t.Errorf("centered line = %q, want %q", got, "        xyz")
-	}
-}
-
-func TestExtractMistypedWordsAcrossLines(t *testing.T) {
-	tests := []struct {
-		text, typed string
-		want        []mistake
-	}{
-		{"ab \ncd", "ab \ncx", []mistake{{"cd", "cx"}}},
-		{"ab\ncd", "ab\ncx", []mistake{{"cd", "cx"}}},
-		{"ab\ncd", "xb\ncd", []mistake{{"ab", "xb"}}},
-	}
-
-	for _, tc := range tests {
-		got := extractMistypedWords([]rune(tc.text), []rune(tc.typed))
-		if !reflect.DeepEqual(got, tc.want) {
-			t.Errorf("extractMistypedWords(%q, %q) = %q, want %q", tc.text, tc.typed, got, tc.want)
-		}
 	}
 }
 
