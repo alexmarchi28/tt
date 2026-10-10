@@ -74,12 +74,39 @@ func TestGenerateWordTest(t *testing.T) {
 func TestGenerateWordTestUsesBuiltinLists(t *testing.T) {
 	useTempStorage(t)
 
-	segments := generateWordTest("1000en", 50, 1)()
-	if len(segments) != 1 {
-		t.Fatalf("got %d segments, want 1", len(segments))
+	gen := generateWordTest("1000en", 50, 1)
+	for i := 0; i < 100; i++ {
+		segments := gen()
+		if len(segments) != 1 {
+			t.Fatalf("got %d segments, want 1", len(segments))
+		}
+		assertWords(t, segments[0].Text, 50)
 	}
-	if n := len(strings.Fields(segments[0].Text)); n < 45 || n > 50 {
-		t.Errorf("got %d words, want about 50", n)
+}
+
+func TestGenerateWordTestIgnoresBlankEntries(t *testing.T) {
+	dir := useTempStorage(t)
+	writeUserResource(t, dir, "words", "blanks", "\n  alpha beta\n\ngamma\t\n")
+
+	gen := generateWordTest("blanks", 10, 1)
+	for i := 0; i < 100; i++ {
+		assertWords(t, gen()[0].Text, 10)
+	}
+}
+
+// assertWords checks that text consists of n words separated by single
+// spaces.
+func assertWords(t *testing.T, text string, n int) {
+	t.Helper()
+
+	words := strings.Split(text, " ")
+	if len(words) != n {
+		t.Fatalf("%q has %d words, want %d", text, len(words), n)
+	}
+	for _, w := range words {
+		if w == "" {
+			t.Fatalf("%q contains an empty word", text)
+		}
 	}
 }
 
