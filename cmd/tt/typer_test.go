@@ -801,3 +801,65 @@ func TestTyperBlind(t *testing.T) {
 	got := waitOutcome(t, done)
 	assertOutcome(t, got, TyperComplete, 6, 6, 2, []mistake{{"ab", "xb"}})
 }
+
+// fakeClock is a clock which only moves when told to.
+type fakeClock struct {
+	mu sync.Mutex
+	t  time.Time
+}
+
+func (c *fakeClock) now() time.Time {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return c.t
+}
+
+func (c *fakeClock) advance(d time.Duration) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.t = c.t.Add(d)
+}
+
+// useFakeClock makes ty use a fake clock and update the screen often.
+func useFakeClock(ty *typer) *fakeClock {
+	clock := &fakeClock{t: time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)}
+	ty.now = clock.now
+	ty.tick = 10 * time.Millisecond
+	return clock
+}
+
+func TestTyperMeasuresTimeWithItsClock(t *testing.T) {
+	ty, sim := newTestTyper(t)
+	clock := useFakeClock(ty)
+
+	done := startTyper(ty, []segment{{"abcde", ""}}, -1)
+	x, y := textOrigin(t, sim, "abcde")
+
+	// The time starts with the first key.
+	sendKeys(t, sim, "a")
+	waitForColors(t, sim, x, y, map[int]cellWant{0: {testHi, testBg, true}})
+	clock.advance(time.Minute)
+	sendKeys(t, sim, "bcde")
+
+	got := waitOutcome(t, done)
+	if got.duration != time.Minute || got.cpm() != 5 || got.wpm() != 1 {
+		t.Errorf("duration %v, cpm %d, wpm %d, want 1m, 5 and 1", got.duration, got.cpm(), got.wpm())
+	}
+}
+
+func TestTyperTimeLimitWithFakeClock(t *testing.T) {
+	ty, sim := newTestTyper(t)
+	clock := useFakeClock(ty)
+
+	done := startTyper(ty, []segment{{"abcde", ""}}, 10*time.Second)
+	x, y := textOrigin(t, sim, "abcde")
+
+	sendKeys(t, sim, "ab")
+	waitForColors(t, sim, x, y, map[int]cellWant{1: {testHi, testBg, true}})
+	clock.advance(10 * time.Second)
+
+	got := waitOutcome(t, done)
+	if got.rc != TyperComplete || got.duration != 10*time.Second || got.correctChars != 2 {
+		t.Errorf("got %+v, want the test to end after 10s with 2 characters", got)
+	}
+}

@@ -40,6 +40,8 @@ type typer struct {
 	Blind            bool // Show mistakes like correctly typed characters.
 	CycleTheme       func(direction int) (string, error)
 	tty              io.Writer
+	now              func() time.Time // The clock, replaced in tests.
+	tick             time.Duration    // Interval between screen updates.
 
 	emboldenTypedText   bool
 	highlightCurrent    bool
@@ -84,6 +86,8 @@ func NewTyper(scr tcell.Screen, emboldenTypedText bool, th theme) *typer {
 		Scr:      scr,
 		SkipWord: true,
 		tty:      tty,
+		now:      time.Now,
+		tick:     500 * time.Millisecond,
 
 		emboldenTypedText: emboldenTypedText,
 		highlightCurrent:  true,
@@ -145,7 +149,7 @@ func (t *typer) ShowStatusMessage(message string, duration time.Duration) {
 		return
 	}
 
-	t.statusMessageUntil = time.Now().Add(duration)
+	t.statusMessageUntil = t.now().Add(duration)
 }
 
 func (t *typer) statusMessageActive() string {
@@ -153,7 +157,7 @@ func (t *typer) statusMessageActive() string {
 		return ""
 	}
 
-	if !t.statusMessageUntil.IsZero() && time.Now().After(t.statusMessageUntil) {
+	if !t.statusMessageUntil.IsZero() && t.now().After(t.statusMessageUntil) {
 		t.statusMessage = ""
 		t.statusMessageUntil = time.Time{}
 		return ""
@@ -283,7 +287,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 	result := func() testResult {
 		return testResult{
 			rc:           TyperComplete,
-			duration:     time.Since(startTime),
+			duration:     t.now().Sub(startTime),
 			correctChars: state.correctChars(),
 			correctKeys:  state.correctKeys,
 			wrongKeys:    state.wrongKeys,
@@ -293,7 +297,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 
 	startTimer := func() {
 		if startTime.IsZero() {
-			startTime = time.Now()
+			startTime = t.now()
 		}
 	}
 
@@ -315,7 +319,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 		drawString(t.Scr, x+nc-aw, y+nr+1, attribution, t.defaultStyle)
 
 		if timeLimit != -1 && !startTime.IsZero() {
-			remaining := timeLimit - time.Since(startTime)
+			remaining := timeLimit - t.now().Sub(startTime)
 			drawString(t.Scr, x+nc/2, y+nr+ah+1, "      ", t.defaultStyle)
 			drawString(t.Scr, x+nc/2, y+nr+ah+1, strconv.Itoa(int(remaining/1e9)+1), t.defaultStyle)
 		}
@@ -346,7 +350,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 			default:
 			}
 
-			time.Sleep(time.Duration(5e8))
+			time.Sleep(t.tick)
 			t.Scr.PostEventWait(nil)
 		}
 	}
@@ -355,7 +359,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 	defer close(tickerCloser)
 
 	if startImmediately {
-		startTime = time.Now()
+		startTime = t.now()
 	}
 
 	t.Scr.Clear()
@@ -418,7 +422,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 				}
 			}
 		default: //tick
-			if timeLimit != -1 && !startTime.IsZero() && timeLimit <= time.Since(startTime) {
+			if timeLimit != -1 && !startTime.IsZero() && timeLimit <= t.now().Sub(startTime) {
 				return result()
 			}
 
