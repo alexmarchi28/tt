@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -95,4 +96,41 @@ func newTcellColor(s string) (tcell.Color, error) {
 	}
 
 	return tcell.NewHexColor(int32(rgb)), nil
+}
+
+func loadRememberedTheme(disableTransparentBg bool) string {
+	cfg, err := readAppConfig()
+	if err != nil {
+		return ""
+	}
+
+	themeName := strings.TrimSpace(cfg.Theme)
+	if themeName == "" {
+		return ""
+	}
+
+	if _, err := loadTheme(themeName, disableTransparentBg); err != nil {
+		return ""
+	}
+
+	return themeName
+}
+
+func indexResourceName(names []string, name string) int {
+	for i, candidate := range names {
+		if candidate == name {
+			return i
+		}
+	}
+
+	base := filepath.Base(name)
+	if base != name {
+		for i, candidate := range names {
+			if candidate == base {
+				return i
+			}
+		}
+	}
+
+	return -1
 }

@@ -98,3 +98,35 @@ func writePersistedResults(stored []persistedResult) error {
 
 	return os.WriteFile(RESULTS_DB, b, 0600)
 }
+
+func saveMistakes(mistakes []mistake) {
+	var db []mistake
+
+	if err := readValue(MISTAKE_DB, &db); err != nil {
+		db = nil
+	}
+
+	db = append(db, mistakes...)
+	writeValue(MISTAKE_DB, db)
+}
+
+func savePersistedResult(wpm int, accuracy float64, timestamp int64) {
+	stored, err := readPersistedResults()
+	if err != nil {
+		if os.IsNotExist(err) {
+			stored = nil
+		} else {
+			panic(err)
+		}
+	}
+
+	stored = append(stored, persistedResult{
+		Wpm:       wpm,
+		Accuracy:  accuracy,
+		Timestamp: timestamp,
+	})
+
+	if err := writePersistedResults(stored); err != nil {
+		panic(err)
+	}
+}

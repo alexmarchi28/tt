@@ -5,7 +5,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -20,14 +19,6 @@ var csvMode bool
 var jsonMode bool
 var themeToPersist string
 var persistThemeOnExit bool
-
-type result struct {
-	Wpm       int       `json:"wpm"`
-	Cpm       int       `json:"cpm"`
-	Accuracy  float64   `json:"accuracy"`
-	Timestamp int64     `json:"timestamp"`
-	Mistakes  []mistake `json:"mistakes"`
-}
 
 func die(format string, args ...interface{}) {
 	if scr != nil {
@@ -78,57 +69,6 @@ func exit(rc int) {
 	}
 
 	os.Exit(rc)
-}
-
-func showReport(scr tcell.Screen, cpm, wpm int, accuracy float64, attribution string, mistakes []mistake) {
-	mistakeStr := ""
-	if attribution != "" {
-		attribution = "\n\nAttribution: " + attribution
-	}
-
-	if len(mistakes) > 0 {
-		mistakeStr = "\nMistakes:    "
-		for i, m := range mistakes {
-			mistakeStr += m.Word
-			if i != len(mistakes)-1 {
-				mistakeStr += ", "
-			}
-		}
-	}
-
-	report := fmt.Sprintf("WPM:         %d\nCPM:         %d\nAccuracy:    %.2f%%%s%s", wpm, cpm, accuracy, mistakeStr, attribution)
-
-	scr.Clear()
-	drawStringAtCenter(scr, report, tcell.StyleDefault)
-	scr.HideCursor()
-	scr.Show()
-
-	for {
-		if key, ok := scr.PollEvent().(*tcell.EventKey); ok && key.Key() == tcell.KeyEscape {
-			return
-		} else if ok && key.Key() == tcell.KeyCtrlC {
-			exit(1)
-		}
-	}
-}
-
-func indexResourceName(names []string, name string) int {
-	for i, candidate := range names {
-		if candidate == name {
-			return i
-		}
-	}
-
-	base := filepath.Base(name)
-	if base != name {
-		for i, candidate := range names {
-			if candidate == base {
-				return i
-			}
-		}
-	}
-
-	return -1
 }
 
 var usage = `usage: tt [options] [file]
@@ -191,108 +131,6 @@ Misc
 Version
     -v                  Print the current version.
 `
-
-func saveMistakes(mistakes []mistake) {
-	var db []mistake
-
-	if err := readValue(MISTAKE_DB, &db); err != nil {
-		db = nil
-	}
-
-	db = append(db, mistakes...)
-	writeValue(MISTAKE_DB, db)
-}
-
-func savePersistedResult(wpm int, accuracy float64, timestamp int64) {
-	stored, err := readPersistedResults()
-	if err != nil {
-		if os.IsNotExist(err) {
-			stored = nil
-		} else {
-			panic(err)
-		}
-	}
-
-	stored = append(stored, persistedResult{
-		Wpm:       wpm,
-		Accuracy:  accuracy,
-		Timestamp: timestamp,
-	})
-
-	if err := writePersistedResults(stored); err != nil {
-		panic(err)
-	}
-}
-
-func formatStatsLine(label string, stored []persistedResult, window time.Duration, now time.Time) string {
-	var wpmSum int
-	var accuracySum float64
-	var count int
-	cutoff := now.Add(-window).Unix()
-
-	for _, r := range stored {
-		if r.Timestamp < cutoff {
-			continue
-		}
-
-		wpmSum += r.Wpm
-		accuracySum += r.Accuracy
-		count++
-	}
-
-	if count == 0 {
-		return fmt.Sprintf("%-10s no results", label)
-	}
-
-	return fmt.Sprintf(
-		"%-10s avg wpm %.2f, avg accuracy %.2f%% (%d tests)",
-		label,
-		float64(wpmSum)/float64(count),
-		accuracySum/float64(count),
-		count,
-	)
-}
-
-func printStats() {
-	stored, err := readPersistedResults()
-	if err != nil {
-		if os.IsNotExist(err) {
-			fmt.Println("No saved results yet.")
-			return
-		}
-
-		die("Could not read saved results: %v", err)
-	}
-
-	if len(stored) == 0 {
-		fmt.Println("No saved results yet.")
-		return
-	}
-
-	now := time.Now()
-	fmt.Println("Typing stats")
-	fmt.Println(formatStatsLine("Last hour", stored, time.Hour, now))
-	fmt.Println(formatStatsLine("Last day", stored, 24*time.Hour, now))
-	fmt.Println(formatStatsLine("Last week", stored, 7*24*time.Hour, now))
-}
-
-func loadRememberedTheme(disableTransparentBg bool) string {
-	cfg, err := readAppConfig()
-	if err != nil {
-		return ""
-	}
-
-	themeName := strings.TrimSpace(cfg.Theme)
-	if themeName == "" {
-		return ""
-	}
-
-	if _, err := loadTheme(themeName, disableTransparentBg); err != nil {
-		return ""
-	}
-
-	return themeName
-}
 
 func main() {
 	var n int
