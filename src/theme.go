@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -114,25 +113,6 @@ func loadRememberedTheme(disableTransparentBg bool) string {
 	}
 
 	return themeName
-}
-
-func indexResourceName(names []string, name string) int {
-	for i, candidate := range names {
-		if candidate == name {
-			return i
-		}
-	}
-
-	base := filepath.Base(name)
-	if base != name {
-		for i, candidate := range names {
-			if candidate == base {
-				return i
-			}
-		}
-	}
-
-	return -1
 }
 
 // themeCycler steps through the available themes, skipping invalid ones.
