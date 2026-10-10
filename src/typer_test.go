@@ -69,8 +69,7 @@ func TestQuestionMarkTogglesKeyboardHelp(t *testing.T) {
 	typer := NewTyper(sim, true, testTheme)
 	done := make(chan int, 1)
 	go func() {
-		_, rc, _, _, _, _ := typer.start("alpha beta", -1, false, "")
-		done <- rc
+		done <- typer.start("alpha beta", -1, false, "").rc
 	}()
 
 	sim.InjectKey(tcell.KeyRune, '?', tcell.ModNone)
@@ -102,15 +101,6 @@ var (
 	testTheme = theme{testFg, testBg, testHi, testHi2, testHi3, testErrCol}
 )
 
-type typerOutcome struct {
-	ncorrect int
-	duration time.Duration
-	rc       int
-	mistakes []mistake
-	correct  int
-	errors   int
-}
-
 func newTestTyper(t *testing.T) (*typer, tcell.SimulationScreen) {
 	t.Helper()
 
@@ -120,14 +110,9 @@ func newTestTyper(t *testing.T) (*typer, tcell.SimulationScreen) {
 
 // startTyper runs a test in the background; the outcome is delivered on the
 // returned channel once the typer returns.
-func startTyper(ty *typer, segments []segment, timeout time.Duration) <-chan typerOutcome {
-	done := make(chan typerOutcome, 1)
-
-	go func() {
-		var o typerOutcome
-		o.ncorrect, o.duration, o.rc, o.mistakes, o.correct, o.errors = ty.Start(segments, timeout)
-		done <- o
-	}()
+func startTyper(ty *typer, segments []segment, timeout time.Duration) <-chan testResult {
+	done := make(chan testResult, 1)
+	go func() { done <- ty.Start(segments, timeout) }()
 
 	return done
 }
@@ -169,7 +154,7 @@ func sendKeys(t *testing.T, sim tcell.SimulationScreen, items ...interface{}) {
 	}
 }
 
-func waitOutcome(t *testing.T, done <-chan typerOutcome) typerOutcome {
+func waitOutcome(t *testing.T, done <-chan testResult) testResult {
 	t.Helper()
 
 	select {
@@ -179,12 +164,12 @@ func waitOutcome(t *testing.T, done <-chan typerOutcome) typerOutcome {
 		t.Fatal("typer did not return")
 	}
 
-	return typerOutcome{}
+	return testResult{}
 }
 
 // typeText runs a single segment test with the given keys and returns its
 // outcome.
-func typeText(t *testing.T, ty *typer, sim tcell.SimulationScreen, text string, items ...interface{}) typerOutcome {
+func typeText(t *testing.T, ty *typer, sim tcell.SimulationScreen, text string, items ...interface{}) testResult {
 	t.Helper()
 
 	done := startTyper(ty, []segment{{text, ""}}, -1)
@@ -192,20 +177,20 @@ func typeText(t *testing.T, ty *typer, sim tcell.SimulationScreen, text string, 
 	return waitOutcome(t, done)
 }
 
-func assertOutcome(t *testing.T, got typerOutcome, rc, ncorrect, correct, errors int, mistakes []mistake) {
+func assertOutcome(t *testing.T, got testResult, rc, correctChars, correctKeys, wrongKeys int, mistakes []mistake) {
 	t.Helper()
 
 	if got.rc != rc {
 		t.Errorf("rc = %d, want %d", got.rc, rc)
 	}
-	if got.ncorrect != ncorrect {
-		t.Errorf("ncorrect = %d, want %d", got.ncorrect, ncorrect)
+	if got.correctChars != correctChars {
+		t.Errorf("correct characters = %d, want %d", got.correctChars, correctChars)
 	}
-	if got.correct != correct {
-		t.Errorf("correct keystrokes = %d, want %d", got.correct, correct)
+	if got.correctKeys != correctKeys {
+		t.Errorf("correct keystrokes = %d, want %d", got.correctKeys, correctKeys)
 	}
-	if got.errors != errors {
-		t.Errorf("wrong keystrokes = %d, want %d", got.errors, errors)
+	if got.wrongKeys != wrongKeys {
+		t.Errorf("wrong keystrokes = %d, want %d", got.wrongKeys, wrongKeys)
 	}
 	if !reflect.DeepEqual(got.mistakes, mistakes) {
 		t.Errorf("mistakes = %v, want %v", got.mistakes, mistakes)
@@ -354,8 +339,8 @@ func TestTyperMultipleSegments(t *testing.T) {
 	sendKeys(t, sim, "ab cx", "ef")
 	got := waitOutcome(t, done)
 
-	if got.rc != TyperComplete || got.ncorrect != 6 || !reflect.DeepEqual(got.mistakes, []mistake{{"cd", "cx"}}) {
-		t.Errorf("got %+v, want rc %d, ncorrect 6 and mistakes [{cd cx}]", got, TyperComplete)
+	if got.rc != TyperComplete || got.correctChars != 6 || !reflect.DeepEqual(got.mistakes, []mistake{{"cd", "cx"}}) {
+		t.Errorf("got %+v, want rc %d, 6 correct characters and mistakes [{cd cx}]", got, TyperComplete)
 	}
 
 	done = startTyper(ty, []segment{{"ab", ""}, {"cd", ""}}, -1)
@@ -391,8 +376,8 @@ func TestTyperTimeoutSpansSegments(t *testing.T) {
 	sendKeys(t, sim, "b", "c")
 	got := waitOutcome(t, done)
 
-	if got.rc != TyperComplete || got.ncorrect != 3 {
-		t.Errorf("got %+v, want rc %d and ncorrect 3", got, TyperComplete)
+	if got.rc != TyperComplete || got.correctChars != 3 {
+		t.Errorf("got %+v, want rc %d and 3 correct characters", got, TyperComplete)
 	}
 	if got.duration < timeout || got.duration > timeout+600*time.Millisecond {
 		t.Errorf("duration = %v, want about %v", got.duration, timeout)
@@ -705,4 +690,22 @@ func TestTyperTypingQuestionMarkDoesNotToggleHelp(t *testing.T) {
 
 	sendKeys(t, sim, tcell.KeyEscape)
 	waitOutcome(t, done)
+}
+
+func TestTestResultStats(t *testing.T) {
+	tests := []struct {
+		r        testResult
+		cpm, wpm int
+		accuracy float64
+	}{
+		{testResult{duration: time.Minute, correctChars: 250, correctKeys: 250}, 250, 50, 100},
+		{testResult{duration: 30 * time.Second, correctChars: 251, correctKeys: 3, wrongKeys: 1}, 502, 100, 75},
+		{testResult{duration: 90 * time.Second, correctChars: 14}, 9, 1, 0},
+	}
+
+	for _, tc := range tests {
+		if cpm, wpm, accuracy := tc.r.cpm(), tc.r.wpm(), tc.r.accuracy(); cpm != tc.cpm || wpm != tc.wpm || accuracy != tc.accuracy {
+			t.Errorf("%+v: cpm %d, wpm %d, accuracy %v, want %d, %d, %v", tc.r, cpm, wpm, accuracy, tc.cpm, tc.wpm, tc.accuracy)
+		}
+	}
 }

@@ -208,35 +208,51 @@ func (t *typer) drawKeyboardHelp(sw, sh int) {
 	}
 }
 
-func (t *typer) Start(text []segment, timeout time.Duration) (ncorrect int, duration time.Duration, rc int, mistakes []mistake, correct int, errors int) {
+// testResult is the outcome of a test.
+type testResult struct {
+	rc           int
+	duration     time.Duration
+	correctChars int // Correctly typed characters, used for the speed.
+	correctKeys  int // Correct keystrokes, used for the accuracy.
+	wrongKeys    int // Wrong keystrokes, used for the accuracy.
+	mistakes     []mistake
+}
+
+func (r testResult) cpm() int {
+	return int(float64(r.correctChars) / (float64(r.duration) / 60e9))
+}
+
+func (r testResult) wpm() int {
+	return r.cpm() / 5
+}
+
+func (r testResult) accuracy() float64 {
+	return calcAccuracy(r.correctKeys, r.wrongKeys)
+}
+
+// Start runs a test made of the given segments. A timeout of -1 disables the
+// time limit.
+func (t *typer) Start(text []segment, timeout time.Duration) (res testResult) {
 	timeLeft := timeout
 
 	for i, s := range text {
-		startImmediately := true
-		var d time.Duration
-		var c, sc, se int
-		var m []mistake
+		r := t.start(s.Text, timeLeft, i > 0, s.Attribution)
 
-		if i == 0 {
-			startImmediately = false
-		}
-
-		c, rc, d, m, sc, se = t.start(s.Text, timeLeft, startImmediately, s.Attribution)
-
-		ncorrect += c
-		duration += d
-		mistakes = append(mistakes, m...)
-		correct += sc
-		errors += se
+		res.rc = r.rc
+		res.duration += r.duration
+		res.correctChars += r.correctChars
+		res.correctKeys += r.correctKeys
+		res.wrongKeys += r.wrongKeys
+		res.mistakes = append(res.mistakes, r.mistakes...)
 
 		if timeout != -1 {
-			timeLeft -= d
+			timeLeft -= r.duration
 			if timeLeft <= 0 {
 				return
 			}
 		}
 
-		if rc != TyperComplete {
+		if r.rc != TyperComplete {
 			return
 		}
 	}
@@ -244,7 +260,7 @@ func (t *typer) Start(text []segment, timeout time.Duration) (ncorrect int, dura
 	return
 }
 
-func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, attribution string) (ncorrect int, rc int, duration time.Duration, mistakes []mistake, correctChar int, errorChar int) {
+func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, attribution string) testResult {
 	var startTime time.Time
 	state := newTypingState(s)
 
@@ -263,13 +279,15 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 
 	t.Scr.SetStyle(t.defaultStyle)
 
-	calcStats := func() {
-		ncorrect = state.correctChars()
-		mistakes = state.mistakes()
-		correctChar = state.correctKeys
-		errorChar = state.wrongKeys
-		rc = TyperComplete
-		duration = time.Since(startTime)
+	result := func() testResult {
+		return testResult{
+			rc:           TyperComplete,
+			duration:     time.Since(startTime),
+			correctChars: state.correctChars(),
+			correctKeys:  state.correctKeys,
+			wrongKeys:    state.wrongKeys,
+			mistakes:     state.mistakes(),
+		}
 	}
 
 	startTimer := func() {
@@ -292,8 +310,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 		}
 
 		if (t.ShowWpm || t.ShowAccuracy) && !startTime.IsZero() {
-			calcStats()
-			t.drawLiveStats(x+nc/2-4, y-2, ncorrect, duration, correctChar, errorChar)
+			t.drawLiveStats(x+nc/2-4, y-2, result())
 		}
 
 		t.drawStatusMessage(sw, sh)
@@ -336,8 +353,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 
 		switch ev := t.Scr.PollEvent().(type) {
 		case *tcell.EventResize:
-			rc = TyperResize
-			return
+			return testResult{rc: TyperResize}
 		case *tcell.EventKey:
 			if runtime.GOOS != "windows" && ev.Key() == tcell.KeyBackspace { //Control+backspace on unix terms
 				if !t.DisableBackspace {
@@ -349,17 +365,13 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 
 			switch ev.Key() {
 			case tcell.KeyCtrlC:
-				rc = TyperSigInt
-				return
+				return testResult{rc: TyperSigInt}
 			case tcell.KeyEscape:
-				rc = TyperEscape
-				return
+				return testResult{rc: TyperEscape}
 			case tcell.KeyRight:
-				rc = TyperNext
-				return
+				return testResult{rc: TyperNext}
 			case tcell.KeyLeft:
-				rc = TyperPrevious
-				return
+				return testResult{rc: TyperPrevious}
 			case tcell.KeyCtrlL:
 				t.Scr.Sync()
 			case tcell.KeyCtrlN:
@@ -392,14 +404,12 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 				}
 
 				if state.done() {
-					calcStats()
-					return
+					return result()
 				}
 			}
 		default: //tick
 			if timeLimit != -1 && !startTime.IsZero() && timeLimit <= time.Since(startTime) {
-				calcStats()
-				return
+				return result()
 			}
 
 			redraw()
@@ -447,20 +457,19 @@ func (t *typer) drawText(state *typingState, x, y int) {
 }
 
 // drawLiveStats draws the enabled live statistics above the text.
-func (t *typer) drawLiveStats(x, y int, ncorrect int, duration time.Duration, correctChar, errorChar int) {
-	if duration <= 1e7 { //Avoid flashing large numbers on test start.
+func (t *typer) drawLiveStats(x, y int, r testResult) {
+	if r.duration <= 1e7 { //Avoid flashing large numbers on test start.
 		return
 	}
 
 	wpmY := y
 	if t.ShowAccuracy {
-		drawString(t.Scr, x, y, formatLiveAccuracy(calcAccuracy(correctChar, errorChar)), t.defaultStyle)
+		drawString(t.Scr, x, y, formatLiveAccuracy(r.accuracy()), t.defaultStyle)
 		wpmY--
 	}
 
 	if t.ShowWpm {
-		wpm := int((float64(ncorrect) / 5) / (float64(duration) / 60e9))
-		drawString(t.Scr, x, wpmY, fmt.Sprintf("WPM: %-10d\n", wpm), t.defaultStyle)
+		drawString(t.Scr, x, wpmY, fmt.Sprintf("WPM: %-10d\n", r.wpm()), t.defaultStyle)
 	}
 }
 

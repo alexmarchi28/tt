@@ -530,9 +530,9 @@ func main() {
 			}
 		}
 
-		ncorrectWords, t, rc, mistakes, ncorrectChars, nerrorsChars := typer.Start(tests[idx], time.Duration(timeout))
+		res := typer.Start(tests[idx], time.Duration(timeout))
 
-		switch rc {
+		switch res.rc {
 		case TyperNext:
 			idx++
 		case TyperPrevious:
@@ -540,20 +540,20 @@ func main() {
 				idx--
 			}
 		case TyperComplete:
-			cpm := int(float64(ncorrectWords) / (float64(t) / 60e9))
-			wpm := cpm / 5
-			accuracy := calcAccuracy(ncorrectChars, nerrorsChars)
+			cpm := res.cpm()
+			wpm := res.wpm()
+			accuracy := res.accuracy()
 			timestamp := time.Now().Unix()
 
-			results = append(results, result{wpm, cpm, accuracy, timestamp, mistakes})
+			results = append(results, result{wpm, cpm, accuracy, timestamp, res.mistakes})
 			savePersistedResult(wpm, accuracy, timestamp)
-			saveMistakes(mistakes)
+			saveMistakes(res.mistakes)
 			if !noReport {
 				attribution := ""
 				if len(tests[idx]) == 1 {
 					attribution = tests[idx][0].Attribution
 				}
-				showReport(scr, cpm, wpm, accuracy, attribution, mistakes)
+				showReport(scr, cpm, wpm, accuracy, attribution, res.mistakes)
 			}
 			if oneShotMode {
 				exit(0)
