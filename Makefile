@@ -3,7 +3,7 @@ PREFIX := /usr/local
 
 .PHONY: all
 all:
-	go build -o bin/tt src/*.go
+	go build -o bin/tt .
 
 .PHONY: install
 install:
@@ -20,13 +20,13 @@ uninstall:
 .PHONY: assets
 assets:
 	python3 ./scripts/themegen.py
-	./scripts/pack themes/ words/ quotes/ > src/packed.go
+	./scripts/pack themes/ words/ quotes/ > packed.go
 	pandoc -s -t man -o - man.md|gzip > tt.1.gz
 
 .PHONY: rel
 rel:
-	GOOS=darwin GOARCH=amd64 go build -o bin/tt-osx src/*.go
-	GOOS=windows GOARCH=amd64 go build -o bin/tt.exe src/*.go
-	GOOS=linux GOARCH=amd64 go build -o bin/tt-linux src/*.go
-	GOOS=linux GOARCH=arm go build -o bin/tt-linux_arm src/*.go
-	GOOS=linux GOARCH=arm64 go build -o bin/tt-linux_arm64 src/*.go
+	GOOS=darwin GOARCH=amd64 go build -o bin/tt-osx .
+	GOOS=windows GOARCH=amd64 go build -o bin/tt.exe .
+	GOOS=linux GOARCH=amd64 go build -o bin/tt-linux .
+	GOOS=linux GOARCH=arm go build -o bin/tt-linux_arm .
+	GOOS=linux GOARCH=arm64 go build -o bin/tt-linux_arm64 .
