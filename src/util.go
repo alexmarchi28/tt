@@ -12,12 +12,12 @@ import (
 	"github.com/gdamore/tcell"
 )
 
-var CONFIG_DIRS []string
+var configDirs []string
 
 func init() {
 	home, _ := os.LookupEnv("HOME")
 
-	CONFIG_DIRS = []string{
+	configDirs = []string{
 		filepath.Join(home, ".tt"),
 		"/etc/tt",
 	}
@@ -176,7 +176,7 @@ func readResource(typ, name string) []byte {
 		return b
 	}
 
-	for _, d := range CONFIG_DIRS {
+	for _, d := range configDirs {
 		if b, err := os.ReadFile(filepath.Join(d, typ, name)); err == nil {
 			return b
 		}
@@ -196,7 +196,7 @@ func listResourceNames(typ string) []string {
 		}
 	}
 
-	for _, d := range CONFIG_DIRS {
+	for _, d := range configDirs {
 		entries, err := os.ReadDir(filepath.Join(d, typ))
 		if err != nil {
 			continue

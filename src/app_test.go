@@ -75,7 +75,7 @@ func TestAppRecordsCompletedTests(t *testing.T) {
 
 	// The mistake of the restarted attempt is not recorded.
 	var mistakes []mistake
-	if err := readValue(MISTAKE_DB, &mistakes); err != nil || !reflect.DeepEqual(mistakes, []mistake{{"cd", "cx"}}) {
+	if err := readValue(mistakeDB, &mistakes); err != nil || !reflect.DeepEqual(mistakes, []mistake{{"cd", "cx"}}) {
 		t.Errorf("stored mistakes = %v (%v), want [{cd cx}]", mistakes, err)
 	}
 }

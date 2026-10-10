@@ -30,11 +30,11 @@ func TestMain(m *testing.M) {
 }
 
 func setStorageDir(dir string) {
-	FILE_STATE_DB = filepath.Join(dir, ".db")
-	MISTAKE_DB = filepath.Join(dir, ".errors")
-	RESULTS_DB = filepath.Join(dir, ".results")
-	APP_CONFIG_PATH = filepath.Join(dir, "config.json")
-	CONFIG_DIRS = []string{filepath.Join(dir, ".tt")}
+	fileStateDB = filepath.Join(dir, ".db")
+	mistakeDB = filepath.Join(dir, ".errors")
+	resultsDB = filepath.Join(dir, ".results")
+	appConfigPath = filepath.Join(dir, "config.json")
+	configDirs = []string{filepath.Join(dir, ".tt")}
 }
 
 // useTempStorage gives the calling test its own empty storage directory and
@@ -42,11 +42,11 @@ func setStorageDir(dir string) {
 func useTempStorage(t *testing.T) string {
 	t.Helper()
 
-	oldFileState, oldMistakes, oldResults, oldConfig := FILE_STATE_DB, MISTAKE_DB, RESULTS_DB, APP_CONFIG_PATH
-	oldConfigDirs := CONFIG_DIRS
+	oldFileState, oldMistakes, oldResults, oldConfig := fileStateDB, mistakeDB, resultsDB, appConfigPath
+	oldConfigDirs := configDirs
 	t.Cleanup(func() {
-		FILE_STATE_DB, MISTAKE_DB, RESULTS_DB, APP_CONFIG_PATH = oldFileState, oldMistakes, oldResults, oldConfig
-		CONFIG_DIRS = oldConfigDirs
+		fileStateDB, mistakeDB, resultsDB, appConfigPath = oldFileState, oldMistakes, oldResults, oldConfig
+		configDirs = oldConfigDirs
 	})
 
 	dir := t.TempDir()

@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 )
 
-var FILE_STATE_DB string
-var MISTAKE_DB string
-var RESULTS_DB string
-var APP_CONFIG_PATH string
+var fileStateDB string
+var mistakeDB string
+var resultsDB string
+var appConfigPath string
 
 type appConfig struct {
 	Theme string `json:"theme,omitempty"`
@@ -38,10 +38,10 @@ func init() {
 
 	config := filepath.Join(home, ".config", "tt")
 
-	FILE_STATE_DB = filepath.Join(data, ".db")
-	MISTAKE_DB = filepath.Join(data, ".errors")
-	RESULTS_DB = filepath.Join(data, ".results")
-	APP_CONFIG_PATH = filepath.Join(config, "config.json")
+	fileStateDB = filepath.Join(data, ".db")
+	mistakeDB = filepath.Join(data, ".errors")
+	resultsDB = filepath.Join(data, ".results")
+	appConfigPath = filepath.Join(config, "config.json")
 }
 
 func readValue(path string, o interface{}) error {
@@ -70,33 +70,33 @@ func writeValue(path string, o interface{}) error {
 
 func readAppConfig() (appConfig, error) {
 	var cfg appConfig
-	err := readValue(APP_CONFIG_PATH, &cfg)
+	err := readValue(appConfigPath, &cfg)
 	return cfg, err
 }
 
 func writeAppConfig(cfg appConfig) error {
-	return writeValue(APP_CONFIG_PATH, cfg)
+	return writeValue(appConfigPath, cfg)
 }
 
 func readPersistedResults() ([]persistedResult, error) {
 	var stored []persistedResult
-	err := readValue(RESULTS_DB, &stored)
+	err := readValue(resultsDB, &stored)
 	return stored, err
 }
 
 func writePersistedResults(stored []persistedResult) error {
-	return writeValue(RESULTS_DB, stored)
+	return writeValue(resultsDB, stored)
 }
 
 func saveMistakes(mistakes []mistake) {
 	var db []mistake
 
-	if err := readValue(MISTAKE_DB, &db); err != nil {
+	if err := readValue(mistakeDB, &db); err != nil {
 		db = nil
 	}
 
 	db = append(db, mistakes...)
-	if err := writeValue(MISTAKE_DB, db); err != nil {
+	if err := writeValue(mistakeDB, db); err != nil {
 		panic(err)
 	}
 }

@@ -40,7 +40,7 @@ func TestSaveMistakes(t *testing.T) {
 	saveMistakes([]mistake{{"beta", "bteta"}, {"gamma", "gama_"}})
 
 	var got []mistake
-	if err := readValue(MISTAKE_DB, &got); err != nil {
+	if err := readValue(mistakeDB, &got); err != nil {
 		t.Fatal(err)
 	}
 

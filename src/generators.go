@@ -94,13 +94,13 @@ func generateTestFromFile(path string, startParagraph int) func() []segment {
 		panic(err)
 	}
 
-	if err := readValue(FILE_STATE_DB, &db); err != nil {
+	if err := readValue(fileStateDB, &db); err != nil {
 		db = map[string]int{}
 	}
 
 	if startParagraph != -1 {
 		db[path] = startParagraph
-		if err := writeValue(FILE_STATE_DB, db); err != nil {
+		if err := writeValue(fileStateDB, db); err != nil {
 			panic(err)
 		}
 	}
@@ -116,7 +116,7 @@ func generateTestFromFile(path string, startParagraph int) func() []segment {
 	return func() []segment {
 		idx++
 		db[path] = idx
-		if err := writeValue(FILE_STATE_DB, db); err != nil {
+		if err := writeValue(fileStateDB, db); err != nil {
 			panic(err)
 		}
 
