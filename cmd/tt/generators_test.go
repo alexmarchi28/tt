@@ -543,3 +543,41 @@ func mustGen(gen func() []segment, err error) func() []segment {
 
 	return gen
 }
+
+func TestGeneratorsRejectEmptyText(t *testing.T) {
+	dir := useTempStorage(t)
+	blankFile := writeTextFile(t, "  \n\n\t\n")
+	writeUserResource(t, dir, "quotes", "blank", `[{"text": " "}, {"text": ""}]`)
+
+	tests := []struct {
+		name string
+		gen  func() (func() []segment, error)
+		want string
+	}{
+		{"raw", func() (func() []segment, error) { return generateTestFromData([]byte(" \n"), true, false) }, "There is no text to type."},
+		{"paragraphs", func() (func() []segment, error) { return generateTestFromData([]byte(" \n\n "), false, false) }, "There is no text to type."},
+		{"multi", func() (func() []segment, error) { return generateTestFromData(nil, false, true) }, "There is no text to type."},
+		{"file", func() (func() []segment, error) { return generateTestFromFile(blankFile, -1) }, blankFile + " does not contain any text."},
+		{"quotes", func() (func() []segment, error) { return generateQuoteTest("blank") }, "blank does not contain any quotes."},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := tc.gen(); err == nil || err.Error() != tc.want {
+				t.Errorf("error = %v, want %q", err, tc.want)
+			}
+		})
+	}
+}
+
+func TestGenerateQuoteTestIgnoresBlankQuotes(t *testing.T) {
+	dir := useTempStorage(t)
+	writeUserResource(t, dir, "quotes", "some-blank", `[{"text": "  "}, {"text": "real quote"}]`)
+
+	gen := mustGen(generateQuoteTest("some-blank"))
+	for i := 0; i < 20; i++ {
+		if got := gen(); got[0].Text != "real quote" {
+			t.Fatalf("got %q, want the only quote with text", got)
+		}
+	}
+}

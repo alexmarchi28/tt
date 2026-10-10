@@ -972,3 +972,19 @@ func TestTyperRecordsKeystrokes(t *testing.T) {
 		t.Errorf("keystrokes = %v, want %v", got, want)
 	}
 }
+
+func TestTyperEmptyText(t *testing.T) {
+	ty, sim := newTestTyper(t)
+
+	// The timer never starts, the test lasts no time at all.
+	got := typeText(t, ty, sim, "", "a")
+	if got.rc != TyperComplete || got.duration != 0 || got.cpm() != 0 || got.wpm() != 0 {
+		t.Errorf("got %+v (cpm %d), want a completed test without duration nor speed", got, got.cpm())
+	}
+}
+
+func TestTestResultWithoutDuration(t *testing.T) {
+	if got := (testResult{correctChars: 10}).cpm(); got != 0 {
+		t.Errorf("cpm() without duration = %d, want 0", got)
+	}
+}

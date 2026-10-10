@@ -220,6 +220,14 @@ func generateQuoteTest(name string) (func() []segment, error) {
 		return nil, fmt.Errorf("Improperly formatted quote file: %v", err)
 	}
 
+	var withText []segment
+	for _, q := range quotes {
+		if strings.TrimSpace(q.Text) != "" {
+			withText = append(withText, q)
+		}
+	}
+	quotes = withText
+
 	if len(quotes) == 0 {
 		return nil, fmt.Errorf("%s does not contain any quotes.", name)
 	}
@@ -231,10 +239,14 @@ func generateQuoteTest(name string) (func() []segment, error) {
 }
 
 func generateTestFromData(data []byte, raw bool, split bool) (func() []segment, error) {
+	paragraphs := getParagraphs(string(data))
+	if len(paragraphs) == 0 {
+		return nil, errors.New("There is no text to type.")
+	}
+
 	if raw {
 		return func() []segment { return []segment{{string(data), ""}} }, nil
 	} else if split {
-		paragraphs := getParagraphs(string(data))
 		i := 0
 
 		return func() []segment {
@@ -250,7 +262,7 @@ func generateTestFromData(data []byte, raw bool, split bool) (func() []segment, 
 		return func() []segment {
 			var segments []segment
 
-			for _, p := range getParagraphs(string(data)) {
+			for _, p := range paragraphs {
 				segments = append(segments, segment{p, ""})
 			}
 
@@ -285,6 +297,9 @@ func generateTestFromFile(path string, startParagraph int) (func() []segment, er
 		return nil, fmt.Errorf("Failed to read %s.", path)
 	}
 	paragraphs := getParagraphs(string(b))
+	if len(paragraphs) == 0 {
+		return nil, fmt.Errorf("%s does not contain any text.", path)
+	}
 
 	return func() []segment {
 		idx++

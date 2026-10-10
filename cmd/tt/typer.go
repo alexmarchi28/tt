@@ -229,6 +229,10 @@ type testResult struct {
 }
 
 func (r testResult) cpm() int {
+	if r.duration <= 0 {
+		return 0
+	}
+
 	return int(float64(r.correctChars) / (float64(r.duration) / 60e9))
 }
 
@@ -294,9 +298,15 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 	t.Scr.SetStyle(t.defaultStyle)
 
 	result := func() testResult {
+		//The timer never starts if nothing had to be typed.
+		var duration time.Duration
+		if !startTime.IsZero() {
+			duration = t.now().Sub(startTime)
+		}
+
 		return testResult{
 			rc:           TyperComplete,
-			duration:     t.now().Sub(startTime),
+			duration:     duration,
 			correctChars: state.correctChars(),
 			correctKeys:  state.correctKeys,
 			wrongKeys:    state.wrongKeys,

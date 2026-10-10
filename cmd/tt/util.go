@@ -7,10 +7,19 @@ import (
 	"github.com/gdamore/tcell"
 )
 
+// getParagraphs returns the paragraphs of s which aren't blank.
 func getParagraphs(s string) []string {
 	s = strings.Replace(s, "\r", "", -1)
 	s = regexp.MustCompile("\n\n+").ReplaceAllString(s, "\n\n")
-	return strings.Split(strings.Trim(s, "\n"), "\n\n")
+
+	var paragraphs []string
+	for _, p := range strings.Split(strings.Trim(s, "\n"), "\n\n") {
+		if strings.TrimSpace(p) != "" {
+			paragraphs = append(paragraphs, p)
+		}
+	}
+
+	return paragraphs
 }
 
 func wordWrapRunes(s []rune, n int) {

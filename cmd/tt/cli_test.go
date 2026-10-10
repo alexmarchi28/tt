@@ -347,3 +347,12 @@ func TestOptionsValidate(t *testing.T) {
 		}
 	}
 }
+
+func TestCLIWithoutText(t *testing.T) {
+	// runCLI pipes nothing to stdin.
+	got := runCLI(t, t.TempDir(), nil)
+
+	if want := (cliResult{"", "ERROR: There is no text to type.\n", 1}); got != want {
+		t.Errorf("tt < /dev/null = %+v, want %+v", got, want)
+	}
+}
