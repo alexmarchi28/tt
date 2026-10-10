@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -189,23 +190,12 @@ func newTcellColor(s string) (tcell.Color, error) {
 		return 0, fmt.Errorf("%s is not a valid hex color", s)
 	}
 
-	tonum := func(c byte) int32 {
-		if c > '9' {
-			if c >= 'a' {
-				return (int32)(c - 'a' + 10)
-			} else {
-				return (int32)(c - 'A' + 10)
-			}
-		} else {
-			return (int32)(c - '0')
-		}
+	rgb, err := strconv.ParseUint(s[1:], 16, 32)
+	if err != nil {
+		return 0, fmt.Errorf("%s is not a valid hex color", s)
 	}
 
-	r := tonum(s[1])<<4 | tonum(s[2])
-	g := tonum(s[3])<<4 | tonum(s[4])
-	b := tonum(s[5])<<4 | tonum(s[6])
-
-	return tcell.NewRGBColor(r, g, b), nil
+	return tcell.NewHexColor(int32(rgb)), nil
 }
 
 func readResource(typ, name string) []byte {

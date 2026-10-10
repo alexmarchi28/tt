@@ -361,3 +361,11 @@ func TestWordWrapCountsCharacters(t *testing.T) {
 		}
 	}
 }
+
+func TestNewTcellColorRejectsInvalidDigits(t *testing.T) {
+	for _, in := range []string{"#gggggg", "#12345z", "#+12345", "# 12345", "#0x1234"} {
+		if c, err := newTcellColor(in); err == nil {
+			t.Errorf("newTcellColor(%q) = %v, want an error", in, c)
+		}
+	}
+}
