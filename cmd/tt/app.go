@@ -99,7 +99,7 @@ func (a *app) run(testFn func() []segment) int {
 				if len(tests[idx]) == 1 {
 					attribution = tests[idx][0].Attribution
 				}
-				if quit := showReport(a.scr, res.cpm(), res.wpm(), res.accuracy(), attribution, res.mistakes); quit {
+				if quit := showReport(a.scr, formatReport(res, attribution)); quit {
 					return 1
 				}
 			}

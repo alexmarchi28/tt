@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"strconv"
+	"strings"
 
 	"github.com/gdamore/tcell"
 )
@@ -18,26 +19,31 @@ type result struct {
 	Mistakes  []mistake `json:"mistakes"`
 }
 
-// showReport shows the results of a test until escape is pressed. It
-// returns true if the user asked to quit instead.
-func showReport(scr tcell.Screen, cpm, wpm int, accuracy float64, attribution string, mistakes []mistake) (quit bool) {
-	mistakeStr := ""
-	if attribution != "" {
-		attribution = "\n\nAttribution: " + attribution
-	}
+// formatReport describes the outcome of a completed test.
+func formatReport(res testResult, attribution string) string {
+	var b strings.Builder
 
-	if len(mistakes) > 0 {
-		mistakeStr = "\nMistakes:    "
-		for i, m := range mistakes {
-			mistakeStr += m.Word
-			if i != len(mistakes)-1 {
-				mistakeStr += ", "
-			}
+	fmt.Fprintf(&b, "WPM:         %d\nCPM:         %d\nAccuracy:    %.2f%%", res.wpm(), res.cpm(), res.accuracy())
+
+	if len(res.mistakes) > 0 {
+		words := make([]string, len(res.mistakes))
+		for i, m := range res.mistakes {
+			words[i] = m.Word
 		}
+
+		fmt.Fprintf(&b, "\nMistakes:    %s", strings.Join(words, ", "))
 	}
 
-	report := fmt.Sprintf("WPM:         %d\nCPM:         %d\nAccuracy:    %.2f%%%s%s", wpm, cpm, accuracy, mistakeStr, attribution)
+	if attribution != "" {
+		fmt.Fprintf(&b, "\n\nAttribution: %s", attribution)
+	}
 
+	return b.String()
+}
+
+// showReport shows a report until escape is pressed. It returns true if the
+// user asked to quit instead.
+func showReport(scr tcell.Screen, report string) (quit bool) {
 	scr.Clear()
 	drawStringAtCenter(scr, report, tcell.StyleDefault)
 	scr.HideCursor()

@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"testing"
+	"time"
 )
 
 var testResults = []result{
@@ -64,5 +65,42 @@ func TestWriteResultsEscapesCSV(t *testing.T) {
 		"mistake,\"\"\"quoted\"\"\",\"\"\"quoted_\"\n"
 	if b.String() != want {
 		t.Errorf("got\n%s\nwant\n%s", b.String(), want)
+	}
+}
+
+func TestFormatReport(t *testing.T) {
+	res := testResult{
+		duration:     time.Minute,
+		correctChars: 300,
+		correctKeys:  39,
+		wrongKeys:    1,
+		mistakes:     []mistake{{"alpha", "alpah"}, {"beta", "bet_"}},
+	}
+
+	tests := []struct {
+		name        string
+		res         testResult
+		attribution string
+		want        string
+	}{
+		{"plain", testResult{duration: time.Minute, correctChars: 250, correctKeys: 10}, "", "" +
+			"WPM:         50\n" +
+			"CPM:         250\n" +
+			"Accuracy:    100.00%"},
+		{"mistakes and attribution", res, "Someone", "" +
+			"WPM:         60\n" +
+			"CPM:         300\n" +
+			"Accuracy:    97.50%\n" +
+			"Mistakes:    alpha, beta\n" +
+			"\n" +
+			"Attribution: Someone"},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := formatReport(tc.res, tc.attribution); got != tc.want {
+				t.Errorf("got\n%s\nwant\n%s", got, tc.want)
+			}
+		})
 	}
 }
