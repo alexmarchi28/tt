@@ -31,6 +31,7 @@ func TestWriteResults(t *testing.T) {
 				"mistake,beta,bet_\n",
 		},
 		{"csv without results", nil, false, true, ""},
+		{"json without results", nil, true, false, "[]"},
 	}
 
 	for _, tc := range tests {

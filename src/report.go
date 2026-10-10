@@ -57,6 +57,9 @@ func showReport(scr tcell.Screen, cpm, wpm int, accuracy float64, attribution st
 func writeResults(w io.Writer, results []result, asJSON, asCSV bool) error {
 	if asJSON {
 		//Avoid null in serialized JSON.
+		if results == nil {
+			results = []result{}
+		}
 		for i := range results {
 			if results[i].Mistakes == nil {
 				results[i].Mistakes = []mistake{}
