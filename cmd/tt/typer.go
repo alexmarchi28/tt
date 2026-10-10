@@ -37,6 +37,7 @@ type typer struct {
 	ShowAccuracy     bool
 	DisableBackspace bool
 	BlockCursor      bool
+	Blind            bool // Show mistakes like correctly typed characters.
 	CycleTheme       func(direction int) (string, error)
 	tty              io.Writer
 
@@ -452,12 +453,12 @@ func (t *typer) drawText(state *typingState, x, y int) {
 			style = t.nextWordStyle
 		case i >= state.idx:
 			style = t.defaultStyle
-		case r != state.typed[i] && (r == ' ' || r == '\t'):
-			style = t.incorrectSpaceStyle
-		case r != state.typed[i]:
-			style = t.incorrectStyle
-		default:
+		case t.Blind || r == state.typed[i]:
 			style = t.correctStyle
+		case r == ' ' || r == '\t':
+			style = t.incorrectSpaceStyle
+		default:
+			style = t.incorrectStyle
 		}
 
 		glyph := r

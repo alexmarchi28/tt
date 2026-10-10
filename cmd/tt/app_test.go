@@ -241,11 +241,11 @@ func TestAppWithoutTheme(t *testing.T) {
 }
 
 func TestNewAppAppliesOptions(t *testing.T) {
-	opts := parseFlags([]string{"-noskip", "-nobackspace", "-showwpm", "-showaccuracy", "-nohighlight", "-blockcursor"})
+	opts := parseFlags([]string{"-noskip", "-nobackspace", "-showwpm", "-showaccuracy", "-nohighlight", "-blockcursor", "-blind"})
 	a, _ := newTestApp(t, opts)
 
 	ty := a.typer
-	if ty.SkipWord || !ty.DisableBackspace || !ty.ShowWpm || !ty.ShowAccuracy || ty.highlightCurrent || ty.highlightNext || !ty.BlockCursor {
+	if ty.SkipWord || !ty.DisableBackspace || !ty.ShowWpm || !ty.ShowAccuracy || ty.highlightCurrent || ty.highlightNext || !ty.BlockCursor || !ty.Blind {
 		t.Errorf("options not applied to the typer: %+v", ty)
 	}
 	if a.theme != "default" {

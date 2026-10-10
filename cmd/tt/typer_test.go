@@ -779,3 +779,25 @@ func TestTyperDrawsTabs(t *testing.T) {
 	sendKeys(t, sim, tcell.KeyEscape)
 	waitOutcome(t, done)
 }
+
+func TestTyperBlind(t *testing.T) {
+	ty, sim := newTestTyper(t)
+	ty.SkipWord = false
+	ty.Blind = true
+
+	done := startTyper(ty, []segment{{"ab cd ef", ""}}, -1)
+	x, y := textOrigin(t, sim, "ab cd ef")
+
+	// Mistakes look like correctly typed characters.
+	correct := cellWant{testHi, testBg, true}
+	sendKeys(t, sim, "xbx")
+	waitForColors(t, sim, x, y, map[int]cellWant{
+		0: correct, 1: correct, 2: correct,
+		3: {testHi2, testBg, false},
+	})
+
+	// But they still count.
+	sendKeys(t, sim, "cd ef")
+	got := waitOutcome(t, done)
+	assertOutcome(t, got, TyperComplete, 6, 6, 2, []mistake{{"ab", "xb"}})
+}

@@ -67,6 +67,8 @@ Test Parameters
     -t SECONDS          Terminate the test after the given number of seconds.
     -noskip             Disable word skipping when space is pressed.
     -nobackspace        Disable the backspace key.
+    -blind              Don't show mistakes while typing, they are still
+                        reported at the end of the test.
     -nohighlight        Disable current and next word highlighting.
     -highlight1         Only highlight the current word.
     -highlight2         Only highlight the next word.
@@ -116,6 +118,7 @@ type options struct {
 	noSkip             bool
 	blockCursor        bool
 	noBackspace        bool
+	blind              bool
 	noTheme            bool
 	opaqueBg           bool
 	oneShot            bool
@@ -158,6 +161,7 @@ func parseFlags(args []string) options {
 	fs.BoolVar(&opts.noSkip, "noskip", false, "")
 	fs.BoolVar(&opts.blockCursor, "blockcursor", false, "")
 	fs.BoolVar(&opts.noBackspace, "nobackspace", false, "")
+	fs.BoolVar(&opts.blind, "blind", false, "")
 	fs.BoolVar(&opts.noTheme, "notheme", false, "")
 	fs.BoolVar(&opts.opaqueBg, "notransparent", false, "")
 	fs.BoolVar(&opts.oneShot, "oneshot", false, "")

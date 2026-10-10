@@ -105,6 +105,11 @@ mistyped ones coming up more often. -n and -g apply.
 
 : Disable word skipping when space is pressed.
 
+-blind
+
+: Don't show mistakes while typing, they are still reported at the end of the
+test.
+
 -nohighlight
 
 : Disable highlighting.
