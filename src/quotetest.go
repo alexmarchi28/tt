@@ -17,6 +17,10 @@ func generateQuoteTest(name string) func() []segment {
 		}
 	}
 
+	if len(quotes) == 0 {
+		die("%s does not contain any quotes.", name)
+	}
+
 	return func() []segment {
 		idx := rand.Int() % len(quotes)
 		return quotes[idx : idx+1]

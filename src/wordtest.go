@@ -10,6 +10,9 @@ func generateWordTest(name string, n int, g int) func() []segment {
 	}
 
 	words := strings.Fields(string(b))
+	if len(words) == 0 {
+		die("%s does not contain any words.", name)
+	}
 
 	return func() []segment {
 		segments := make([]segment, g)

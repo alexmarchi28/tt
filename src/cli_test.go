@@ -194,3 +194,21 @@ func TestCLIInvalidResources(t *testing.T) {
 		}
 	}
 }
+
+func TestCLIEmptyResources(t *testing.T) {
+	home := t.TempDir()
+	words := filepath.Join(home, "words.txt")
+	quotes := filepath.Join(home, "quotes.json")
+	writeFile(t, words, " \n\n")
+	writeFile(t, quotes, "[]")
+
+	got := runCLI(t, home, nil, "-words", words)
+	if want := (cliResult{"", "ERROR: " + words + " does not contain any words.\n", 1}); got != want {
+		t.Errorf("tt -words <empty file> = %+v, want %+v", got, want)
+	}
+
+	got = runCLI(t, home, nil, "-quotes", quotes)
+	if want := (cliResult{"", "ERROR: " + quotes + " does not contain any quotes.\n", 1}); got != want {
+		t.Errorf("tt -quotes <empty file> = %+v, want %+v", got, want)
+	}
+}
