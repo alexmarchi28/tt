@@ -272,7 +272,8 @@ func TestBuiltinResourcesMatchFiles(t *testing.T) {
 	useTempStorage(t)
 
 	for _, typ := range []string{"themes", "words", "quotes"} {
-		entries, err := os.ReadDir(typ)
+		dir := filepath.Join("..", "..", typ)
+		entries, err := os.ReadDir(dir)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -282,7 +283,7 @@ func TestBuiltinResourcesMatchFiles(t *testing.T) {
 		}
 
 		for _, e := range entries {
-			want, err := os.ReadFile(filepath.Join(typ, e.Name()))
+			want, err := os.ReadFile(filepath.Join(dir, e.Name()))
 			if err != nil {
 				t.Fatal(err)
 			}

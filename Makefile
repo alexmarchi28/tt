@@ -3,7 +3,7 @@ PREFIX := /usr/local
 
 .PHONY: all
 all:
-	go build -o bin/tt .
+	go build -o bin/tt ./cmd/tt
 
 .PHONY: install
 install:
@@ -24,8 +24,8 @@ assets:
 
 .PHONY: rel
 rel:
-	GOOS=darwin GOARCH=amd64 go build -o bin/tt-osx .
-	GOOS=windows GOARCH=amd64 go build -o bin/tt.exe .
-	GOOS=linux GOARCH=amd64 go build -o bin/tt-linux .
-	GOOS=linux GOARCH=arm go build -o bin/tt-linux_arm .
-	GOOS=linux GOARCH=arm64 go build -o bin/tt-linux_arm64 .
+	GOOS=darwin GOARCH=amd64 go build -o bin/tt-osx ./cmd/tt
+	GOOS=windows GOARCH=amd64 go build -o bin/tt.exe ./cmd/tt
+	GOOS=linux GOARCH=amd64 go build -o bin/tt-linux ./cmd/tt
+	GOOS=linux GOARCH=arm go build -o bin/tt-linux_arm ./cmd/tt
+	GOOS=linux GOARCH=arm64 go build -o bin/tt-linux_arm64 ./cmd/tt

@@ -1,19 +1,14 @@
 package main
 
 import (
-	"embed"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
 	"sort"
-)
 
-// builtin holds the resources shipped with tt. Explicit patterns are used so
-// that files starting with an underscore (e.g. themes/_base) are included.
-//
-//go:embed themes/* words/* quotes/*
-var builtin embed.FS
+	"tt"
+)
 
 var configDirs []string
 
@@ -46,7 +41,7 @@ func readResource(typ, name string) []byte {
 		}
 	}
 
-	if b, err := builtin.ReadFile(path.Join(typ, name)); err == nil {
+	if b, err := tt.Builtin.ReadFile(path.Join(typ, name)); err == nil {
 		return b
 	}
 
@@ -56,7 +51,7 @@ func readResource(typ, name string) []byte {
 func listResourceNames(typ string) []string {
 	names := map[string]struct{}{}
 
-	if entries, err := builtin.ReadDir(typ); err == nil {
+	if entries, err := tt.Builtin.ReadDir(typ); err == nil {
 		for _, entry := range entries {
 			names[entry.Name()] = struct{}{}
 		}
