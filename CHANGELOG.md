@@ -1,3 +1,54 @@
+# 1.0.0:
+
+New:
+ - -mistakes practices the recently mistyped words, the most frequent ones more often.
+ - -adaptive practices the words with the pairs of letters typed the slowest or missed the most.
+ - -punct and -numbers add capital letters, punctuation and numbers to word tests.
+ - -blind hides mistakes while typing.
+ - -pace WPM shows a pacer typing at the given speed.
+ - -keys (and -layout) shows on a keyboard how accurately and quickly each key is typed.
+ - -stats also shows the number of tests, the time spent typing, the personal best,
+   the all time average, the weekly trend, a chart of the daily progress, the results
+   by kind of test and the most mistyped words.
+ - The report shows new personal bests.
+ - Tabs can be typed, e.g. source code with -raw.
+ - Binaries for macOS on Apple Silicon, and tt can be installed with go install.
+
+Changed:
+ - -v prints the version on stdout and exits successfully.
+ - -csv quotes words containing commas or quotes, -json prints [] rather than null
+   when no test was completed.
+ - Invalid numeric options and texts with nothing to type are rejected.
+ - The release binaries are named tt-OS-ARCH.
+
+Fixed:
+ - The accuracy of tests made of several segments only counted the last one.
+ - Crash when a test was completed without any counted keystroke.
+ - Pressing space at the start of a line skipped its first word.
+ - Mistakes at the start of a line were recorded with a line break.
+ - Typing a '?' of the text toggled the help.
+ - The default word list contained an empty word, a word list with a single word made
+   tt hang and an empty one made it crash.
+ - Lines were wrapped by bytes rather than characters, too early with accented letters.
+ - The builtin quotes were out of date and the maia theme had an invalid colour.
+ - A truncated results file made tt crash after every test. Saved files are now
+   written atomically.
+ - The mistakes of abandoned tests were recorded with -showwpm only.
+ - tt 0.4.5 reported version 0.4.4.
+
+# 0.4.5:
+ - Ctrl-N and Ctrl-P cycle themes, the last used theme is remembered.
+ - Results are saved and -stats prints the average WPM and accuracy.
+ - -showaccuracy displays the accuracy whilst typing.
+ - The background is transparent by default, -notransparent disables it.
+ - The next word is highlighted correctly across line breaks.
+
+# 0.4.4:
+ - The accuracy is calculated in real time rather than at the end of the test.
+
+# 0.4.3:
+ - Added support for a transparent background.
+
 # 0.4.2:
   Added -notheme, -blockcursor and -bold.
 
