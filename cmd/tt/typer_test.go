@@ -953,3 +953,22 @@ func TestTyperRefreshInterval(t *testing.T) {
 		t.Errorf("refreshInterval() = %v, want the shorter configured interval", got)
 	}
 }
+
+func TestTyperRecordsKeystrokes(t *testing.T) {
+	ty, sim := newTestTyper(t)
+	clock := useFakeClock(ty)
+
+	done := startTyper(ty, []segment{{"ab", ""}, {"c", ""}}, -1)
+	x, y := textOrigin(t, sim, "ab")
+
+	sendKeys(t, sim, "a")
+	waitForColors(t, sim, x, y, map[int]cellWant{0: {testHi, testBg, true}})
+	clock.advance(250 * time.Millisecond)
+	sendKeys(t, sim, "b", "x")
+
+	// Segments are separated by a break, times are relative to each segment.
+	want := []keystroke{{'a', 'a', 0}, {'b', 'b', 250 * time.Millisecond}, {}, {'c', 'x', 0}}
+	if got := waitOutcome(t, done).keystrokes; !reflect.DeepEqual(got, want) {
+		t.Errorf("keystrokes = %v, want %v", got, want)
+	}
+}

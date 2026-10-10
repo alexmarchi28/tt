@@ -225,6 +225,7 @@ type testResult struct {
 	correctKeys  int // Correct keystrokes, used for the accuracy.
 	wrongKeys    int // Wrong keystrokes, used for the accuracy.
 	mistakes     []mistake
+	keystrokes   []keystroke // Segments are separated by a break.
 }
 
 func (r testResult) cpm() int {
@@ -253,6 +254,10 @@ func (t *typer) Start(text []segment, timeout time.Duration) (res testResult) {
 		res.correctKeys += r.correctKeys
 		res.wrongKeys += r.wrongKeys
 		res.mistakes = append(res.mistakes, r.mistakes...)
+		if i > 0 {
+			res.keystrokes = append(res.keystrokes, keystroke{})
+		}
+		res.keystrokes = append(res.keystrokes, r.keystrokes...)
 
 		if timeout != -1 {
 			timeLeft -= r.duration
@@ -296,6 +301,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 			correctKeys:  state.correctKeys,
 			wrongKeys:    state.wrongKeys,
 			mistakes:     state.mistakes(),
+			keystrokes:   state.keystrokes,
 		}
 	}
 
@@ -309,7 +315,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 	handleRune := func(r rune) bool {
 		if !state.done() {
 			startTimer()
-			state.typeRune(r, t.SkipWord)
+			state.typeRune(r, t.SkipWord, t.now().Sub(startTime))
 		}
 
 		return state.done()

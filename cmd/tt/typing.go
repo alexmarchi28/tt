@@ -11,6 +11,14 @@ type typingState struct {
 
 	correctKeys int // Keystrokes matching the expected character.
 	wrongKeys   int // Keystrokes not matching the expected character.
+	keystrokes  []keystroke
+}
+
+// keystroke is a key pressed to type a character of the text.
+type keystroke struct {
+	expected rune          // The character of the text, 0 for a break in the sequence (a correction or a skipped word).
+	typed    rune          // The character typed.
+	at       time.Duration // Time since the start of the test.
 }
 
 func newTypingState(s string) *typingState {
@@ -31,9 +39,10 @@ func (s *typingState) expects(r rune) bool {
 	return s.idx < len(s.text) && s.text[s.idx] == r
 }
 
-// typeRune handles a typed character. If skipWord is set a space moves the
-// cursor to the next word, leaving the rest of the current one untyped.
-func (s *typingState) typeRune(r rune, skipWord bool) {
+// typeRune handles a character typed at the given time since the start of the
+// test. If skipWord is set a space moves the cursor to the next word, leaving
+// the rest of the current one untyped.
+func (s *typingState) typeRune(r rune, skipWord bool, at time.Duration) {
 	if s.done() {
 		return
 	}
@@ -43,9 +52,17 @@ func (s *typingState) typeRune(r rune, skipWord bool) {
 			return
 		}
 
+		start := s.idx
 		for s.idx < len(s.text) && !isWordSeparator(s.text[s.idx]) {
 			s.typed[s.idx] = 0
 			s.idx++
+		}
+
+		//A space typed on a space is a regular keystroke, skipping anything breaks the sequence.
+		if s.idx == start && s.text[s.idx] == ' ' {
+			s.keystrokes = append(s.keystrokes, keystroke{' ', ' ', at})
+		} else {
+			s.keystrokes = append(s.keystrokes, keystroke{})
 		}
 
 		if s.idx < len(s.text) {
@@ -53,6 +70,7 @@ func (s *typingState) typeRune(r rune, skipWord bool) {
 			s.idx++
 		}
 	} else {
+		s.keystrokes = append(s.keystrokes, keystroke{s.text[s.idx], r, at})
 		s.typed[s.idx] = r
 		if r == s.text[s.idx] {
 			s.correctKeys++
@@ -75,6 +93,8 @@ func (s *typingState) backspace() {
 		return
 	}
 
+	s.keystrokes = append(s.keystrokes, keystroke{})
+
 	s.idx--
 
 	for s.idx > 0 && s.text[s.idx] == '\n' {
@@ -88,6 +108,8 @@ func (s *typingState) deleteWord() {
 	if s.idx == 0 {
 		return
 	}
+
+	s.keystrokes = append(s.keystrokes, keystroke{})
 
 	s.idx--
 

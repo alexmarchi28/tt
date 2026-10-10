@@ -81,19 +81,19 @@ func TestExtractMistypedWordsAcrossLines(t *testing.T) {
 	}
 }
 
-// typeKeys feeds keys to a new typingState for text. '\b' stands for
-// backspace and '\x17' (C-w) for deleting a word.
+// typeKeys feeds keys to a new typingState for text, one every 100ms. '\b'
+// stands for backspace and '\x17' (C-w) for deleting a word.
 func typeKeys(text, keys string, skipWord bool) *typingState {
 	s := newTypingState(text)
 
-	for _, r := range keys {
+	for i, r := range []rune(keys) {
 		switch r {
 		case '\b':
 			s.backspace()
 		case '\x17':
 			s.deleteWord()
 		default:
-			s.typeRune(r, skipWord)
+			s.typeRune(r, skipWord, time.Duration(i)*100*time.Millisecond)
 		}
 	}
 
@@ -156,12 +156,12 @@ func TestTypingStateDone(t *testing.T) {
 		t.Errorf("at the start: done %t, expects a %t, expects ? %t", s.done(), s.expects('a'), s.expects('?'))
 	}
 
-	s.typeRune('a', true)
+	s.typeRune('a', true, 0)
 	if s.done() || !s.expects('?') {
 		t.Errorf("after a: done %t, expects ? %t", s.done(), s.expects('?'))
 	}
 
-	s.typeRune('?', true)
+	s.typeRune('?', true, 0)
 	if !s.done() || s.expects('?') {
 		t.Errorf("at the end: done %t, expects ? %t", s.done(), s.expects('?'))
 	}
@@ -227,5 +227,36 @@ func TestPaceIndex(t *testing.T) {
 
 	if got := paceIndex(text, time.Second, 120); got != 6 {
 		t.Errorf("at 120 wpm paceIndex(1s) = %d, want the end of the text", got)
+	}
+}
+
+func TestTypingStateRecordsKeystrokes(t *testing.T) {
+	ms := time.Millisecond
+	brk := keystroke{}
+
+	tests := []struct {
+		name       string
+		text, keys string
+		noSkip     bool
+		want       []keystroke
+	}{
+		{"typed", "ab cd", "ax c", false, []keystroke{{'a', 'a', 0}, {'b', 'x', 100 * ms}, {' ', ' ', 200 * ms}, {'c', 'c', 300 * ms}}},
+		{"corrections break the sequence", "ab cd", "x\ba\x17ab", false, []keystroke{
+			{'a', 'x', 0}, brk, {'a', 'a', 200 * ms}, brk, {'a', 'a', 400 * ms}, {'b', 'b', 500 * ms},
+		}},
+		{"skipped words break the sequence", "ab cd", "a c", false, []keystroke{{'a', 'a', 0}, brk, {'c', 'c', 200 * ms}}},
+		{"spaces typed without skipping", "ab cd", "a c", true, []keystroke{{'a', 'a', 0}, {'b', ' ', 100 * ms}, {' ', 'c', 200 * ms}}},
+		{"ignored space", "ab cd", "ab  c", false, []keystroke{{'a', 'a', 0}, {'b', 'b', 100 * ms}, {' ', ' ', 200 * ms}, {'c', 'c', 400 * ms}}},
+		{"line breaks are not keystrokes", "a\nb", "ab", false, []keystroke{{'a', 'a', 0}, {'b', 'b', 100 * ms}}},
+		{"space on a tab", "ab\tc", "ab c", false, []keystroke{{'a', 'a', 0}, {'b', 'b', 100 * ms}, brk, {'c', 'c', 300 * ms}}},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := typeKeys(tc.text, tc.keys, !tc.noSkip).keystrokes
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("keystrokes = %v, want %v", got, tc.want)
+			}
+		})
 	}
 }
