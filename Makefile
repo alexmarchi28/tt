@@ -5,6 +5,9 @@ PREFIX := /usr/local
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null)
 GOBUILD := CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.version=$(VERSION)"
 
+# The platforms of the release binaries, as os/arch.
+PLATFORMS := linux/amd64 linux/arm64 linux/arm darwin/amd64 darwin/arm64 windows/amd64
+
 .PHONY: all
 all:
 	$(GOBUILD) -o bin/tt ./cmd/tt
@@ -26,10 +29,15 @@ assets:
 	python3 ./scripts/themegen.py
 	pandoc -s -t man -o - man.md|gzip > tt.1.gz
 
+# Builds the release files in bin/release: a binary for each platform, named
+# tt-os-arch, the man page and their checksums.
 .PHONY: rel
 rel:
-	GOOS=darwin GOARCH=amd64 go build -o bin/tt-osx ./cmd/tt
-	GOOS=windows GOARCH=amd64 go build -o bin/tt.exe ./cmd/tt
-	GOOS=linux GOARCH=amd64 go build -o bin/tt-linux ./cmd/tt
-	GOOS=linux GOARCH=arm go build -o bin/tt-linux_arm ./cmd/tt
-	GOOS=linux GOARCH=arm64 go build -o bin/tt-linux_arm64 ./cmd/tt
+	rm -rf bin/release
+	mkdir -p bin/release
+	for p in $(PLATFORMS); do \
+		os=$${p%/*}; arch=$${p#*/}; ext=; [ $$os = windows ] && ext=.exe; \
+		GOOS=$$os GOARCH=$$arch $(GOBUILD) -o bin/release/tt-$$os-$$arch$$ext ./cmd/tt || exit 1; \
+	done
+	cp tt.1.gz bin/release/
+	cd bin/release && sha256sum * > SHA256SUMS
