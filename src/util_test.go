@@ -302,3 +302,21 @@ func TestDrawString(t *testing.T) {
 		t.Errorf("centered line = %q, want %q", got, "        xyz")
 	}
 }
+
+func TestExtractMistypedWordsAcrossLines(t *testing.T) {
+	tests := []struct {
+		text, typed string
+		want        []mistake
+	}{
+		{"ab \ncd", "ab \ncx", []mistake{{"cd", "cx"}}},
+		{"ab\ncd", "ab\ncx", []mistake{{"cd", "cx"}}},
+		{"ab\ncd", "xb\ncd", []mistake{{"ab", "xb"}}},
+	}
+
+	for _, tc := range tests {
+		got := extractMistypedWords([]rune(tc.text), []rune(tc.typed))
+		if !reflect.DeepEqual(got, tc.want) {
+			t.Errorf("extractMistypedWords(%q, %q) = %q, want %q", tc.text, tc.typed, got, tc.want)
+		}
+	}
+}

@@ -261,7 +261,7 @@ func extractMistypedWords(text []rune, typed []rune) (mistakes []mistake) {
 	f := false
 
 	for i := range text {
-		if text[i] == ' ' {
+		if isWordSeparator(text[i]) {
 			if f {
 				mistakes = append(mistakes, mistake{string(w), string(t)})
 			}
