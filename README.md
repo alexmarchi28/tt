@@ -41,6 +41,8 @@ cd tt
 make && sudo make install
 ```
 
+The test suite can be run with `go test ./...`.
+
 Best served on a terminal with truecolor and cursor shape support (e.g kitty, iterm)
 
 # Usage
