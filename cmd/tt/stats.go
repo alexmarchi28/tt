@@ -220,7 +220,7 @@ func formatStats(stored []persistedResult, mistakes []mistake, now time.Time) st
 func printStats() {
 	stored, err := readPersistedResults()
 	if err != nil && !os.IsNotExist(err) {
-		die("Could not read saved results: %v", err)
+		die("%v", unreadableResults(err))
 	}
 
 	if len(stored) == 0 {

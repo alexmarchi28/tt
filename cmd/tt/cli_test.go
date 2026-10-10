@@ -169,7 +169,7 @@ func TestCLIStatsWithCorruptResults(t *testing.T) {
 	writeFile(t, filepath.Join(home, ".local", "share", "tt", ".results"), "not json")
 
 	got := runCLI(t, home, nil, "-stats")
-	if got.code != 1 || !strings.HasPrefix(got.stderr, "ERROR: Could not read saved results: ") {
+	if got.code != 1 || !strings.HasPrefix(got.stderr, "ERROR: Could not read the saved results in ") || !strings.HasSuffix(got.stderr, "Fix or remove the file.\n") {
 		t.Errorf("tt -stats = %+v, want an error", got)
 	}
 }
@@ -354,5 +354,23 @@ func TestCLIWithoutText(t *testing.T) {
 
 	if want := (cliResult{"", "ERROR: There is no text to type.\n", 1}); got != want {
 		t.Errorf("tt < /dev/null = %+v, want %+v", got, want)
+	}
+}
+
+func TestCLIRefusesToStartWithCorruptResults(t *testing.T) {
+	home := t.TempDir()
+	results := filepath.Join(home, ".local", "share", "tt", ".results")
+	writeFile(t, results, `[{"wpm":60,"accur`)
+
+	// Checked before typing a test whose result could not be saved.
+	got := runCLI(t, home, nil, "-n", "5")
+
+	want := "ERROR: Could not read the saved results in " + results + ": unexpected end of JSON input. Fix or remove the file.\n"
+	if got.code != 1 || got.stderr != want {
+		t.Errorf("tt with corrupt results = %+v, want the error %q", got, want)
+	}
+
+	if b, _ := os.ReadFile(results); string(b) != `[{"wpm":60,"accur` {
+		t.Errorf("the results file was changed to %q", b)
 	}
 }

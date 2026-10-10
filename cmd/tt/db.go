@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 )
@@ -109,6 +110,11 @@ func writeAppConfig(cfg appConfig) error {
 	return writeValue(appConfigPath, cfg)
 }
 
+// unreadableResults describes the error of reading the saved results.
+func unreadableResults(err error) error {
+	return fmt.Errorf("Could not read the saved results in %s: %v. Fix or remove the file.", resultsDB, err)
+}
+
 func readPersistedResults() ([]persistedResult, error) {
 	var stored []persistedResult
 	err := readValue(resultsDB, &stored)
@@ -136,16 +142,12 @@ func saveMistakes(mistakes []mistake) {
 // before it.
 func savePersistedResult(r persistedResult) []persistedResult {
 	stored, err := readPersistedResults()
-	if err != nil {
-		if os.IsNotExist(err) {
-			stored = nil
-		} else {
-			panic(err)
-		}
+	if err != nil && !os.IsNotExist(err) {
+		die("%v", unreadableResults(err))
 	}
 
 	if err := writePersistedResults(append(stored, r)); err != nil {
-		panic(err)
+		die("Could not save the result: %v", err)
 	}
 
 	return stored
