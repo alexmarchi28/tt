@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gdamore/tcell"
 )
@@ -318,5 +319,28 @@ func TestExtractMistypedWordsAcrossLines(t *testing.T) {
 		if !reflect.DeepEqual(got, tc.want) {
 			t.Errorf("extractMistypedWords(%q, %q) = %q, want %q", tc.text, tc.typed, got, tc.want)
 		}
+	}
+}
+
+func TestRandomTextWithoutAlternatives(t *testing.T) {
+	tests := map[string][]string{
+		"single word":     {"solo"},
+		"same word twice": {"solo", "solo"},
+	}
+
+	for name, words := range tests {
+		t.Run(name, func(t *testing.T) {
+			done := make(chan string, 1)
+			go func() { done <- randomText(4, words) }()
+
+			select {
+			case got := <-done:
+				if got != "solo solo solo solo" {
+					t.Errorf("randomText = %q, want %q", got, "solo solo solo solo")
+				}
+			case <-time.After(time.Second):
+				t.Fatal("randomText did not return")
+			}
+		})
 	}
 }

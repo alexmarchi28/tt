@@ -84,10 +84,19 @@ func init() {
 func randomText(n int, words []string) string {
 	r := ""
 
+	//Consecutive repetitions can only be avoided if there are at least two distinct words.
+	canAvoidRepeats := false
+	for _, w := range words {
+		if w != words[0] {
+			canAvoidRepeats = true
+			break
+		}
+	}
+
 	var last string
 	for i := 0; i < n; i++ {
 		w := words[rand.Int()%len(words)]
-		for last == w {
+		for canAvoidRepeats && last == w {
 			w = words[rand.Int()%len(words)]
 		}
 
