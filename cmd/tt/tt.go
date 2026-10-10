@@ -92,6 +92,10 @@ Misc
                         tests, time spent typing, personal best, averages over
                         time, weekly trend, a chart of the daily progress,
                         results by kind of test and most mistyped words.
+    -keys               Print how accurately and quickly each key is typed on
+                        a keyboard.
+    -layout LAYOUT      The keyboard layout used by -keys: us, it, de, fr,
+                        dvorak or colemak (default: us).
 
 Version
     -v                  Print the current version.
@@ -106,6 +110,7 @@ type options struct {
 	pace           int           // 0 for no pacer.
 
 	listType  string
+	layout    string
 	wordFile  string
 	quoteFile string
 	themeName string
@@ -134,6 +139,7 @@ type options struct {
 	raw                bool
 	multi              bool
 	stats              bool
+	keys               bool
 	version            bool
 }
 
@@ -180,6 +186,8 @@ func parseFlags(args []string) options {
 	fs.BoolVar(&opts.stats, "stats", false, "")
 	fs.StringVar(&opts.themeName, "theme", "default", "")
 	fs.StringVar(&opts.listType, "list", "", "")
+	fs.BoolVar(&opts.keys, "keys", false, "")
+	fs.StringVar(&opts.layout, "layout", "us", "")
 
 	fs.Usage = func() { os.Stdout.Write([]byte(usage)) }
 	fs.Parse(args)
@@ -245,6 +253,11 @@ func main() {
 
 	if opts.stats {
 		printStats()
+		os.Exit(0)
+	}
+
+	if opts.keys {
+		printKeys(opts.layout, isatty.IsTerminal(os.Stdout.Fd()) && os.Getenv("NO_COLOR") == "")
 		os.Exit(0)
 	}
 

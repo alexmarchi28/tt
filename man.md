@@ -193,6 +193,17 @@ code, are typed with the tab key.
     average WPM of each of the last 30 days, results by kind of test (word list,
     quotes, file...) and most mistyped words.
 
+**-keys**\
+
+    Print how accurately and quickly each key is typed on a keyboard, from the
+    best key to the worst one compared to the others, as well as the most
+    missed and slowest keys. Keys need a few keystrokes before being rated.
+
+**-layout** *LAYOUT*\
+
+    The keyboard layout used by -keys: us, it, de, fr, dvorak or colemak
+    (default: us).
+
 **-v**\
 
     Print the current version.
@@ -258,6 +269,10 @@ Modify to taste.
   The last selected theme is stored in:
 
   ~/.config/tt/config.json
+
+  Results, mistakes and statistics about each key are stored in:
+
+  ~/.local/share/tt (or $XDG_DATA_HOME/tt)
 
 # KEYS
 

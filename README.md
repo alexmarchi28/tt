@@ -76,6 +76,7 @@ options.
  - `tt -t 10` starts a timed test lasting 10 seconds.
  - `tt -pace 70` shows a pacer typing at 70 wpm to keep up with.
  - `tt -theme gruvbox` Starts tt with the gruvbox theme.
+ - `tt -keys -layout it` Shows on an Italian keyboard which keys you miss most and type slowest.
  - `tt -stats` Prints your personal best, average WPM and accuracy over time, weekly trend, a chart of your daily progress, results by kind of test and most mistyped words.
 
 `tt` is designed to be easily scriptable and integrate nicely with

@@ -295,3 +295,23 @@ func TestCLIMistakesWithoutMistakes(t *testing.T) {
 		t.Errorf("tt -mistakes = %+v, want %+v", got, want)
 	}
 }
+
+func TestCLIKeys(t *testing.T) {
+	home := t.TempDir()
+
+	if got := runCLI(t, home, nil, "-keys"); got != (cliResult{"No keystrokes recorded yet.\n", "", 0}) {
+		t.Errorf("tt -keys without data = %+v", got)
+	}
+
+	writeFile(t, filepath.Join(home, ".local", "share", "tt", ".keys"),
+		`{"chars":{"a":{"count":20,"errors":0.1,"timed":10,"latency":200},"è":{"count":20,"errors":0.5,"timed":10,"latency":300}},"bigrams":{}}`)
+
+	got := runCLI(t, home, nil, "-keys", "-layout", "it")
+	if got.code != 0 || !strings.Contains(got.stdout, "  q  w  e  r  t  y  u  i  o  p  è█ +\n") || strings.Contains(got.stdout, "\x1b[") {
+		t.Errorf("tt -keys -layout it = %+v, want an uncoloured Italian keyboard", got)
+	}
+
+	if got := runCLI(t, home, nil, "-keys", "-layout", "nope"); got.code != 1 || !strings.Contains(got.stderr, "unknown layout nope") {
+		t.Errorf("tt -keys -layout nope = %+v, want an error", got)
+	}
+}
