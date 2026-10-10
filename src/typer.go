@@ -43,12 +43,7 @@ type typer struct {
 	emboldenTypedText   bool
 	highlightCurrent    bool
 	highlightNext       bool
-	fgcol               tcell.Color
-	bgcol               tcell.Color
-	hicol               tcell.Color
-	hicol2              tcell.Color
-	hicol3              tcell.Color
-	errcol              tcell.Color
+	theme               theme
 	currentWordStyle    tcell.Style
 	nextWordStyle       tcell.Style
 	incorrectSpaceStyle tcell.Style
@@ -75,7 +70,7 @@ var keyboardHelpLines = []string{
 	"Space - skip current word if enabled",
 }
 
-func NewTyper(scr tcell.Screen, emboldenTypedText bool, fgcol, bgcol, hicol, hicol2, hicol3, errcol tcell.Color) *typer {
+func NewTyper(scr tcell.Screen, emboldenTypedText bool, th theme) *typer {
 	var tty io.Writer
 
 	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
@@ -94,22 +89,22 @@ func NewTyper(scr tcell.Screen, emboldenTypedText bool, fgcol, bgcol, hicol, hic
 		highlightNext:     true,
 	}
 
-	t.SetTheme(fgcol, bgcol, hicol, hicol2, hicol3, errcol)
+	t.SetTheme(th)
 	return t
 }
 
 func (t *typer) applyStyles() {
 	def := tcell.StyleDefault.
-		Foreground(t.fgcol).
-		Background(t.bgcol)
+		Foreground(t.theme.fgcol).
+		Background(t.theme.bgcol)
 
-	correctStyle := def.Foreground(t.hicol)
+	correctStyle := def.Foreground(t.theme.hicol)
 	if t.emboldenTypedText {
 		correctStyle = correctStyle.Bold(true)
 	}
 
-	currentWordStyle := def.Foreground(t.hicol2)
-	nextWordStyle := def.Foreground(t.hicol3)
+	currentWordStyle := def.Foreground(t.theme.hicol2)
+	nextWordStyle := def.Foreground(t.theme.hicol3)
 	if !t.highlightNext {
 		currentWordStyle = nextWordStyle
 		nextWordStyle = def
@@ -122,17 +117,12 @@ func (t *typer) applyStyles() {
 	t.correctStyle = correctStyle
 	t.currentWordStyle = currentWordStyle
 	t.nextWordStyle = nextWordStyle
-	t.incorrectStyle = def.Foreground(t.errcol)
-	t.incorrectSpaceStyle = def.Background(t.errcol)
+	t.incorrectStyle = def.Foreground(t.theme.errcol)
+	t.incorrectSpaceStyle = def.Background(t.theme.errcol)
 }
 
-func (t *typer) SetTheme(fgcol, bgcol, hicol, hicol2, hicol3, errcol tcell.Color) {
-	t.fgcol = fgcol
-	t.bgcol = bgcol
-	t.hicol = hicol
-	t.hicol2 = hicol2
-	t.hicol3 = hicol3
-	t.errcol = errcol
+func (t *typer) SetTheme(th theme) {
+	t.theme = th
 	t.applyStyles()
 }
 

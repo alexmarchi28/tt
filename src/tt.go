@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"flag"
 	"fmt"
@@ -41,22 +40,6 @@ func die(format string, args ...interface{}) {
 }
 
 var results []result
-
-func parseConfig(b []byte) map[string]string {
-	if b == nil {
-		return nil
-	}
-
-	cfg := map[string]string{}
-	for _, ln := range bytes.Split(b, []byte("\n")) {
-		a := strings.SplitN(string(ln), ":", 2)
-		if len(a) == 2 {
-			cfg[a[0]] = strings.Trim(a[1], " ")
-		}
-	}
-
-	return cfg
-}
 
 func exit(rc int) {
 	if scr != nil {
@@ -127,59 +110,6 @@ func showReport(scr tcell.Screen, cpm, wpm int, accuracy float64, attribution st
 			exit(1)
 		}
 	}
-}
-
-func createDefaultTyper(scr tcell.Screen) *typer {
-	return NewTyper(scr, true, tcell.ColorDefault,
-		tcell.ColorDefault,
-		tcell.ColorWhite,
-		tcell.ColorGreen,
-		tcell.ColorGreen,
-		tcell.ColorMaroon)
-}
-
-func loadThemeColors(themeName string, disableTransparentBg bool) (fgcol, bgcol, hicol, hicol2, hicol3, errcol tcell.Color, err error) {
-	var theme map[string]string
-
-	if b := readResource("themes", themeName); b == nil {
-		return 0, 0, 0, 0, 0, 0, fmt.Errorf("%s does not appear to be a valid theme", themeName)
-	} else {
-		theme = parseConfig(b)
-	}
-
-	bgcol = tcell.ColorDefault
-
-	if disableTransparentBg {
-		if bgcol, err = newTcellColor(theme["bgcol"]); err != nil {
-			return 0, 0, 0, 0, 0, 0, fmt.Errorf("bgcol is not defined and/or a valid hex colour")
-		}
-	}
-	if fgcol, err = newTcellColor(theme["fgcol"]); err != nil {
-		return 0, 0, 0, 0, 0, 0, fmt.Errorf("fgcol is not defined and/or a valid hex colour")
-	}
-	if hicol, err = newTcellColor(theme["hicol"]); err != nil {
-		return 0, 0, 0, 0, 0, 0, fmt.Errorf("hicol is not defined and/or a valid hex colour")
-	}
-	if hicol2, err = newTcellColor(theme["hicol2"]); err != nil {
-		return 0, 0, 0, 0, 0, 0, fmt.Errorf("hicol2 is not defined and/or a valid hex colour")
-	}
-	if hicol3, err = newTcellColor(theme["hicol3"]); err != nil {
-		return 0, 0, 0, 0, 0, 0, fmt.Errorf("hicol3 is not defined and/or a valid hex colour")
-	}
-	if errcol, err = newTcellColor(theme["errcol"]); err != nil {
-		return 0, 0, 0, 0, 0, 0, fmt.Errorf("errcol is not defined and/or a valid hex colour")
-	}
-
-	return
-}
-
-func createTyper(scr tcell.Screen, bold bool, themeName string, disableTransparentBg bool) *typer {
-	fgcol, bgcol, hicol, hicol2, hicol3, errcol, err := loadThemeColors(themeName, disableTransparentBg)
-	if err != nil {
-		die("%s theme is invalid: %v", themeName, err)
-	}
-
-	return NewTyper(scr, bold, fgcol, bgcol, hicol, hicol2, hicol3, errcol)
 }
 
 func indexResourceName(names []string, name string) int {
@@ -357,7 +287,7 @@ func loadRememberedTheme(disableTransparentBg bool) string {
 		return ""
 	}
 
-	if _, _, _, _, _, _, err := loadThemeColors(themeName, disableTransparentBg); err != nil {
+	if _, err := loadTheme(themeName, disableTransparentBg); err != nil {
 		return ""
 	}
 
@@ -518,9 +448,14 @@ func main() {
 
 	var typer *typer
 	if noTheme {
-		typer = createDefaultTyper(scr)
+		typer = NewTyper(scr, true, terminalTheme)
 	} else {
-		typer = createTyper(scr, boldFlag, themeName, disableTransparentBg)
+		th, err := loadTheme(themeName, disableTransparentBg)
+		if err != nil {
+			die("%s theme is invalid: %v", themeName, err)
+		}
+
+		typer = NewTyper(scr, boldFlag, th)
 		themeToPersist = themeName
 		persistThemeOnExit = true
 	}
@@ -551,12 +486,12 @@ func main() {
 				}
 
 				nextTheme := themeNames[themeIdx]
-				fgcol, bgcol, hicol, hicol2, hicol3, errcol, err := loadThemeColors(nextTheme, disableTransparentBg)
+				th, err := loadTheme(nextTheme, disableTransparentBg)
 				if err != nil {
 					continue
 				}
 
-				typer.SetTheme(fgcol, bgcol, hicol, hicol2, hicol3, errcol)
+				typer.SetTheme(th)
 				typer.RefreshScreen()
 				themeName = nextTheme
 				themeToPersist = nextTheme

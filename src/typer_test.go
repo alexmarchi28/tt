@@ -108,7 +108,7 @@ func TestQuestionMarkTogglesKeyboardHelp(t *testing.T) {
 		scr = oldScr
 	}()
 
-	typer := NewTyper(sim, true, tcell.ColorWhite, tcell.ColorBlack, tcell.ColorGreen, tcell.ColorBlue, tcell.ColorYellow, tcell.ColorRed)
+	typer := NewTyper(sim, true, testTheme)
 	done := make(chan int, 1)
 	go func() {
 		_, rc, _, _, _, _ := typer.start("alpha beta", -1, false, "")
@@ -140,6 +140,8 @@ var (
 	testHi2    = tcell.ColorBlue
 	testHi3    = tcell.ColorYellow
 	testErrCol = tcell.ColorRed
+
+	testTheme = theme{testFg, testBg, testHi, testHi2, testHi3, testErrCol}
 )
 
 type typerOutcome struct {
@@ -160,7 +162,7 @@ func newTestTyper(t *testing.T) (*typer, tcell.SimulationScreen) {
 	scr = sim
 	t.Cleanup(func() { scr = oldScr })
 
-	return NewTyper(sim, true, testFg, testBg, testHi, testHi2, testHi3, testErrCol), sim
+	return NewTyper(sim, true, testTheme), sim
 }
 
 // startTyper runs a test in the background; the outcome is delivered on the
@@ -600,7 +602,7 @@ func TestTyperSetThemeWhileTyping(t *testing.T) {
 	ty, sim := newTestTyper(t)
 
 	ty.CycleTheme = func(direction int) (string, error) {
-		ty.SetTheme(tcell.ColorAqua, tcell.ColorNavy, tcell.ColorLime, tcell.ColorPurple, tcell.ColorOlive, tcell.ColorMaroon)
+		ty.SetTheme(theme{tcell.ColorAqua, tcell.ColorNavy, tcell.ColorLime, tcell.ColorPurple, tcell.ColorOlive, tcell.ColorMaroon})
 		return "custom", nil
 	}
 

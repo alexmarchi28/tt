@@ -1,14 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"math/rand"
 	"os"
 	"path/filepath"
 	"regexp"
 	"sort"
-	"strconv"
 	"strings"
 
 	"github.com/gdamore/tcell"
@@ -142,19 +140,6 @@ func calcStringDimensions(s string) (nc, nr int) {
 	}
 
 	return
-}
-
-func newTcellColor(s string) (tcell.Color, error) {
-	if len(s) != 7 || s[0] != '#' {
-		return 0, fmt.Errorf("%s is not a valid hex color", s)
-	}
-
-	rgb, err := strconv.ParseUint(s[1:], 16, 32)
-	if err != nil {
-		return 0, fmt.Errorf("%s is not a valid hex color", s)
-	}
-
-	return tcell.NewHexColor(int32(rgb)), nil
 }
 
 func readResource(typ, name string) []byte {
