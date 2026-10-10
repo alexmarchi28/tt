@@ -13,7 +13,7 @@ import (
 var configDirs []string
 
 func init() {
-	home, _ := os.LookupEnv("HOME")
+	home, _ := os.UserHomeDir()
 
 	configDirs = []string{
 		filepath.Join(home, ".tt"),

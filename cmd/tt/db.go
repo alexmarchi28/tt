@@ -33,15 +33,14 @@ func (r persistedResult) kind() testKind {
 }
 
 func init() {
-	var ok bool
-	var data string
-	var home string
-
-	if home, ok = os.LookupEnv("HOME"); !ok {
+	//$HOME on unix, %USERPROFILE% on windows.
+	home, err := os.UserHomeDir()
+	if err != nil {
 		die("could not resolve the home directory")
 	}
 
-	if data, ok = os.LookupEnv("XDG_DATA_HOME"); ok {
+	data, ok := os.LookupEnv("XDG_DATA_HOME")
+	if ok {
 		data = filepath.Join(data, "/tt")
 	} else {
 		data = filepath.Join(home, "/.local/share/tt")

@@ -329,3 +329,11 @@ func TestCLIRefusesToStartWithCorruptResults(t *testing.T) {
 		t.Errorf("the results file was changed to %q", b)
 	}
 }
+
+func TestCLIWithoutHome(t *testing.T) {
+	got := runCLI(t, "", nil, "-v")
+
+	if want := (cliResult{"", "ERROR: could not resolve the home directory\n", 1}); got != want {
+		t.Errorf("tt -v without a home directory = %+v, want %+v", got, want)
+	}
+}
