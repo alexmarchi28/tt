@@ -102,12 +102,6 @@ func TestQuestionMarkTogglesKeyboardHelp(t *testing.T) {
 	}
 	defer sim.Fini()
 
-	oldScr := scr
-	scr = sim
-	defer func() {
-		scr = oldScr
-	}()
-
 	typer := NewTyper(sim, true, testTheme)
 	done := make(chan int, 1)
 	go func() {
@@ -157,11 +151,6 @@ func newTestTyper(t *testing.T) (*typer, tcell.SimulationScreen) {
 	t.Helper()
 
 	sim := newSimScreen(t)
-
-	oldScr := scr
-	scr = sim
-	t.Cleanup(func() { scr = oldScr })
-
 	return NewTyper(sim, true, testTheme), sim
 }
 

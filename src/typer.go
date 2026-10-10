@@ -337,7 +337,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 	text := []rune(s)
 	typed := make([]rune, len(text))
 
-	sw, sh := scr.Size()
+	sw, sh := t.Scr.Size()
 	nc, nr := calcStringDimensions(s)
 	x := (sw - nc) / 2
 	y := (sh - nr) / 2
@@ -387,7 +387,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 			}
 
 			if i == idx {
-				scr.ShowCursor(cx, cy)
+				t.Scr.ShowCursor(cx, cy)
 			}
 
 			if i >= idx {
@@ -408,7 +408,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 				style = t.correctStyle
 			}
 
-			scr.SetContent(cx, cy, text[i], nil, style)
+			t.Scr.SetContent(cx, cy, text[i], nil, style)
 			cx++
 		}
 
