@@ -81,6 +81,10 @@ func TestAppRecordsCompletedTests(t *testing.T) {
 		}
 	}
 
+	if ks := loadKeyStats(); ks.Chars["a"].Count != 1 || ks.Chars["d"].ErrorRate != 1 {
+		t.Errorf("key statistics = %+v, want those of the completed tests", ks)
+	}
+
 	// The mistake of the restarted attempt is not recorded.
 	var mistakes []mistake
 	if err := readValue(mistakeDB, &mistakes); err != nil || !reflect.DeepEqual(mistakes, []mistake{{"cd", "cx"}}) {

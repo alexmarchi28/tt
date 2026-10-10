@@ -33,6 +33,7 @@ func setStorageDir(dir string) {
 	fileStateDB = filepath.Join(dir, ".db")
 	mistakeDB = filepath.Join(dir, ".errors")
 	resultsDB = filepath.Join(dir, ".results")
+	keyStatsDB = filepath.Join(dir, ".keys")
 	appConfigPath = filepath.Join(dir, "config.json")
 	configDirs = []string{filepath.Join(dir, ".tt")}
 }
@@ -43,10 +44,10 @@ func useTempStorage(t *testing.T) string {
 	t.Helper()
 
 	oldFileState, oldMistakes, oldResults, oldConfig := fileStateDB, mistakeDB, resultsDB, appConfigPath
-	oldConfigDirs := configDirs
+	oldKeyStats, oldConfigDirs := keyStatsDB, configDirs
 	t.Cleanup(func() {
 		fileStateDB, mistakeDB, resultsDB, appConfigPath = oldFileState, oldMistakes, oldResults, oldConfig
-		configDirs = oldConfigDirs
+		keyStatsDB, configDirs = oldKeyStats, oldConfigDirs
 	})
 
 	dir := t.TempDir()

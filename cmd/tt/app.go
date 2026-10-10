@@ -137,6 +137,7 @@ func (a *app) record(res testResult) personalBest {
 		Duration:  res.duration.Seconds(),
 	})
 	saveMistakes(res.mistakes)
+	saveKeyStats(res.keystrokes)
 
 	if best, ok := bestWpm(previous, a.kind); ok && res.wpm() > best {
 		return personalBest{beaten: true, previous: best}

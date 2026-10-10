@@ -9,6 +9,7 @@ import (
 var fileStateDB string
 var mistakeDB string
 var resultsDB string
+var keyStatsDB string
 var appConfigPath string
 
 type appConfig struct {
@@ -50,6 +51,7 @@ func init() {
 	fileStateDB = filepath.Join(data, ".db")
 	mistakeDB = filepath.Join(data, ".errors")
 	resultsDB = filepath.Join(data, ".results")
+	keyStatsDB = filepath.Join(data, ".keys")
 	appConfigPath = filepath.Join(config, "config.json")
 }
 
@@ -127,4 +129,25 @@ func savePersistedResult(r persistedResult) []persistedResult {
 	}
 
 	return stored
+}
+
+// loadKeyStats returns the saved key statistics. They are only an aid which
+// typing rebuilds, so they start over if they can't be read.
+func loadKeyStats() keyStats {
+	ks := newKeyStats()
+	if err := readValue(keyStatsDB, &ks); err != nil || ks.Chars == nil || ks.Bigrams == nil {
+		return newKeyStats()
+	}
+
+	return ks
+}
+
+// saveKeyStats adds the keystrokes of a test to the saved key statistics.
+func saveKeyStats(strokes []keystroke) {
+	ks := loadKeyStats()
+	ks.add(strokes)
+
+	if err := writeValue(keyStatsDB, ks); err != nil {
+		panic(err)
+	}
 }
