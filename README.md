@@ -41,8 +41,6 @@ cd tt
 make && sudo make install
 ```
 
-The test suite can be run with `go test ./...`.
-
 Best served on a terminal with truecolor and cursor shape support (e.g kitty, iterm)
 
 # Usage
@@ -105,3 +103,31 @@ When no `-theme` flag is supplied, tt reuses the last selected theme saved in
 
 Completed tests are saved automatically, and `tt -stats` reads the saved
 history to show your progress.
+
+# Development
+
+The program lives in `cmd/tt`, while `embed.go` at the root embeds the builtin
+themes, word lists and quotes into the binary.
+
+| File | Contents |
+|---|---|
+| `tt.go` | `main` |
+| `options.go` | Command line options and usage |
+| `app.go` | The sequence of tests: navigation, reports, saving the results |
+| `typer.go` | A test on the screen: styles, themes, drawing |
+| `session.go` | Typing a segment of a test: keys, timer, redrawing |
+| `typing.go` | The typing logic, independent of the screen |
+| `generators.go` | The texts of the tests: words, quotes, files, stdin, mistakes |
+| `adaptive.go` | The choice of words of `-adaptive` |
+| `keystats.go` | Statistics about each key and pair of keys |
+| `db.go` | The saved data: results, mistakes, key statistics, settings |
+| `stats.go`, `chart.go` | `-stats` |
+| `heatmap.go` | `-keys` |
+| `report.go` | The report and the `-json`/`-csv` output |
+| `theme.go`, `resources.go` | Themes and builtin or user resources |
+| `util.go` | Text wrapping and drawing helpers |
+
+Run the tests with `go test ./...`. They never touch your own data: saved data
+goes to temporary directories (see `main_test.go`), command line tests run tt in
+a separate process with a temporary home, and screen tests use the simulation
+screen of tcell with a clock they control.
