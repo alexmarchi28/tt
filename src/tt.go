@@ -606,7 +606,7 @@ func main() {
 		case TyperComplete:
 			cpm := int(float64(ncorrectWords) / (float64(t) / 60e9))
 			wpm := cpm / 5
-			accuracy := float64(ncorrectChars) / float64(nerrorsChars+ncorrectChars) * 100
+			accuracy := calcAccuracy(ncorrectChars, nerrorsChars)
 			timestamp := time.Now().Unix()
 
 			results = append(results, result{wpm, cpm, accuracy, timestamp, mistakes})

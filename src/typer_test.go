@@ -695,3 +695,33 @@ func TestTyperCountsKeystrokesOfAllSegments(t *testing.T) {
 
 	assertOutcome(t, waitOutcome(t, done), TyperComplete, 3, 3, 1, []mistake{{"ab", "xb"}})
 }
+
+func TestCalcAccuracy(t *testing.T) {
+	tests := []struct {
+		correct, errors int
+		want            float64
+	}{
+		{10, 0, 100},
+		{3, 1, 75},
+		{0, 4, 0},
+		{0, 0, 0},
+	}
+
+	for _, tc := range tests {
+		if got := calcAccuracy(tc.correct, tc.errors); got != tc.want {
+			t.Errorf("calcAccuracy(%d, %d) = %v, want %v", tc.correct, tc.errors, got, tc.want)
+		}
+	}
+}
+
+func TestTyperLiveAccuracyWithoutKeystrokes(t *testing.T) {
+	ty, sim := newTestTyper(t)
+	ty.ShowAccuracy = true
+
+	done := startTyper(ty, []segment{{"ab cd", ""}}, -1)
+	sendKeys(t, sim, " ")
+	waitForScreenText(t, sim, "Accuracy: 0.00%", true)
+
+	sendKeys(t, sim, tcell.KeyEscape)
+	waitOutcome(t, done)
+}

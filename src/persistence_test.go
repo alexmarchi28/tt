@@ -111,3 +111,17 @@ func TestRememberedTheme(t *testing.T) {
 		t.Errorf("readAppConfig().Theme = %q", cfg.Theme)
 	}
 }
+
+func TestSavePersistedResultWithoutKeystrokes(t *testing.T) {
+	useTempStorage(t)
+
+	savePersistedResult(0, calcAccuracy(0, 0), 1000)
+
+	got, err := readPersistedResults()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := []persistedResult{{Wpm: 0, Accuracy: 0, Timestamp: 1000}}; !reflect.DeepEqual(got, want) {
+		t.Errorf("stored results = %+v, want %+v", got, want)
+	}
+}

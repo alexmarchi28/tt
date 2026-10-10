@@ -450,8 +450,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 			}
 			if duration > 1e7 { //Avoid flashing large numbers on test start.
 				if t.ShowAccuracy {
-					accuracy := float64(correctChar) / float64(errorChar+correctChar) * 100
-					drawString(t.Scr, accuracyX, accuracyY, formatAccuracy(accuracy), -1, t.defaultStyle)
+					drawString(t.Scr, accuracyX, accuracyY, formatAccuracy(calcAccuracy(correctChar, errorChar)), -1, t.defaultStyle)
 				}
 				if t.ShowWpm {
 					wpm := int((float64(ncorrect) / 5) / (float64(duration) / 60e9))
@@ -674,4 +673,14 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 			redraw()
 		}
 	}
+}
+
+// calcAccuracy returns the percentage of correct keystrokes, or 0 when
+// nothing has been typed yet.
+func calcAccuracy(correct, errors int) float64 {
+	if correct+errors == 0 {
+		return 0
+	}
+
+	return float64(correct) / float64(errors+correct) * 100
 }
