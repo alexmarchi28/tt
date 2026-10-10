@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 
 	"github.com/gdamore/tcell"
 )
@@ -14,7 +16,9 @@ type result struct {
 	Mistakes  []mistake `json:"mistakes"`
 }
 
-func showReport(scr tcell.Screen, cpm, wpm int, accuracy float64, attribution string, mistakes []mistake) {
+// showReport shows the results of a test until escape is pressed. It
+// returns true if the user asked to quit instead.
+func showReport(scr tcell.Screen, cpm, wpm int, accuracy float64, attribution string, mistakes []mistake) (quit bool) {
 	mistakeStr := ""
 	if attribution != "" {
 		attribution = "\n\nAttribution: " + attribution
@@ -39,9 +43,41 @@ func showReport(scr tcell.Screen, cpm, wpm int, accuracy float64, attribution st
 
 	for {
 		if key, ok := scr.PollEvent().(*tcell.EventKey); ok && key.Key() == tcell.KeyEscape {
-			return
+			return false
 		} else if ok && key.Key() == tcell.KeyCtrlC {
-			exit(1)
+			return true
 		}
 	}
+}
+
+// writeResults prints the results of the completed tests in the requested
+// formats.
+func writeResults(w io.Writer, results []result, asJSON, asCSV bool) error {
+	if asJSON {
+		//Avoid null in serialized JSON.
+		for i := range results {
+			if results[i].Mistakes == nil {
+				results[i].Mistakes = []mistake{}
+			}
+		}
+
+		b, err := json.Marshal(results)
+		if err != nil {
+			return err
+		}
+		if _, err := w.Write(b); err != nil {
+			return err
+		}
+	}
+
+	if asCSV {
+		for _, r := range results {
+			fmt.Fprintf(w, "test,%d,%d,%.2f,%d\n", r.Wpm, r.Cpm, r.Accuracy, r.Timestamp)
+			for _, m := range r.Mistakes {
+				fmt.Fprintf(w, "mistake,%s,%s\n", m.Word, m.Typed)
+			}
+		}
+	}
+
+	return nil
 }

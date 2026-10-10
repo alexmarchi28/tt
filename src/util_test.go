@@ -227,3 +227,42 @@ func TestWordWrapCountsCharacters(t *testing.T) {
 		}
 	}
 }
+
+func TestReflow(t *testing.T) {
+	tests := []struct {
+		in    string
+		width int
+		want  string
+	}{
+		{"alpha\nbeta   gamma\n", 80, "alpha beta gamma"},
+		{"  the quick brown fox ", 10, "the quick \nbrown fox"},
+		{"the quick \nbrown fox", 80, "the quick brown fox"},
+	}
+
+	for _, tc := range tests {
+		got := reflow(tc.in, tc.width)
+		if got != tc.want {
+			t.Errorf("reflow(%q, %d) = %q, want %q", tc.in, tc.width, got, tc.want)
+		}
+
+		// Tests are reflowed again whenever they are shown.
+		if again := reflow(got, tc.width); again != got {
+			t.Errorf("reflow(%q, %d) = %q, want it unchanged", got, tc.width, again)
+		}
+	}
+}
+
+func TestLineWidth(t *testing.T) {
+	tests := []struct{ maxLineLen, sw, want int }{
+		{80, 120, 80},
+		{80, 80, 80},
+		{80, 50, 42},
+		{20, 50, 20},
+	}
+
+	for _, tc := range tests {
+		if got := lineWidth(tc.maxLineLen, tc.sw); got != tc.want {
+			t.Errorf("lineWidth(%d, %d) = %d, want %d", tc.maxLineLen, tc.sw, got, tc.want)
+		}
+	}
+}

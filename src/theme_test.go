@@ -110,3 +110,44 @@ func TestNewTcellColorRejectsInvalidDigits(t *testing.T) {
 		}
 	}
 }
+
+func TestThemeCycler(t *testing.T) {
+	dir := useTempStorage(t)
+	valid := "fgcol: #ffffff\nhicol: #ffffff\nhicol2: #ffffff\nhicol3: #ffffff\nerrcol: #ffffff\n"
+	writeUserResource(t, dir, "themes", "a", valid)
+	writeUserResource(t, dir, "themes", "bad", "fgcol: #ffffff\n")
+	writeUserResource(t, dir, "themes", "c", valid)
+	names := []string{"a", "bad", "c"}
+
+	assertNext := func(c *themeCycler, direction int, want string) {
+		t.Helper()
+
+		name, _, err := c.next(direction)
+		if err != nil || name != want {
+			t.Errorf("next(%d) = %q, %v, want %q", direction, name, err, want)
+		}
+	}
+
+	c := newThemeCycler(names, "a", false)
+	assertNext(c, 1, "c")
+	assertNext(c, 1, "a")
+	assertNext(c, -1, "c")
+	assertNext(c, -1, "a")
+
+	assertNext(newThemeCycler(names, "/path/to/c", false), 1, "a")
+	assertNext(newThemeCycler(names, "unknown", false), 1, "a")
+	assertNext(newThemeCycler(names, "unknown", false), -1, "c")
+
+	if name, _, err := newThemeCycler(nil, "a", false).next(1); name != "" || err != nil {
+		t.Errorf("without themes next() = %q, %v, want no theme and no error", name, err)
+	}
+
+	if _, _, err := newThemeCycler([]string{"bad"}, "a", false).next(1); err == nil {
+		t.Error("next() should fail when no theme is valid")
+	}
+
+	name, th, err := newThemeCycler([]string{"default"}, "", true).next(1)
+	if want, _ := loadTheme("default", true); name != "default" || th != want || err != nil {
+		t.Errorf("next() = %q, %v, %v, want the opaque default theme", name, th, err)
+	}
+}

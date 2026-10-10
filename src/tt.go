@@ -1,24 +1,18 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
+	"io"
 	"os"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/gdamore/tcell"
 	"github.com/mattn/go-isatty"
-	"io"
 )
 
+// scr is the screen in use, if any, so that die can restore the terminal.
 var scr tcell.Screen
-var csvMode bool
-var jsonMode bool
-var themeToPersist string
-var persistThemeOnExit bool
 
 func die(format string, args ...interface{}) {
 	if scr != nil {
@@ -30,48 +24,7 @@ func die(format string, args ...interface{}) {
 	os.Exit(1)
 }
 
-var results []result
-
-func exit(rc int) {
-	if scr != nil {
-		scr.Fini()
-		scr = nil
-	}
-
-	if persistThemeOnExit && themeToPersist != "" {
-		if err := writeAppConfig(appConfig{Theme: themeToPersist}); err != nil {
-			fmt.Fprintf(os.Stderr, "WARNING: could not save theme selection: %v\n", err)
-		}
-	}
-
-	if jsonMode {
-		//Avoid null in serialized JSON.
-		for i := range results {
-			if results[i].Mistakes == nil {
-				results[i].Mistakes = []mistake{}
-			}
-		}
-
-		b, err := json.Marshal(results)
-		if err != nil {
-			panic(err)
-		}
-		os.Stdout.Write(b)
-	}
-
-	if csvMode {
-		for _, r := range results {
-			fmt.Printf("test,%d,%d,%.2f,%d\n", r.Wpm, r.Cpm, r.Accuracy, r.Timestamp)
-			for _, m := range r.Mistakes {
-				fmt.Printf("mistake,%s,%s\n", m.Word, m.Typed)
-			}
-		}
-	}
-
-	os.Exit(rc)
-}
-
-var usage = `usage: tt [options] [file]
+const usage = `usage: tt [options] [file]
 
 Modes
     -words  WORDFILE    Specifies the file from which words are randomly
@@ -132,142 +85,153 @@ Version
     -v                  Print the current version.
 `
 
-func main() {
-	var n int
-	var g int
+// options holds the command line options, see usage.
+type options struct {
+	n, g           int
+	startParagraph int
+	maxLineLen     int
+	timeout        time.Duration // -1 for no time limit.
 
-	var rawMode bool
-	var oneShotMode bool
-	var noHighlightCurrent bool
-	var noHighlightNext bool
-	var noHighlight bool
-	var maxLineLen int
-	var noSkip bool
-	var noBackspace bool
-	var noReport bool
-	var noTheme bool
-	var disableTransparentBg bool
-	var normalCursor bool
+	listType  string
+	wordFile  string
+	quoteFile string
+	themeName string
+	files     []string
+
+	themeExplicit      bool // Whether -theme was given.
+	showWpm            bool
+	showAccuracy       bool
+	noSkip             bool
+	blockCursor        bool
+	noBackspace        bool
+	noTheme            bool
+	opaqueBg           bool
+	oneShot            bool
+	noHighlight        bool
+	noHighlightCurrent bool
+	noHighlightNext    bool
+	noReport           bool
+	bold               bool
+	csv                bool
+	json               bool
+	raw                bool
+	multi              bool
+	stats              bool
+	version            bool
+}
+
+func parseFlags(args []string) options {
+	var opts options
 	var timeout int
-	var startParagraph int
 
-	var listFlag string
-	var wordFile string
-	var quoteFile string
+	fs := flag.NewFlagSet("tt", flag.ExitOnError)
 
-	var themeName string
-	var showWpm bool
-	var showAccuracy bool
-	var multiMode bool
-	var statsFlag bool
-	var versionFlag bool
-	var boldFlag bool
+	fs.IntVar(&opts.n, "n", 50, "")
+	fs.IntVar(&opts.g, "g", 1, "")
+	fs.IntVar(&opts.startParagraph, "start", -1, "")
 
-	var err error
-	var testFn func() []segment
+	fs.IntVar(&opts.maxLineLen, "w", 80, "")
+	fs.IntVar(&timeout, "t", -1, "")
 
-	flag.IntVar(&n, "n", 50, "")
-	flag.IntVar(&g, "g", 1, "")
-	flag.IntVar(&startParagraph, "start", -1, "")
+	fs.BoolVar(&opts.version, "v", false, "")
 
-	flag.IntVar(&maxLineLen, "w", 80, "")
-	flag.IntVar(&timeout, "t", -1, "")
+	fs.StringVar(&opts.wordFile, "words", "", "")
+	fs.StringVar(&opts.quoteFile, "quotes", "", "")
 
-	flag.BoolVar(&versionFlag, "v", false, "")
+	fs.BoolVar(&opts.showWpm, "showwpm", false, "")
+	fs.BoolVar(&opts.showAccuracy, "showaccuracy", false, "")
+	fs.BoolVar(&opts.noSkip, "noskip", false, "")
+	fs.BoolVar(&opts.blockCursor, "blockcursor", false, "")
+	fs.BoolVar(&opts.noBackspace, "nobackspace", false, "")
+	fs.BoolVar(&opts.noTheme, "notheme", false, "")
+	fs.BoolVar(&opts.opaqueBg, "notransparent", false, "")
+	fs.BoolVar(&opts.oneShot, "oneshot", false, "")
+	fs.BoolVar(&opts.noHighlight, "nohighlight", false, "")
+	fs.BoolVar(&opts.noHighlightCurrent, "highlight2", false, "")
+	fs.BoolVar(&opts.noHighlightNext, "highlight1", false, "")
+	fs.BoolVar(&opts.noReport, "noreport", false, "")
+	fs.BoolVar(&opts.bold, "bold", false, "")
+	fs.BoolVar(&opts.csv, "csv", false, "")
+	fs.BoolVar(&opts.json, "json", false, "")
+	fs.BoolVar(&opts.raw, "raw", false, "")
+	fs.BoolVar(&opts.multi, "multi", false, "")
+	fs.BoolVar(&opts.stats, "stats", false, "")
+	fs.StringVar(&opts.themeName, "theme", "default", "")
+	fs.StringVar(&opts.listType, "list", "", "")
 
-	flag.StringVar(&wordFile, "words", "", "")
-	flag.StringVar(&quoteFile, "quotes", "", "")
+	fs.Usage = func() { os.Stdout.Write([]byte(usage)) }
+	fs.Parse(args)
 
-	flag.BoolVar(&showWpm, "showwpm", false, "")
-	flag.BoolVar(&showAccuracy, "showaccuracy", false, "")
-	flag.BoolVar(&noSkip, "noskip", false, "")
-	flag.BoolVar(&normalCursor, "blockcursor", false, "")
-	flag.BoolVar(&noBackspace, "nobackspace", false, "")
-	flag.BoolVar(&noTheme, "notheme", false, "")
-	flag.BoolVar(&disableTransparentBg, "notransparent", false, "")
-	flag.BoolVar(&oneShotMode, "oneshot", false, "")
-	flag.BoolVar(&noHighlight, "nohighlight", false, "")
-	flag.BoolVar(&noHighlightCurrent, "highlight2", false, "")
-	flag.BoolVar(&noHighlightNext, "highlight1", false, "")
-	flag.BoolVar(&noReport, "noreport", false, "")
-	flag.BoolVar(&boldFlag, "bold", false, "")
-	flag.BoolVar(&csvMode, "csv", false, "")
-	flag.BoolVar(&jsonMode, "json", false, "")
-	flag.BoolVar(&rawMode, "raw", false, "")
-	flag.BoolVar(&multiMode, "multi", false, "")
-	flag.BoolVar(&statsFlag, "stats", false, "")
-	flag.StringVar(&themeName, "theme", "default", "")
-	flag.StringVar(&listFlag, "list", "", "")
-
-	flag.Usage = func() { os.Stdout.Write([]byte(usage)) }
-	flag.Parse()
-
-	themeFlagExplicit := false
-	flag.Visit(func(f *flag.Flag) {
+	fs.Visit(func(f *flag.Flag) {
 		if f.Name == "theme" {
-			themeFlagExplicit = true
+			opts.themeExplicit = true
 		}
 	})
 
-	if listFlag != "" {
-		for _, name := range listResourceNames(listFlag) {
-			fmt.Println(name)
-		}
+	opts.files = fs.Args()
 
-		os.Exit(0)
+	opts.timeout = -1
+	if timeout != -1 {
+		opts.timeout = time.Duration(timeout) * time.Second
 	}
 
-	if versionFlag {
-		fmt.Println("tt version 0.4.4")
-		os.Exit(0)
-	}
+	return opts
+}
 
-	if statsFlag {
-		printStats()
-		os.Exit(0)
-	}
-
-	if noTheme {
-		os.Setenv("TCELL_TRUECOLOR", "disable")
-	} else if !themeFlagExplicit {
-		if rememberedTheme := loadRememberedTheme(disableTransparentBg); rememberedTheme != "" {
-			themeName = rememberedTheme
-		}
-	}
-
-	reflow := func(s string) string {
-		sw, _ := scr.Size()
-
-		wsz := maxLineLen
-		if wsz > sw {
-			wsz = sw - 8
-		}
-
-		s = regexp.MustCompile(`\s+`).ReplaceAllString(s, " ")
-		return strings.ReplaceAll(
-			wordWrap(strings.Trim(s, " "), wsz),
-			"\n", " \n")
-	}
-
+// newTestGenerator returns a function producing the successive tests
+// requested on the command line, or nil once there are no more.
+func newTestGenerator(opts options) func() []segment {
 	switch {
-	case wordFile != "":
-		testFn = generateWordTest(wordFile, n, g)
-	case quoteFile != "":
-		testFn = generateQuoteTest(quoteFile)
+	case opts.wordFile != "":
+		return generateWordTest(opts.wordFile, opts.n, opts.g)
+	case opts.quoteFile != "":
+		return generateQuoteTest(opts.quoteFile)
 	case !isatty.IsTerminal(os.Stdin.Fd()):
 		b, err := io.ReadAll(os.Stdin)
 		if err != nil {
 			panic(err)
 		}
 
-		testFn = generateTestFromData(b, rawMode, multiMode)
-	case len(flag.Args()) > 0:
-		path := flag.Args()[0]
-		testFn = generateTestFromFile(path, startParagraph)
+		return generateTestFromData(b, opts.raw, opts.multi)
+	case len(opts.files) > 0:
+		return generateTestFromFile(opts.files[0], opts.startParagraph)
 	default:
-		testFn = generateWordTest("1000en", n, g)
+		return generateWordTest("1000en", opts.n, opts.g)
+	}
+}
+
+func main() {
+	opts := parseFlags(os.Args[1:])
+
+	if opts.listType != "" {
+		for _, name := range listResourceNames(opts.listType) {
+			fmt.Println(name)
+		}
+
+		os.Exit(0)
 	}
 
+	if opts.version {
+		fmt.Println("tt version 0.4.4")
+		os.Exit(0)
+	}
+
+	if opts.stats {
+		printStats()
+		os.Exit(0)
+	}
+
+	if opts.noTheme {
+		os.Setenv("TCELL_TRUECOLOR", "disable")
+	} else if !opts.themeExplicit {
+		if rememberedTheme := loadRememberedTheme(opts.opaqueBg); rememberedTheme != "" {
+			opts.themeName = rememberedTheme
+		}
+	}
+
+	testFn := newTestGenerator(opts)
+
+	var err error
 	scr, err = tcell.NewScreen()
 	if err != nil {
 		panic(err)
@@ -284,128 +248,6 @@ func main() {
 		}
 	}()
 
-	var typer *typer
-	if noTheme {
-		typer = NewTyper(scr, true, terminalTheme)
-	} else {
-		th, err := loadTheme(themeName, disableTransparentBg)
-		if err != nil {
-			die("%s theme is invalid: %v", themeName, err)
-		}
-
-		typer = NewTyper(scr, boldFlag, th)
-		themeToPersist = themeName
-		persistThemeOnExit = true
-	}
-
-	typer.SetHighlightMode(
-		!(noHighlightCurrent || noHighlight),
-		!(noHighlightNext || noHighlight),
-	)
-
-	if !noTheme {
-		themeNames := listResourceNames("themes")
-		themeIdx := indexResourceName(themeNames, themeName)
-
-		typer.CycleTheme = func(direction int) (string, error) {
-			if len(themeNames) == 0 {
-				return "", nil
-			}
-
-			for attempts := 0; attempts < len(themeNames); attempts++ {
-				if themeIdx == -1 {
-					if direction < 0 {
-						themeIdx = len(themeNames) - 1
-					} else {
-						themeIdx = 0
-					}
-				} else {
-					themeIdx = (themeIdx + direction + len(themeNames)) % len(themeNames)
-				}
-
-				nextTheme := themeNames[themeIdx]
-				th, err := loadTheme(nextTheme, disableTransparentBg)
-				if err != nil {
-					continue
-				}
-
-				typer.SetTheme(th)
-				typer.RefreshScreen()
-				themeName = nextTheme
-				themeToPersist = nextTheme
-				return nextTheme, nil
-			}
-
-			return "", fmt.Errorf("no valid themes available")
-		}
-	}
-
-	typer.SkipWord = !noSkip
-	typer.DisableBackspace = noBackspace
-	typer.BlockCursor = normalCursor
-	typer.ShowWpm = showWpm
-	typer.ShowAccuracy = showAccuracy
-
-	if timeout != -1 {
-		timeout *= 1e9
-	}
-
-	var tests [][]segment
-	var idx = 0
-
-	for {
-		if idx >= len(tests) {
-			tests = append(tests, testFn())
-		}
-
-		if tests[idx] == nil {
-			exit(0)
-		}
-
-		if !rawMode {
-			for i := range tests[idx] {
-				tests[idx][i].Text = reflow(tests[idx][i].Text)
-			}
-		}
-
-		res := typer.Start(tests[idx], time.Duration(timeout))
-
-		switch res.rc {
-		case TyperNext:
-			idx++
-		case TyperPrevious:
-			if idx > 0 {
-				idx--
-			}
-		case TyperComplete:
-			cpm := res.cpm()
-			wpm := res.wpm()
-			accuracy := res.accuracy()
-			timestamp := time.Now().Unix()
-
-			results = append(results, result{wpm, cpm, accuracy, timestamp, res.mistakes})
-			savePersistedResult(wpm, accuracy, timestamp)
-			saveMistakes(res.mistakes)
-			if !noReport {
-				attribution := ""
-				if len(tests[idx]) == 1 {
-					attribution = tests[idx][0].Attribution
-				}
-				showReport(scr, cpm, wpm, accuracy, attribution, res.mistakes)
-			}
-			if oneShotMode {
-				exit(0)
-			}
-
-			idx++
-		case TyperSigInt:
-			exit(1)
-
-		case TyperResize:
-			//Resize events restart the test, this shouldn't be a problem in the vast majority of cases
-			//and allows us to avoid baking rewrapping logic into the typer.
-
-			//TODO: implement state-preserving resize (maybe)
-		}
-	}
+	a := newApp(scr, opts)
+	a.exit(a.run(testFn))
 }

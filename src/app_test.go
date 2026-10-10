@@ -1,0 +1,246 @@
+package main
+
+import (
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+
+	"github.com/gdamore/tcell"
+)
+
+func newTestApp(t *testing.T, opts options) (*app, tcell.SimulationScreen) {
+	t.Helper()
+
+	useTempStorage(t)
+	sim := newSimScreen(t)
+	opts.blockCursor = true
+
+	return newApp(sim, opts), sim
+}
+
+// testSequence returns a test generator producing the given texts, one test
+// each, and then nil. The number of calls is stored in calls.
+func testSequence(calls *int, texts ...string) func() []segment {
+	return func() []segment {
+		*calls++
+		if *calls > len(texts) {
+			return nil
+		}
+
+		return []segment{{texts[*calls-1], ""}}
+	}
+}
+
+func startApp(a *app, testFn func() []segment) <-chan int {
+	done := make(chan int, 1)
+	go func() { done <- a.run(testFn) }()
+	return done
+}
+
+func waitExitCode(t *testing.T, done <-chan int) int {
+	t.Helper()
+
+	select {
+	case rc := <-done:
+		return rc
+	case <-time.After(5 * time.Second):
+		t.Fatal("app did not return")
+	}
+
+	return -1
+}
+
+func TestAppRecordsCompletedTests(t *testing.T) {
+	opts := parseFlags(nil)
+	opts.noReport = true
+	a, sim := newTestApp(t, opts)
+
+	var calls int
+	done := startApp(a, testSequence(&calls, "ab", "cd"))
+	sendKeys(t, sim, "x", tcell.KeyEscape, "ab", "cx")
+
+	if rc := waitExitCode(t, done); rc != 0 {
+		t.Errorf("exit code = %d, want 0", rc)
+	}
+
+	if len(a.results) != 2 || a.results[0].Mistakes != nil || !reflect.DeepEqual(a.results[1].Mistakes, []mistake{{"cd", "cx"}}) {
+		t.Errorf("results = %+v, want two tests with a single mistake in the second", a.results)
+	}
+
+	stored, err := readPersistedResults()
+	if err != nil || len(stored) != 2 {
+		t.Errorf("persisted results = %+v (%v), want 2", stored, err)
+	}
+
+	// The mistake of the restarted attempt is not recorded.
+	var mistakes []mistake
+	if err := readValue(MISTAKE_DB, &mistakes); err != nil || !reflect.DeepEqual(mistakes, []mistake{{"cd", "cx"}}) {
+		t.Errorf("stored mistakes = %v (%v), want [{cd cx}]", mistakes, err)
+	}
+}
+
+func TestAppNavigation(t *testing.T) {
+	opts := parseFlags(nil)
+	opts.noReport = true
+	a, sim := newTestApp(t, opts)
+
+	var calls int
+	done := startApp(a, testSequence(&calls, "ab", "cd", "ef"))
+	sendKeys(t, sim, tcell.KeyRight, tcell.KeyRight, tcell.KeyLeft, tcell.KeyLeft, tcell.KeyLeft, "ab", "cd", "ef")
+
+	if rc := waitExitCode(t, done); rc != 0 {
+		t.Errorf("exit code = %d, want 0", rc)
+	}
+	if calls != 4 {
+		t.Errorf("tests generated %d times, want 4", calls)
+	}
+	if len(a.results) != 3 {
+		t.Fatalf("got %d results, want 3", len(a.results))
+	}
+	for _, r := range a.results {
+		if r.Mistakes != nil {
+			t.Errorf("unexpected mistakes %v, the wrong test was shown", r.Mistakes)
+		}
+	}
+}
+
+func TestAppOneShot(t *testing.T) {
+	opts := parseFlags(nil)
+	opts.noReport = true
+	opts.oneShot = true
+	a, sim := newTestApp(t, opts)
+
+	var calls int
+	done := startApp(a, testSequence(&calls, "ab", "cd"))
+	sendKeys(t, sim, "ab")
+
+	if rc := waitExitCode(t, done); rc != 0 || calls != 1 || len(a.results) != 1 {
+		t.Errorf("exit code %d, %d tests generated, %d results, want 0, 1, 1", rc, calls, len(a.results))
+	}
+}
+
+func TestAppQuit(t *testing.T) {
+	a, sim := newTestApp(t, parseFlags(nil))
+
+	var calls int
+	done := startApp(a, testSequence(&calls, "ab"))
+	sendKeys(t, sim, "a", tcell.KeyCtrlC)
+
+	if rc := waitExitCode(t, done); rc != 1 || len(a.results) != 0 {
+		t.Errorf("exit code %d with %d results, want 1 and none", rc, len(a.results))
+	}
+}
+
+func TestAppReport(t *testing.T) {
+	a, sim := newTestApp(t, parseFlags(nil))
+
+	var calls int
+	done := startApp(a, func() []segment {
+		calls++
+		return []segment{{"ab cd", "Someone"}}
+	})
+
+	sendKeys(t, sim, "xb cd")
+	waitForScreenText(t, sim, "Mistakes:    ab", true)
+	waitForScreenText(t, sim, "Attribution: Someone", true)
+	if text := simulationScreenText(sim); !strings.Contains(text, "WPM:") || !strings.Contains(text, "Accuracy:    75.00%") {
+		t.Errorf("unexpected report:\n%s", text)
+	}
+
+	// Escape moves on to the next test, C-c in the report quits.
+	sendKeys(t, sim, tcell.KeyEscape)
+	waitForScreenText(t, sim, "Mistakes:", false)
+	sendKeys(t, sim, "ab cd", tcell.KeyCtrlC)
+
+	if rc := waitExitCode(t, done); rc != 1 || calls != 2 || len(a.results) != 2 {
+		t.Errorf("exit code %d, %d tests generated, %d results, want 1, 2, 2", rc, calls, len(a.results))
+	}
+}
+
+func TestAppReflowsText(t *testing.T) {
+	opts := parseFlags(nil)
+	opts.noReport = true
+	opts.maxLineLen = 10
+	a, sim := newTestApp(t, opts)
+
+	var calls int
+	done := startApp(a, testSequence(&calls, "the  quick\nbrown fox"))
+	waitForScreenText(t, sim, "brown fox", true)
+
+	lines := strings.Split(simulationScreenText(sim), "\n")
+	for _, l := range lines {
+		if strings.Contains(l, "quick") && strings.Contains(l, "brown") {
+			t.Errorf("text was not wrapped at 10 characters: %q", l)
+		}
+	}
+
+	sendKeys(t, sim, "the quick brown fox")
+	waitExitCode(t, done)
+
+	if len(a.results) != 1 || a.results[0].Mistakes != nil {
+		t.Errorf("results = %+v, want one test without mistakes", a.results)
+	}
+}
+
+func TestAppRawMode(t *testing.T) {
+	opts := parseFlags(nil)
+	opts.noReport = true
+	opts.raw = true
+	a, sim := newTestApp(t, opts)
+
+	var calls int
+	done := startApp(a, testSequence(&calls, "ab\ncd"))
+	sendKeys(t, sim, "abcd")
+	waitExitCode(t, done)
+
+	if len(a.results) != 1 || a.results[0].Mistakes != nil {
+		t.Errorf("results = %+v, want one test without mistakes", a.results)
+	}
+}
+
+func TestAppCyclesThemes(t *testing.T) {
+	a, sim := newTestApp(t, parseFlags(nil))
+
+	names := listResourceNames("themes")
+	next := names[indexResourceName(names, "default")+1]
+
+	var calls int
+	done := startApp(a, testSequence(&calls, "ab"))
+	sendKeys(t, sim, tcell.KeyCtrlN)
+	waitForScreenText(t, sim, "Theme: "+next, true)
+	sendKeys(t, sim, tcell.KeyCtrlC)
+	waitExitCode(t, done)
+
+	if a.theme != next {
+		t.Errorf("theme to remember = %q, want %q", a.theme, next)
+	}
+}
+
+func TestAppWithoutTheme(t *testing.T) {
+	opts := parseFlags(nil)
+	opts.noTheme = true
+	a, sim := newTestApp(t, opts)
+
+	var calls int
+	done := startApp(a, testSequence(&calls, "ab"))
+	sendKeys(t, sim, tcell.KeyCtrlN, tcell.KeyCtrlC)
+	waitExitCode(t, done)
+
+	if a.theme != "" || a.typer.CycleTheme != nil {
+		t.Errorf("themes should not be used with -notheme, theme to remember %q", a.theme)
+	}
+}
+
+func TestNewAppAppliesOptions(t *testing.T) {
+	opts := parseFlags([]string{"-noskip", "-nobackspace", "-showwpm", "-showaccuracy", "-nohighlight"})
+	a, _ := newTestApp(t, opts)
+
+	ty := a.typer
+	if ty.SkipWord || !ty.DisableBackspace || !ty.ShowWpm || !ty.ShowAccuracy || ty.highlightCurrent || ty.highlightNext {
+		t.Errorf("options not applied to the typer: %+v", ty)
+	}
+	if a.theme != "default" {
+		t.Errorf("theme to remember = %q, want default", a.theme)
+	}
+}

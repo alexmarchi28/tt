@@ -134,3 +134,41 @@ func indexResourceName(names []string, name string) int {
 
 	return -1
 }
+
+// themeCycler steps through the available themes, skipping invalid ones.
+type themeCycler struct {
+	names    []string
+	idx      int // Index of the current theme in names, -1 if it is not one of them.
+	opaqueBg bool
+}
+
+func newThemeCycler(names []string, current string, opaqueBg bool) *themeCycler {
+	return &themeCycler{names, indexResourceName(names, current), opaqueBg}
+}
+
+// next loads the next (direction > 0) or previous valid theme. The name is
+// empty if there are no themes at all.
+func (c *themeCycler) next(direction int) (string, theme, error) {
+	if len(c.names) == 0 {
+		return "", theme{}, nil
+	}
+
+	for attempts := 0; attempts < len(c.names); attempts++ {
+		if c.idx == -1 {
+			if direction < 0 {
+				c.idx = len(c.names) - 1
+			} else {
+				c.idx = 0
+			}
+		} else {
+			c.idx = (c.idx + direction + len(c.names)) % len(c.names)
+		}
+
+		name := c.names[c.idx]
+		if th, err := loadTheme(name, c.opaqueBg); err == nil {
+			return name, th, nil
+		}
+	}
+
+	return "", theme{}, fmt.Errorf("no valid themes available")
+}

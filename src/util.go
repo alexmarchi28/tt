@@ -55,6 +55,26 @@ func wordWrapRunes(s []rune, n int) {
 
 }
 
+var whitespace = regexp.MustCompile(`\s+`)
+
+// reflow joins the lines of s and wraps it to the given width. Line breaks
+// are preceded by a space so that they can be typed like any other word
+// separator.
+func reflow(s string, width int) string {
+	s = whitespace.ReplaceAllString(s, " ")
+	return strings.ReplaceAll(wordWrap(strings.Trim(s, " "), width), "\n", " \n")
+}
+
+// lineWidth returns the width at which text is wrapped on a screen sw cells
+// wide.
+func lineWidth(maxLineLen, sw int) int {
+	if maxLineLen > sw {
+		return sw - 8
+	}
+
+	return maxLineLen
+}
+
 func wordWrap(s string, n int) string {
 	r := []rune(s)
 	wordWrapRunes(r, n)
