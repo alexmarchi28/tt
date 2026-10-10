@@ -53,7 +53,7 @@ func generateWordTest(name string, o wordOptions) func() []segment {
 		die("%s does not contain any words.", name)
 	}
 
-	return wordTest(words, o)
+	return wordTest(func(n int) []string { return randomWords(n, words) }, o)
 }
 
 // recentMistakes is the number of most recent mistakes practiced with
@@ -91,15 +91,15 @@ func generateMistakesTest(o wordOptions) func() []segment {
 		die("There are no recorded mistakes to practice yet.")
 	}
 
-	return wordTest(words, o)
+	return wordTest(func(n int) []string { return randomWords(n, words) }, o)
 }
 
-// wordTest makes tests of words randomly drawn from words.
-func wordTest(words []string, o wordOptions) func() []segment {
+// wordTest makes tests of words drawn by draw.
+func wordTest(draw func(n int) []string, o wordOptions) func() []segment {
 	return func() []segment {
 		segments := make([]segment, o.g)
 		for i := range segments {
-			text := randomWords(o.n, words)
+			text := draw(o.n)
 			if o.numbers {
 				text = addNumbers(text)
 			}
@@ -116,6 +116,12 @@ func wordTest(words []string, o wordOptions) func() []segment {
 
 // randomWords draws n words, avoiding consecutive repetitions when possible.
 func randomWords(n int, words []string) []string {
+	return drawWords(n, words, func() string { return words[rand.Intn(len(words))] })
+}
+
+// drawWords draws n words with pick, which randomly chooses one of words,
+// avoiding consecutive repetitions when possible.
+func drawWords(n int, words []string, pick func() string) []string {
 	//Consecutive repetitions can only be avoided if there are at least two distinct words.
 	canAvoidRepeats := false
 	for _, w := range words {
@@ -127,9 +133,9 @@ func randomWords(n int, words []string) []string {
 
 	drawn := make([]string, n)
 	for i := range drawn {
-		w := words[rand.Intn(len(words))]
+		w := pick()
 		for canAvoidRepeats && i > 0 && drawn[i-1] == w {
-			w = words[rand.Intn(len(words))]
+			w = pick()
 		}
 
 		drawn[i] = w
