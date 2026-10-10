@@ -106,6 +106,18 @@ func TestFormatStats(t *testing.T) {
 		"All time   avg wpm 46.20, avg accuracy 86.80% (5 tests)\n" +
 		"Trend      +30.33 wpm compared to the previous week\n" +
 		"\n" +
+		"Progress (average wpm per day)\n" +
+		"80 │                          █\n" +
+		"   │                          █\n" +
+		"   │                          █\n" +
+		"   │                          █  ▆\n" +
+		"   │                          █  █\n" +
+		"   │                          █  █\n" +
+		"   │                          █ ▆█\n" +
+		"30 │                   ▁      █ ██\n" +
+		"   └──────────────────────────────\n" +
+		"    09-11                    10-10\n" +
+		"\n" +
 		"Most mistyped words\n" +
 		"the        3\n" +
 		"because    1\n"

@@ -75,7 +75,7 @@ options.
  - `tt -punct -numbers` adds capital letters, punctuation and numbers to the words.
  - `tt -t 10` starts a timed test lasting 10 seconds.
  - `tt -theme gruvbox` Starts tt with the gruvbox theme.
- - `tt -stats` Prints your personal best, average WPM and accuracy over time, weekly trend, results by kind of test and most mistyped words.
+ - `tt -stats` Prints your personal best, average WPM and accuracy over time, weekly trend, a chart of your daily progress, results by kind of test and most mistyped words.
 
 `tt` is designed to be easily scriptable and integrate nicely with
 other *nix tools. With a little shell scripting most features the user can

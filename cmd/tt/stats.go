@@ -10,6 +10,9 @@ import (
 
 const week = 7 * 24 * time.Hour
 
+// progressDays is the number of days shown in the progress chart.
+const progressDays = 30
+
 // summary aggregates a set of results.
 type summary struct {
 	count    int
@@ -179,6 +182,14 @@ func formatStats(stored []persistedResult, mistakes []mistake, now time.Time) st
 	previousWeek := summarize(before(since(stored, now.Add(-2*week)), now.Add(-week)))
 	if lastWeek.count > 0 && previousWeek.count > 0 {
 		fmt.Fprintf(&b, "%-10s %+.2f wpm compared to the previous week\n", "Trend", lastWeek.wpm-previousWeek.wpm)
+	}
+
+	days := dailyAverages(stored, progressDays, now)
+	if daysWithTests(days) > 1 {
+		fmt.Fprintln(&b, "\nProgress (average wpm per day)")
+		for _, line := range progressChart(days) {
+			fmt.Fprintln(&b, line)
+		}
 	}
 
 	if kinds := summarizeByKind(stored); len(kinds) > 1 {

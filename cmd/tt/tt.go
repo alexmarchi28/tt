@@ -89,8 +89,8 @@ Misc
                         TYPE=[themes|quotes|words]
     -stats              Print statistics about the saved results: number of
                         tests, time spent typing, personal best, averages over
-                        time, weekly trend, results by kind of test and most
-                        mistyped words.
+                        time, weekly trend, a chart of the daily progress,
+                        results by kind of test and most mistyped words.
 
 Version
     -v                  Print the current version.

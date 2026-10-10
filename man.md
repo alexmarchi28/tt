@@ -184,8 +184,9 @@ code, are typed with the tab key.
 
     Print statistics about the saved results: number of tests, time spent
     typing, personal best, average WPM and accuracy over the last hour, day,
-    week and all time, trend compared to the previous week, results by kind of
-    test (word list, quotes, file...) and most mistyped words.
+    week and all time, trend compared to the previous week, a chart of the
+    average WPM of each of the last 30 days, results by kind of test (word list,
+    quotes, file...) and most mistyped words.
 
 **-v**\
 
