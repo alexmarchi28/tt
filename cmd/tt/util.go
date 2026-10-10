@@ -120,6 +120,18 @@ func drawStringAtCenter(scr tcell.Screen, s string, style tcell.Style) {
 	drawString(scr, x, y, s, style)
 }
 
+// tabWidth is the number of cells taken by a tab.
+const tabWidth = 4
+
+// cellWidth returns the number of cells taken by r on the screen.
+func cellWidth(r rune) int {
+	if r == '\t' {
+		return tabWidth
+	}
+
+	return 1
+}
+
 func calcStringDimensions(s string) (nc, nr int) {
 	if s == "" {
 		return 0, 0
@@ -135,7 +147,7 @@ func calcStringDimensions(s string) (nc, nr int) {
 			}
 			c = 0
 		} else {
-			c++
+			c += cellWidth(x)
 		}
 	}
 

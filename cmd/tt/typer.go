@@ -296,6 +296,16 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 		}
 	}
 
+	//handleRune types a character and reports whether the text is complete.
+	handleRune := func(r rune) bool {
+		if !state.done() {
+			startTimer()
+			state.typeRune(r, t.SkipWord)
+		}
+
+		return state.done()
+	}
+
 	redraw := func() {
 		t.clearKeyboardHelpArea(sw, sh)
 		t.drawText(state, x, y)
@@ -392,18 +402,17 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 						state.backspace()
 					}
 				}
+			case tcell.KeyTab:
+				if handleRune('\t') {
+					return result()
+				}
 			case tcell.KeyRune:
 				if ev.Rune() == '?' && !state.expects('?') {
 					t.showKeyboardHelp = !t.showKeyboardHelp
 					continue
 				}
 
-				if !state.done() {
-					startTimer()
-					state.typeRune(ev.Rune(), t.SkipWord)
-				}
-
-				if state.done() {
+				if handleRune(ev.Rune()) {
 					return result()
 				}
 			}
@@ -443,7 +452,7 @@ func (t *typer) drawText(state *typingState, x, y int) {
 			style = t.nextWordStyle
 		case i >= state.idx:
 			style = t.defaultStyle
-		case r != state.typed[i] && r == ' ':
+		case r != state.typed[i] && (r == ' ' || r == '\t'):
 			style = t.incorrectSpaceStyle
 		case r != state.typed[i]:
 			style = t.incorrectStyle
@@ -451,8 +460,14 @@ func (t *typer) drawText(state *typingState, x, y int) {
 			style = t.correctStyle
 		}
 
-		t.Scr.SetContent(cx, cy, r, nil, style)
-		cx++
+		glyph := r
+		if r == '\t' {
+			glyph = ' '
+		}
+		for j := 0; j < cellWidth(r); j++ {
+			t.Scr.SetContent(cx+j, cy, glyph, nil, style)
+		}
+		cx += cellWidth(r)
 	}
 }
 

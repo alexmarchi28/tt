@@ -133,7 +133,8 @@ usage: tt \[OPTION\]... \[FILE\]
 -raw
 
 : Don't reflow STDIN text or show one paragraph at a time.  Note that line breaks
-are determined exclusively by the input.  
+are determined exclusively by the input. Tabs, e.g. the indentation of source
+code, are typed with the tab key.
 
 -multi 
 

@@ -164,7 +164,7 @@ func extractMistypedWords(text []rune, typed []rune) (mistakes []mistake) {
 }
 
 func isWordSeparator(r rune) bool {
-	return r == ' ' || r == '\n'
+	return r == ' ' || r == '\n' || r == '\t'
 }
 
 // highlightWordPositions returns, for each character of text, the position

@@ -165,3 +165,37 @@ func TestTypingStateDone(t *testing.T) {
 		t.Errorf("at the end: done %t, expects ? %t", s.done(), s.expects('?'))
 	}
 }
+
+func TestTypingStateTabs(t *testing.T) {
+	tests := []struct {
+		name         string
+		text, keys   string
+		noSkip       bool
+		idx          int
+		correctChars int
+		mistakes     []mistake
+	}{
+		{"tab typed", "a\n\tb", "a\tb", false, 4, 3, nil},
+		{"tabs separate mistyped words", "ab\tcd", "ab\tcx", false, 5, 4, []mistake{{"cd", "cx"}}},
+		{"space at indentation is ignored", "a\n\tb", "a ", false, 2, 1, nil},
+		{"space at indentation without skipping", "a\n\tb", "a ", true, 3, 1, nil},
+		{"space skips to a tab", "ab\tcd", "a ", false, 3, 2, []mistake{{"ab", "a_"}}},
+		{"delete word stops at a tab", "ab\tcd", "ab\tc\x17", false, 3, 3, nil},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := typeKeys(tc.text, tc.keys, !tc.noSkip)
+
+			if s.idx != tc.idx {
+				t.Errorf("idx = %d, want %d", s.idx, tc.idx)
+			}
+			if got := s.correctChars(); got != tc.correctChars {
+				t.Errorf("correctChars() = %d, want %d", got, tc.correctChars)
+			}
+			if got := s.mistakes(); !reflect.DeepEqual(got, tc.mistakes) {
+				t.Errorf("mistakes() = %q, want %q", got, tc.mistakes)
+			}
+		})
+	}
+}

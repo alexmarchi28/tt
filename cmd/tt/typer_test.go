@@ -737,3 +737,45 @@ func TestTyperCursorShape(t *testing.T) {
 		}
 	}
 }
+
+func TestTyperTab(t *testing.T) {
+	for _, skip := range []bool{true, false} {
+		ty, sim := newTestTyper(t)
+		ty.SkipWord = skip
+
+		got := typeText(t, ty, sim, "if x {\n\treturn\n}", "if x {", tcell.KeyTab, "return}")
+		if got.rc != TyperComplete || got.mistakes != nil || got.wrongKeys != 0 {
+			t.Errorf("with SkipWord %t got %+v, want a completed test without mistakes", skip, got)
+		}
+	}
+}
+
+func TestTyperDrawsTabs(t *testing.T) {
+	ty, sim := newTestTyper(t)
+	ty.SkipWord = false
+
+	done := startTyper(ty, []segment{{"ab\n\tcd", ""}}, -1)
+	x, y := textOrigin(t, sim, "ab")
+
+	// A tab takes tabWidth cells, the text is centered accordingly.
+	if line := screenLine(sim, y+1); line != strings.Repeat(" ", x+tabWidth)+"cd" {
+		t.Errorf("indented line = %q, want cd after a %d cells tab", line, tabWidth)
+	}
+
+	sendKeys(t, sim, "ab")
+	waitFor(t, sim, func() bool {
+		cx, cy, _ := sim.GetCursor()
+		return cx == x && cy == y+1
+	})
+
+	// A wrongly typed tab is highlighted like a wrong space.
+	sendKeys(t, sim, " ")
+	want := map[int]cellWant{}
+	for i := 0; i < tabWidth; i++ {
+		want[i] = cellWant{testFg, testErrCol, false}
+	}
+	waitForColors(t, sim, x, y+1, want)
+
+	sendKeys(t, sim, tcell.KeyEscape)
+	waitOutcome(t, done)
+}

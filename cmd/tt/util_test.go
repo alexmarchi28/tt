@@ -60,6 +60,8 @@ func TestCalcStringDimensions(t *testing.T) {
 		{"ab\ncde\nf", 3, 3},
 		{"abc\n", 3, 2},
 		{"àèì", 3, 1},
+		{"\tab", tabWidth + 2, 1},
+		{"a\n\t\tb", 2*tabWidth + 1, 2},
 	}
 
 	for _, tc := range tests {
