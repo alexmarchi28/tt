@@ -596,7 +596,6 @@ func main() {
 		}
 
 		ncorrectWords, t, rc, mistakes, ncorrectChars, nerrorsChars := typer.Start(tests[idx], time.Duration(timeout))
-		saveMistakes(mistakes)
 
 		switch rc {
 		case TyperNext:
@@ -613,6 +612,7 @@ func main() {
 
 			results = append(results, result{wpm, cpm, accuracy, timestamp, mistakes})
 			savePersistedResult(wpm, accuracy, timestamp)
+			saveMistakes(mistakes)
 			if !noReport {
 				attribution := ""
 				if len(tests[idx]) == 1 {
