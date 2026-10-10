@@ -630,7 +630,7 @@ func (t *typer) start(s string, timeLimit time.Duration, startImmediately bool, 
 						startTime = time.Now()
 					}
 					if t.SkipWord && ev.Rune() == ' ' {
-						if idx > 0 && text[idx-1] == ' ' && text[idx] != ' ' { //Do nothing on word boundaries.
+						if idx > 0 && isWordSeparator(text[idx-1]) && text[idx] != ' ' { //Do nothing on word boundaries.
 							break
 						}
 

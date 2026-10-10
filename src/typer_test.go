@@ -725,3 +725,13 @@ func TestTyperLiveAccuracyWithoutKeystrokes(t *testing.T) {
 	sendKeys(t, sim, tcell.KeyEscape)
 	waitOutcome(t, done)
 }
+
+func TestTyperSpaceAtLineStartIsIgnored(t *testing.T) {
+	ty, sim := newTestTyper(t)
+
+	got := typeText(t, ty, sim, "ab \ncd", "ab  cd")
+	assertOutcome(t, got, TyperComplete, 5, 4, 0, nil)
+
+	got = typeText(t, ty, sim, "ab\ncd", "ab cd")
+	assertOutcome(t, got, TyperComplete, 4, 4, 0, nil)
+}
