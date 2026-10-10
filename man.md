@@ -44,7 +44,7 @@ usage: tt \[OPTION\]... \[FILE\]
 : Practice the words mistyped in the last 500 mistakes, the most frequently
 mistyped ones coming up more often. -n and -g apply.
 
-## Word Mode
+## Word Mode (also applies to -mistakes)
 
 -n *GROUPSZ*
 
@@ -53,6 +53,14 @@ mistyped ones coming up more often. -n and -g apply.
 -g *NGROUPS*
 
 : Sets the number of groups which constitute a test.
+
+-punct
+
+: Turn the words into sentences with capital letters and punctuation marks.
+
+-numbers
+
+: Replace some of the words with numbers.
 
 ## File Mode
 -start *PARAGRAPH*

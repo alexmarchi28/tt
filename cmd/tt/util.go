@@ -1,7 +1,6 @@
 package main
 
 import (
-	"math/rand"
 	"regexp"
 	"strings"
 
@@ -64,36 +63,6 @@ func wordWrap(s string, n int) string {
 	r := []rune(s)
 	wordWrapRunes(r, n)
 	return string(r)
-}
-
-func randomText(n int, words []string) string {
-	r := ""
-
-	//Consecutive repetitions can only be avoided if there are at least two distinct words.
-	canAvoidRepeats := false
-	for _, w := range words {
-		if w != words[0] {
-			canAvoidRepeats = true
-			break
-		}
-	}
-
-	var last string
-	for i := 0; i < n; i++ {
-		w := words[rand.Int()%len(words)]
-		for canAvoidRepeats && last == w {
-			w = words[rand.Int()%len(words)]
-		}
-
-		r += w
-		if i != n-1 {
-			r += " "
-		}
-
-		last = w
-	}
-
-	return strings.Replace(r, "\n", " \n", -1)
 }
 
 func drawString(scr tcell.Screen, x, y int, s string, style tcell.Style) {

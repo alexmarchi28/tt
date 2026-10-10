@@ -8,7 +8,6 @@ import (
 	"sort"
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/gdamore/tcell"
 )
@@ -68,30 +67,6 @@ func TestCalcStringDimensions(t *testing.T) {
 		if nc, nr := calcStringDimensions(tc.in); nc != tc.nc || nr != tc.nr {
 			t.Errorf("calcStringDimensions(%q) = (%d, %d), want (%d, %d)", tc.in, nc, nr, tc.nc, tc.nr)
 		}
-	}
-}
-
-func TestRandomText(t *testing.T) {
-	words := []string{"alpha", "beta", "gamma"}
-
-	for i := 0; i < 50; i++ {
-		got := strings.Split(randomText(20, words), " ")
-		if len(got) != 20 {
-			t.Fatalf("randomText produced %d words, want 20: %q", len(got), got)
-		}
-
-		for j, w := range got {
-			if w != "alpha" && w != "beta" && w != "gamma" {
-				t.Fatalf("unexpected word %q in %q", w, got)
-			}
-			if j > 0 && got[j-1] == w {
-				t.Fatalf("repeated word %q in %q", w, got)
-			}
-		}
-	}
-
-	if got := randomText(1, []string{"two\nlines"}); got != "two \nlines" {
-		t.Errorf("randomText with an embedded newline = %q, want %q", got, "two \nlines")
 	}
 }
 
@@ -188,29 +163,6 @@ func TestDrawString(t *testing.T) {
 	drawStringAtCenter(sim, "xyz", tcell.StyleDefault)
 	if got := screenLine(sim, 2); got != "        xyz" {
 		t.Errorf("centered line = %q, want %q", got, "        xyz")
-	}
-}
-
-func TestRandomTextWithoutAlternatives(t *testing.T) {
-	tests := map[string][]string{
-		"single word":     {"solo"},
-		"same word twice": {"solo", "solo"},
-	}
-
-	for name, words := range tests {
-		t.Run(name, func(t *testing.T) {
-			done := make(chan string, 1)
-			go func() { done <- randomText(4, words) }()
-
-			select {
-			case got := <-done:
-				if got != "solo solo solo solo" {
-					t.Errorf("randomText = %q, want %q", got, "solo solo solo solo")
-				}
-			case <-time.After(time.Second):
-				t.Fatal("randomText did not return")
-			}
-		})
 	}
 }
 

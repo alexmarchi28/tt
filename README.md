@@ -72,6 +72,7 @@ options.
  - `tt -quotes en` Starts quote mode with the builtin quote list 'en'.
  - `tt -mistakes` Practices the words you recently mistyped, the most frequent ones more often.
  - `tt -n 10 -g 5` produces a test consisting of 50 randomly drawn words in 5 groups of 10 words each.
+ - `tt -punct -numbers` adds capital letters, punctuation and numbers to the words.
  - `tt -t 10` starts a timed test lasting 10 seconds.
  - `tt -theme gruvbox` Starts tt with the gruvbox theme.
  - `tt -stats` Prints your personal best, average WPM and accuracy over time, weekly trend, results by kind of test and most mistyped words.

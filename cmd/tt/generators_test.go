@@ -4,8 +4,12 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
+	"unicode"
+	"unicode/utf8"
 )
 
 func TestGenerateTestFromDataRaw(t *testing.T) {
@@ -247,6 +251,11 @@ func TestNewTestGenerator(t *testing.T) {
 		{"file", []string{book}, "", true, exactly("first paragraph"), testKind{"file", "book.txt"}},
 		{"stdin over file", []string{book}, "piped text", false, exactly("piped text"), testKind{"text", ""}},
 		{"mistakes", []string{"-mistakes", "-n", "3"}, "", true, exactly("ab ab ab"), testKind{"mistakes", ""}},
+		{"punctuation and numbers", []string{"-punct", "-numbers", "-n", "200"}, "", true, func(t *testing.T, segments []segment) {
+			if len(segments) != 1 || !endsSentence(segments[0].Text) || !strings.ContainsAny(segments[0].Text, "0123456789") {
+				t.Errorf("got %q, want sentences with numbers", segments)
+			}
+		}, testKind{"words", "1000en"}},
 		{"mistakes over stdin", []string{"-mistakes", "-n", "2"}, "piped text", false, exactly("ab ab"), testKind{"mistakes", ""}},
 	}
 
@@ -370,5 +379,152 @@ func TestGenerateMistakesTest(t *testing.T) {
 	// Without weights "often" would make a third of the words.
 	if share := float64(counts["often"]) / 5000; share < 0.4 {
 		t.Errorf("often makes %.2f of the words, want frequent mistakes to come up more often (%v)", share, counts)
+	}
+}
+
+func TestRandomWords(t *testing.T) {
+	words := []string{"alpha", "beta", "gamma"}
+
+	for i := 0; i < 50; i++ {
+		got := randomWords(20, words)
+		if len(got) != 20 {
+			t.Fatalf("randomWords produced %d words, want 20: %q", len(got), got)
+		}
+
+		for j, w := range got {
+			if w != "alpha" && w != "beta" && w != "gamma" {
+				t.Fatalf("unexpected word %q in %q", w, got)
+			}
+			if j > 0 && got[j-1] == w {
+				t.Fatalf("repeated word %q in %q", w, got)
+			}
+		}
+	}
+}
+
+func TestRandomWordsWithoutAlternatives(t *testing.T) {
+	tests := map[string][]string{
+		"single word":     {"solo"},
+		"same word twice": {"solo", "solo"},
+	}
+
+	for name, words := range tests {
+		t.Run(name, func(t *testing.T) {
+			done := make(chan []string, 1)
+			go func() { done <- randomWords(4, words) }()
+
+			select {
+			case got := <-done:
+				if want := []string{"solo", "solo", "solo", "solo"}; !reflect.DeepEqual(got, want) {
+					t.Errorf("randomWords = %q, want %q", got, want)
+				}
+			case <-time.After(time.Second):
+				t.Fatal("randomWords did not return")
+			}
+		})
+	}
+}
+
+// startsUpper reports whether the first letter of w is upper case, ignoring
+// opening quotes and parentheses.
+func startsUpper(w string) bool {
+	r, _ := utf8.DecodeRuneInString(strings.TrimLeft(w, `"(`))
+	return unicode.IsUpper(r)
+}
+
+func endsSentence(w string) bool {
+	return strings.ContainsAny(w[len(w)-1:], ".?!")
+}
+
+func TestPunctuate(t *testing.T) {
+	words := []string{"alpha", "beta", "gamma", "delta", "épsilon", "zeta", "eta", "theta"}
+	marks := map[string]int{}
+
+	for i := 0; i < 500; i++ {
+		got := punctuate(words)
+		if len(got) != len(words) {
+			t.Fatalf("punctuate() returned %d words, want %d", len(got), len(words))
+		}
+
+		if !startsUpper(got[0]) || !endsSentence(got[len(got)-1]) {
+			t.Errorf("%q is not made of whole sentences", got)
+		}
+
+		for j, w := range got {
+			bare := strings.Trim(w, `.,;:?!"()`)
+			if !strings.EqualFold(bare, words[j]) {
+				t.Fatalf("word %q became %q", words[j], w)
+			}
+			if j > 0 && startsUpper(w) != endsSentence(got[j-1]) {
+				t.Errorf("%q: only words starting a sentence should be capitalized", got)
+			}
+
+			for _, m := range []string{".", ",", ";", ":", "?", "!", `"`, "("} {
+				if strings.Contains(w, m) {
+					marks[m]++
+				}
+			}
+		}
+	}
+
+	for _, m := range []string{".", ",", ";", ":", "?", "!", `"`, "("} {
+		if marks[m] == 0 {
+			t.Errorf("%q never used: %v", m, marks)
+		}
+	}
+	if marks[","] < marks[";"] || marks["."] < marks["?"] {
+		t.Errorf("unrealistic punctuation frequencies: %v", marks)
+	}
+}
+
+func TestAddNumbers(t *testing.T) {
+	words := strings.Fields(strings.Repeat("word ", 20))
+	numbers := 0
+
+	for i := 0; i < 200; i++ {
+		got := addNumbers(words)
+		if len(got) != len(words) {
+			t.Fatalf("addNumbers() returned %d words, want %d", len(got), len(words))
+		}
+
+		for _, w := range got {
+			if w == "word" {
+				continue
+			}
+
+			numbers++
+			if _, err := strconv.Atoi(w); err != nil || len(w) > 4 {
+				t.Errorf("%q is neither a word nor a number of at most 4 digits", w)
+			}
+		}
+	}
+
+	if share := float64(numbers) / 4000; share < 0.08 || share > 0.25 {
+		t.Errorf("%.2f of the words are numbers, want some but not too many", share)
+	}
+}
+
+func TestGenerateWordTestDecorations(t *testing.T) {
+	dir := useTempStorage(t)
+	writeUserResource(t, dir, "words", "greek", "alpha beta gamma delta")
+
+	gen := generateWordTest("greek", wordOptions{n: 30, g: 2, punctuation: true, numbers: true})
+	digits := false
+
+	for i := 0; i < 20; i++ {
+		for _, s := range gen() {
+			words := strings.Split(s.Text, " ")
+			if len(words) != 30 {
+				t.Fatalf("%q has %d words, want 30", s.Text, len(words))
+			}
+			if !endsSentence(s.Text) {
+				t.Errorf("%q does not end a sentence", s.Text)
+			}
+			digits = digits || strings.ContainsAny(s.Text, "0123456789")
+		}
+	}
+
+	if !digits {
+		t.Error("no number in 40 segments")
 	}
 }

@@ -42,6 +42,9 @@ Modes
 Word Mode (also applies to -mistakes)
     -n GROUPSZ          Sets the number of words which constitute a group.
     -g NGROUPS          Sets the number of groups which constitute a test.
+    -punct              Turn the words into sentences with capital letters
+                        and punctuation.
+    -numbers            Replace some of the words with numbers.
 
 File Mode
     -start PARAGRAPH    The offset of the starting paragraph, set this to 0 to
@@ -106,6 +109,8 @@ type options struct {
 
 	themeExplicit      bool // Whether -theme was given.
 	mistakes           bool
+	punct              bool
+	numbers            bool
 	showWpm            bool
 	showAccuracy       bool
 	noSkip             bool
@@ -145,6 +150,8 @@ func parseFlags(args []string) options {
 	fs.StringVar(&opts.wordFile, "words", "", "")
 	fs.StringVar(&opts.quoteFile, "quotes", "", "")
 	fs.BoolVar(&opts.mistakes, "mistakes", false, "")
+	fs.BoolVar(&opts.punct, "punct", false, "")
+	fs.BoolVar(&opts.numbers, "numbers", false, "")
 
 	fs.BoolVar(&opts.showWpm, "showwpm", false, "")
 	fs.BoolVar(&opts.showAccuracy, "showaccuracy", false, "")
@@ -190,7 +197,7 @@ func parseFlags(args []string) options {
 // requested on the command line, or nil once there are no more, and what they
 // are made of. Text piped to stdin is used unless stdin is a terminal.
 func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func() []segment, testKind) {
-	words := wordOptions{n: opts.n, g: opts.g}
+	words := wordOptions{n: opts.n, g: opts.g, punctuation: opts.punct, numbers: opts.numbers}
 
 	switch {
 	case opts.wordFile != "":

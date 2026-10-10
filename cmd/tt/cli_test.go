@@ -251,7 +251,7 @@ func TestParseFlagsDefaults(t *testing.T) {
 }
 
 func TestParseFlags(t *testing.T) {
-	got := parseFlags([]string{"-t", "30", "-theme", "nord", "-highlight1", "-highlight2", "-notransparent", "-n", "10", "-g", "3", "book.txt"})
+	got := parseFlags([]string{"-t", "30", "-theme", "nord", "-highlight1", "-highlight2", "-notransparent", "-punct", "-numbers", "-n", "10", "-g", "3", "book.txt"})
 
 	if got.timeout != 30*time.Second {
 		t.Errorf("timeout = %v, want 30s", got.timeout)
@@ -259,7 +259,7 @@ func TestParseFlags(t *testing.T) {
 	if got.themeName != "nord" || !got.themeExplicit {
 		t.Errorf("theme = %q (explicit %t), want nord given explicitly", got.themeName, got.themeExplicit)
 	}
-	if !got.noHighlightNext || !got.noHighlightCurrent || !got.opaqueBg {
+	if !got.noHighlightNext || !got.noHighlightCurrent || !got.opaqueBg || !got.punct || !got.numbers {
 		t.Errorf("flags not set: %+v", got)
 	}
 	if got.n != 10 || got.g != 3 || !reflect.DeepEqual(got.files, []string{"book.txt"}) {
