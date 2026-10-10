@@ -44,7 +44,7 @@ func TestGenerateWordTest(t *testing.T) {
 	dir := useTempStorage(t)
 	writeUserResource(t, dir, "words", "greek", "alpha beta\tgamma\ndelta")
 
-	gen := generateWordTest("greek", 3, 2)
+	gen := generateWordTest("greek", wordOptions{n: 3, g: 2})
 	allowed := map[string]bool{"alpha": true, "beta": true, "gamma": true, "delta": true}
 
 	for i := 0; i < 20; i++ {
@@ -74,7 +74,7 @@ func TestGenerateWordTest(t *testing.T) {
 func TestGenerateWordTestUsesBuiltinLists(t *testing.T) {
 	useTempStorage(t)
 
-	gen := generateWordTest("1000en", 50, 1)
+	gen := generateWordTest("1000en", wordOptions{n: 50, g: 1})
 	for i := 0; i < 100; i++ {
 		segments := gen()
 		if len(segments) != 1 {
@@ -88,7 +88,7 @@ func TestGenerateWordTestIgnoresBlankEntries(t *testing.T) {
 	dir := useTempStorage(t)
 	writeUserResource(t, dir, "words", "blanks", "\n  alpha beta\n\ngamma\t\n")
 
-	gen := generateWordTest("blanks", 10, 1)
+	gen := generateWordTest("blanks", wordOptions{n: 10, g: 1})
 	for i := 0; i < 100; i++ {
 		assertWords(t, gen()[0].Text, 10)
 	}
@@ -347,7 +347,7 @@ func TestGenerateMistakesTest(t *testing.T) {
 	}
 	saveTestMistakes(t, words...)
 
-	gen := generateMistakesTest(50, 2)
+	gen := generateMistakesTest(wordOptions{n: 50, g: 2})
 	counts := map[string]int{}
 	for i := 0; i < 50; i++ {
 		segments := gen()

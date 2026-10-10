@@ -29,7 +29,13 @@ func (k testKind) String() string {
 	}
 }
 
-func generateWordTest(name string, n int, g int) func() []segment {
+// wordOptions describes the tests made of random words.
+type wordOptions struct {
+	n int // Words per segment.
+	g int // Segments per test.
+}
+
+func generateWordTest(name string, o wordOptions) func() []segment {
 	var b []byte
 
 	if b = readResource("words", name); b == nil {
@@ -41,7 +47,7 @@ func generateWordTest(name string, n int, g int) func() []segment {
 		die("%s does not contain any words.", name)
 	}
 
-	return wordTest(words, n, g)
+	return wordTest(words, o)
 }
 
 // recentMistakes is the number of most recent mistakes practiced with
@@ -68,7 +74,7 @@ func weightedMistakes(mistakes []mistake, n int) []string {
 
 // generateMistakesTest practices the recently mistyped words, the most
 // frequently mistyped ones coming up more often.
-func generateMistakesTest(n int, g int) func() []segment {
+func generateMistakesTest(o wordOptions) func() []segment {
 	var mistakes []mistake
 	if err := readValue(mistakeDB, &mistakes); err != nil && !os.IsNotExist(err) {
 		die("Could not read the recorded mistakes: %v", err)
@@ -79,15 +85,15 @@ func generateMistakesTest(n int, g int) func() []segment {
 		die("There are no recorded mistakes to practice yet.")
 	}
 
-	return wordTest(words, n, g)
+	return wordTest(words, o)
 }
 
-// wordTest makes tests of g segments of n words randomly drawn from words.
-func wordTest(words []string, n int, g int) func() []segment {
+// wordTest makes tests of words randomly drawn from words.
+func wordTest(words []string, o wordOptions) func() []segment {
 	return func() []segment {
-		segments := make([]segment, g)
-		for i := 0; i < g; i++ {
-			segments[i] = segment{randomText(n, words), ""}
+		segments := make([]segment, o.g)
+		for i := range segments {
+			segments[i] = segment{randomText(o.n, words), ""}
 		}
 
 		return segments

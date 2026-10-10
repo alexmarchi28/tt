@@ -190,13 +190,15 @@ func parseFlags(args []string) options {
 // requested on the command line, or nil once there are no more, and what they
 // are made of. Text piped to stdin is used unless stdin is a terminal.
 func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func() []segment, testKind) {
+	words := wordOptions{n: opts.n, g: opts.g}
+
 	switch {
 	case opts.wordFile != "":
-		return generateWordTest(opts.wordFile, opts.n, opts.g), testKind{"words", filepath.Base(opts.wordFile)}
+		return generateWordTest(opts.wordFile, words), testKind{"words", filepath.Base(opts.wordFile)}
 	case opts.quoteFile != "":
 		return generateQuoteTest(opts.quoteFile), testKind{"quotes", filepath.Base(opts.quoteFile)}
 	case opts.mistakes:
-		return generateMistakesTest(opts.n, opts.g), testKind{"mistakes", ""}
+		return generateMistakesTest(words), testKind{"mistakes", ""}
 	case !stdinIsTerminal:
 		b, err := io.ReadAll(stdin)
 		if err != nil {
@@ -207,7 +209,7 @@ func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func
 	case len(opts.files) > 0:
 		return generateTestFromFile(opts.files[0], opts.startParagraph), testKind{"file", filepath.Base(opts.files[0])}
 	default:
-		return generateWordTest("1000en", opts.n, opts.g), testKind{"words", "1000en"}
+		return generateWordTest("1000en", words), testKind{"words", "1000en"}
 	}
 }
 
