@@ -50,7 +50,7 @@ func simulationScreenText(sim tcell.SimulationScreen) string {
 func waitForScreenText(t *testing.T, sim tcell.SimulationScreen, needle string, want bool) {
 	t.Helper()
 
-	deadline := time.Now().Add(time.Second)
+	deadline := time.Now().Add(testWait)
 	for time.Now().Before(deadline) {
 		if strings.Contains(simulationScreenText(sim), needle) == want {
 			return
@@ -151,7 +151,7 @@ func sendKeys(t *testing.T, sim tcell.SimulationScreen, items ...interface{}) {
 	t.Helper()
 
 	for _, ev := range keys(items...) {
-		deadline := time.Now().Add(time.Second)
+		deadline := time.Now().Add(testWait)
 		for sim.PostEvent(ev) != nil {
 			if time.Now().After(deadline) {
 				t.Fatal("event queue is full")
@@ -167,7 +167,7 @@ func waitOutcome(t *testing.T, done <-chan testResult) testResult {
 	select {
 	case o := <-done:
 		return o
-	case <-time.After(5 * time.Second):
+	case <-time.After(testWait):
 		t.Fatal("typer did not return")
 	}
 
@@ -442,7 +442,7 @@ func textOrigin(t *testing.T, sim tcell.SimulationScreen, text string) (int, int
 func waitFor(t *testing.T, sim tcell.SimulationScreen, cond func() bool) {
 	t.Helper()
 
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(testWait)
 	for !cond() {
 		if time.Now().After(deadline) {
 			t.Fatalf("condition not met, screen:\n%s", simulationScreenText(sim))
@@ -471,7 +471,7 @@ type cellWant struct {
 func waitForColors(t *testing.T, sim tcell.SimulationScreen, x, y int, want map[int]cellWant) {
 	t.Helper()
 
-	deadline := time.Now().Add(2 * time.Second)
+	deadline := time.Now().Add(testWait)
 	for {
 		var diff []string
 		for i := 0; i < 20; i++ {

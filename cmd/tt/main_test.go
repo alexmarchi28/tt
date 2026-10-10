@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gdamore/tcell"
 )
@@ -70,6 +71,10 @@ func writeUserResource(t *testing.T, dir, typ, name, content string) string {
 
 	return path
 }
+
+// testWait is how long tests wait for the screen or the typer before failing.
+// It is generous for slow machines, waits end as soon as possible.
+const testWait = 5 * time.Second
 
 func newSimScreen(t *testing.T) tcell.SimulationScreen {
 	t.Helper()

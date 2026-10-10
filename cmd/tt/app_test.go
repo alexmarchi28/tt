@@ -47,7 +47,7 @@ func waitExitCode(t *testing.T, done <-chan int) int {
 	select {
 	case rc := <-done:
 		return rc
-	case <-time.After(5 * time.Second):
+	case <-time.After(testWait):
 		t.Fatal("app did not return")
 	}
 
