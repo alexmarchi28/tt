@@ -257,7 +257,7 @@ curl https://api.quotable.io/quotes|\
 Starts a new typing test which uses the tt source as input:
 
 ```
-curl -LsS https://raw.githubusercontent.com/lemnos/tt/master/src/tt.go | head -n 20 | tt -noskip -raw
+curl -LsS https://raw.githubusercontent.com/alexmarchi28/tt/master/cmd/tt/tt.go | head -n 20 | tt -noskip -raw
 ```
 
 Modify to taste.
@@ -302,6 +302,10 @@ Aetnaeus (aetnaeus@protonmail.com)
 # SEE ALSO
 
 ## Project Page
+
+    https://github.com/alexmarchi28/tt
+
+## Original Project
 
     https://github.com/lemnos/tt
 
