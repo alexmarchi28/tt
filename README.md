@@ -153,3 +153,9 @@ Run the tests with `go test ./...`. They never touch your own data: saved data
 goes to temporary directories (see `main_test.go`), command line tests run tt in
 a separate process with a temporary home, and screen tests use the simulation
 screen of tcell with a clock they control.
+
+Pushing a tag such as `v1.1.0` publishes the release of that version with the
+binaries of every platform, the man page and their checksums (see `make rel`).
+Its notes are taken from the `# 1.1.0:` section of `CHANGELOG.md`, so write it
+before tagging. The release of an earlier tag can be published by running the
+Release workflow by hand from the Actions tab.

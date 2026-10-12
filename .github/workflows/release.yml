@@ -1,0 +1,53 @@
+name: Release
+
+# Publishes the release of a version when its tag (e.g. v1.1.0) is pushed: the
+# binaries of every platform, the man page and their checksums (see make rel),
+# described by the notes of the version in CHANGELOG.md.
+on:
+  push:
+    tags:
+      - "v*"
+  # Publishes the release of a tag pushed earlier.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: The tag of the version to release, e.g. v1.0.0
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ inputs.tag || github.ref_name }}
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refs/tags/${{ env.TAG }}
+          # The version shown by the binaries is taken from the tag.
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+      - run: go test ./...
+      - run: make rel
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # The notes of the version in the changelog, from its header to the
+          # next one.
+          awk -v header="# ${TAG#v}:" '
+            $0 == header { found = 1; next }
+            found && /^# / { exit }
+            found && (printed || NF) { print; printed = 1 }
+          ' CHANGELOG.md > notes.md
+
+          if [ -s notes.md ]; then
+            gh release create "$TAG" bin/release/* --title "$TAG" --notes-file notes.md
+          else
+            gh release create "$TAG" bin/release/* --title "$TAG" --generate-notes
+          fi
