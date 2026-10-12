@@ -108,7 +108,7 @@ func TestCLIList(t *testing.T) {
 	}
 
 	quotes := runCLI(t, home, nil, "-list", "quotes")
-	if quotes != (cliResult{"en\n", "", 0}) {
+	if quotes != (cliResult{"en\nit\n", "", 0}) {
 		t.Errorf("tt -list quotes = %+v", quotes)
 	}
 }

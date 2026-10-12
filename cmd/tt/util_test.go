@@ -138,14 +138,14 @@ func TestListResourceNames(t *testing.T) {
 	}
 
 	words := listResourceNames("words")
-	for _, want := range []string{"1000en", "200en", "it"} {
+	for _, want := range []string{"1000en", "200en", "1000it", "it"} {
 		if indexResourceName(words, want) == -1 {
 			t.Errorf("word list %q missing from %v", want, words)
 		}
 	}
 
-	if quotes := listResourceNames("quotes"); !reflect.DeepEqual(quotes, []string{"en"}) {
-		t.Errorf("listResourceNames(quotes) = %v, want [en]", quotes)
+	if quotes := listResourceNames("quotes"); !reflect.DeepEqual(quotes, []string{"en", "it"}) {
+		t.Errorf("listResourceNames(quotes) = %v, want [en it]", quotes)
 	}
 }
 

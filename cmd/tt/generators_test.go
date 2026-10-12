@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -146,10 +147,49 @@ func TestGenerateQuoteTest(t *testing.T) {
 func TestBuiltinQuotesAreValid(t *testing.T) {
 	useTempStorage(t)
 
-	for i := 0; i < 20; i++ {
-		if got := mustGen(generateQuoteTest("en"))(); len(got) != 1 || got[0].Text == "" {
-			t.Fatalf("unexpected builtin quote %q", got)
+	names := listResourceNames("quotes")
+	for _, want := range []string{"en", "it"} {
+		if indexResourceName(names, want) == -1 {
+			t.Errorf("no builtin %s quotes in %q", want, names)
 		}
+	}
+
+	for _, name := range names {
+		var quotes []segment
+		if err := json.Unmarshal(readResource("quotes", name), &quotes); err != nil {
+			t.Fatalf("builtin quotes %s: %v", name, err)
+		}
+
+		for _, q := range quotes {
+			if strings.TrimSpace(q.Text) == "" {
+				t.Errorf("builtin quotes %s: %+v has no text", name, q)
+			}
+		}
+	}
+}
+
+func TestItalianWordList(t *testing.T) {
+	useTempStorage(t)
+
+	words, err := loadWords("1000it")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	seen := map[string]bool{}
+	for _, w := range words {
+		if seen[w] {
+			t.Errorf("%q appears twice", w)
+		}
+		seen[w] = true
+
+		if strings.Trim(w, "abcdefghijklmnopqrstuvwxyzàèéìòù") != "" {
+			t.Errorf("%q is not a lower case Italian word", w)
+		}
+	}
+
+	if len(seen) != 1000 {
+		t.Errorf("got %d distinct words, want 1000", len(seen))
 	}
 }
 

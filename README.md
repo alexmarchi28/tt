@@ -88,7 +88,8 @@ options.
 
 ## Examples
 
- - `tt -quotes en` Starts quote mode with the builtin quote list 'en'.
+ - `tt -quotes en` Starts quote mode with the builtin quote list 'en' ('it' for Italian literature).
+ - `tt -words 1000it` Draws the words from 1000 common Italian words, see `tt -list words` for the other languages.
  - `tt -mistakes` Practices the words you recently mistyped, the most frequent ones more often.
  - `tt -adaptive` Practices the words containing the pairs of letters you miss or type slowly.
  - `tt -n 10 -g 5` produces a test consisting of 50 randomly drawn words in 5 groups of 10 words each.
