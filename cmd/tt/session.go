@@ -57,10 +57,19 @@ func (s *session) timeUp() bool {
 	return s.timeLimit != -1 && s.timeLimit <= s.elapsed()
 }
 
+// duration returns the time spent typing, which ends at the time limit.
+func (s *session) duration() time.Duration {
+	if s.timeUp() {
+		return s.timeLimit
+	}
+
+	return s.elapsed()
+}
+
 func (s *session) result() testResult {
 	return testResult{
 		rc:           TyperComplete,
-		duration:     s.elapsed(),
+		duration:     s.duration(),
 		correctChars: s.state.correctChars(),
 		correctKeys:  s.state.correctKeys,
 		wrongKeys:    s.state.wrongKeys,

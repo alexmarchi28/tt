@@ -301,17 +301,19 @@ func (t *typer) start(text string, timeLimit time.Duration, startImmediately boo
 	for {
 		s.redraw()
 
-		switch ev := t.Scr.PollEvent().(type) {
+		ev := t.Scr.PollEvent()
+		if s.timeUp() { //Whatever happened after the time limit comes too late.
+			return s.result()
+		}
+
+		switch ev := ev.(type) {
 		case *tcell.EventResize:
 			return testResult{rc: TyperResize}
 		case *tcell.EventKey:
 			if res, ended := s.handleKey(ev); ended {
 				return res
 			}
-		default: //tick
-			if s.timeUp() {
-				return s.result()
-			}
+		default: //The ticks of startTicker only update the screen.
 		}
 	}
 }

@@ -375,6 +375,28 @@ func TestTyperTimeout(t *testing.T) {
 	}
 }
 
+func TestTyperTimeoutIgnoresLateKeys(t *testing.T) {
+	ty, sim := newTestTyper(t)
+	clock := useFakeClock(ty)
+
+	done := startTyper(ty, []segment{{"abcd", ""}}, 10*time.Second)
+	x, y := textOrigin(t, sim, "abcd")
+
+	sendKeys(t, sim, "a")
+	waitForColors(t, sim, x, y, map[int]cellWant{0: {testHi, testBg, true}})
+
+	// Keys pressed after the time limit, before the screen is next updated,
+	// come too late to count.
+	clock.advance(11 * time.Second)
+	sendKeys(t, sim, "bcd")
+
+	got := waitOutcome(t, done)
+	assertOutcome(t, got, TyperComplete, 1, 1, 0, nil)
+	if got.duration != 10*time.Second {
+		t.Errorf("duration = %v, want the time limit", got.duration)
+	}
+}
+
 func TestTyperTimeoutSpansSegments(t *testing.T) {
 	ty, sim := newTestTyper(t)
 	clock := useFakeClock(ty)
