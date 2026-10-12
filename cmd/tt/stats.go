@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"math"
 	"sort"
 	"strings"
 	"time"
@@ -65,10 +66,15 @@ func before(results []persistedResult, t time.Time) []persistedResult {
 	return filterResults(results, func(r persistedResult) bool { return r.Timestamp < t.Unix() })
 }
 
+// ofKind returns the results of the given kind of test.
+func ofKind(results []persistedResult, kind testKind) []persistedResult {
+	return filterResults(results, func(r persistedResult) bool { return r.kind() == kind })
+}
+
 // bestWpm returns the best WPM achieved on the given kind of test, and false
 // if no such test was completed.
 func bestWpm(results []persistedResult, kind testKind) (int, bool) {
-	s := summarize(filterResults(results, func(r persistedResult) bool { return r.kind() == kind }))
+	s := summarize(ofKind(results, kind))
 	return s.best.Wpm, s.count > 0
 }
 
@@ -231,4 +237,32 @@ func printStats() {
 	mistakes, _ := readMistakes()
 
 	fmt.Print(formatStats(stored, mistakes, time.Now()))
+}
+
+// Speeds of the pacer taken from the saved results, see -pace.
+const (
+	paceBest    = "best" // The best result.
+	paceAverage = "avg"  // The average of the recent results, see recentPaceResults.
+)
+
+// recentPaceResults is the number of latest results averaged by -pace avg.
+const recentPaceResults = 10
+
+// paceFromResults returns the speed of the pacer set by target (paceBest or
+// paceAverage) from the saved results of the given kind of test.
+func paceFromResults(target string, results []persistedResult, kind testKind) (int, error) {
+	results = ofKind(results, kind)
+	if len(results) == 0 {
+		return 0, fmt.Errorf("-pace %s needs a saved result of %s", target, kind)
+	}
+
+	if target == paceBest {
+		return summarize(results).best.Wpm, nil
+	}
+
+	if len(results) > recentPaceResults {
+		results = results[len(results)-recentPaceResults:]
+	}
+
+	return int(math.Round(summarize(results).wpm)), nil
 }

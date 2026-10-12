@@ -132,10 +132,11 @@ the least number of groups.
 : Don't show mistakes while typing, they are still reported at the end of the
 test.
 
--pace *WPM*
+-pace *WPM*|best|avg
 
 : Show a pacer going through the text at the given speed, starting with the
-first key press.
+first key press. best sets the speed to your best result on the same kind of
+test (see DESCRIPTION), avg to your average over its last 10 results.
 
 -nohighlight
 

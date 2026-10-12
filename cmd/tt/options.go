@@ -4,6 +4,7 @@ import (
 	"errors"
 	"flag"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -55,7 +56,9 @@ Test Parameters
     -nobackspace        Disable the backspace key.
     -blind              Don't show mistakes while typing, they are still
                         reported at the end of the test.
-    -pace WPM           Show a pacer going through the text at the given speed.
+    -pace WPM           Show a pacer going through the text at the given speed,
+                        or at your personal best (best) or recent average (avg)
+                        on the same kind of test.
     -nohighlight        Disable current and next word highlighting.
     -highlight1         Only highlight the current word.
     -highlight2         Only highlight the next word.
@@ -96,6 +99,7 @@ type options struct {
 	maxLineLen     int
 	timeout        time.Duration // -1 for no time limit.
 	pace           int           // 0 for no pacer.
+	paceTarget     string        // -pace best or avg, see paceFromResults.
 
 	listType  string
 	layout    string
@@ -136,6 +140,7 @@ type options struct {
 func parseFlags(args []string) options {
 	var opts options
 	var timeout int
+	var pace string
 
 	fs := flag.NewFlagSet("tt", flag.ExitOnError)
 
@@ -161,7 +166,7 @@ func parseFlags(args []string) options {
 	fs.BoolVar(&opts.blockCursor, "blockcursor", false, "")
 	fs.BoolVar(&opts.noBackspace, "nobackspace", false, "")
 	fs.BoolVar(&opts.blind, "blind", false, "")
-	fs.IntVar(&opts.pace, "pace", 0, "")
+	fs.StringVar(&pace, "pace", "", "")
 	fs.BoolVar(&opts.noTheme, "notheme", false, "")
 	fs.BoolVar(&opts.opaqueBg, "notransparent", false, "")
 	fs.BoolVar(&opts.oneShot, "oneshot", false, "")
@@ -197,6 +202,12 @@ func parseFlags(args []string) options {
 		opts.timeout = time.Duration(timeout) * time.Second
 	}
 
+	if wpm, err := strconv.Atoi(pace); err == nil {
+		opts.pace = wpm
+	} else {
+		opts.paceTarget = pace
+	}
+
 	return opts
 }
 
@@ -213,6 +224,8 @@ func (o options) validate() error {
 		return errors.New("-t must be at least 1")
 	case o.pace < 0:
 		return errors.New("-pace can't be negative")
+	case o.paceTarget != "" && o.paceTarget != paceBest && o.paceTarget != paceAverage:
+		return errors.New("-pace must be a speed in wpm, best or avg")
 	}
 
 	return nil

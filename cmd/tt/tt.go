@@ -67,13 +67,20 @@ func main() {
 	}
 
 	//Checked before typing a test whose result could not be saved.
-	if _, err := readPersistedResults(); err != nil {
+	stored, err := readPersistedResults()
+	if err != nil {
 		die("%v", err)
 	}
 
 	testFn, kind, err := newTestGenerator(opts, os.Stdin, isatty.IsTerminal(os.Stdin.Fd()))
 	if err != nil {
 		die("%v", err)
+	}
+
+	if opts.paceTarget != "" {
+		if opts.pace, err = paceFromResults(opts.paceTarget, stored, kind); err != nil {
+			die("%v", err)
+		}
 	}
 
 	scr, err = tcell.NewScreen()

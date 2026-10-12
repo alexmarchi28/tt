@@ -225,3 +225,32 @@ func TestBestWpm(t *testing.T) {
 		t.Errorf("bestWpm(quotes en) = %d, %t, want no result", best, ok)
 	}
 }
+
+func TestPaceFromResults(t *testing.T) {
+	kind := testKind{mode: "words", source: "1000en", words: 50}
+	other := persistedResult{Wpm: 200}.withKind(testKind{mode: "words", source: "1000en", words: 10})
+
+	stored := []persistedResult{other}
+	for _, wpm := range []int{90, 10, 50, 50, 50, 50, 50, 60, 60, 60, 60, 60} {
+		stored = append(stored, persistedResult{Wpm: wpm}.withKind(kind), other)
+	}
+
+	if got, err := paceFromResults("best", stored, kind); got != 90 || err != nil {
+		t.Errorf("pace best = %d, %v, want 90, the best result of the kind of test", got, err)
+	}
+
+	// The average of the last 10 results: 5 at 50 wpm and 5 at 60 wpm.
+	if got, err := paceFromResults("avg", stored, kind); got != 55 || err != nil {
+		t.Errorf("pace avg = %d, %v, want 55, the average of the recent results", got, err)
+	}
+
+	// With fewer results, all of them count.
+	if got, err := paceFromResults("avg", stored[:4], kind); got != 50 || err != nil {
+		t.Errorf("pace avg of 2 results = %d, %v, want 50", got, err)
+	}
+
+	_, err := paceFromResults("best", []persistedResult{other}, kind)
+	if err == nil || err.Error() != "-pace best needs a saved result of words 1000en, 50 words" {
+		t.Errorf("error = %v, want the lack of results of the kind of test", err)
+	}
+}

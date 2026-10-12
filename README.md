@@ -95,6 +95,7 @@ options.
  - `tt -punct -numbers` adds capital letters, punctuation and numbers to the words.
  - `tt -t 10` starts a timed test lasting 10 seconds.
  - `tt -pace 70` shows a pacer typing at 70 wpm to keep up with.
+ - `tt -t 30 -pace best` races a pacer at your personal best on 30 second tests (`-pace avg` for your recent average).
  - `tt -theme gruvbox` Starts tt with the gruvbox theme.
  - `tt -keys -layout it` Shows on an Italian keyboard which keys you miss most and type slowest.
  - `tt -export results > results.csv` Exports all your saved results, e.g. to a spreadsheet (`tt -export mistakes` for the mistakes, `-json` for JSON).

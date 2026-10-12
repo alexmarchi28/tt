@@ -42,10 +42,34 @@ func TestParseFlags(t *testing.T) {
 }
 
 func TestOptionsValidate(t *testing.T) {
-	valid := [][]string{nil, {"-n", "1", "-g", "1", "-w", "1", "-t", "1", "-pace", "0"}, {"-t", "-1"}}
+	valid := [][]string{nil, {"-n", "1", "-g", "1", "-w", "1", "-t", "1", "-pace", "0"}, {"-t", "-1"}, {"-pace", "best"}, {"-pace", "avg"}}
 	for _, args := range valid {
 		if err := parseFlags(args).validate(); err != nil {
 			t.Errorf("%q: unexpected error %v", args, err)
+		}
+	}
+}
+
+func TestParsePace(t *testing.T) {
+	tests := []struct {
+		arg    string
+		pace   int
+		target string
+	}{
+		{"", 0, ""},
+		{"70", 70, ""},
+		{"best", 0, "best"},
+		{"avg", 0, "avg"},
+	}
+
+	for _, tc := range tests {
+		args := []string{}
+		if tc.arg != "" {
+			args = []string{"-pace", tc.arg}
+		}
+
+		if got := parseFlags(args); got.pace != tc.pace || got.paceTarget != tc.target {
+			t.Errorf("-pace %q: pace %d, target %q, want %d and %q", tc.arg, got.pace, got.paceTarget, tc.pace, tc.target)
 		}
 	}
 }

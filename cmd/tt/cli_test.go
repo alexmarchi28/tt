@@ -310,6 +310,7 @@ func TestCLIRejectsInvalidNumbers(t *testing.T) {
 		{[]string{"-t", "0"}, "-t must be at least 1"},
 		{[]string{"-t", "-5"}, "-t must be at least 1"},
 		{[]string{"-pace", "-10"}, "-pace can't be negative"},
+		{[]string{"-pace", "fast"}, "-pace must be a speed in wpm, best or avg"},
 	}
 
 	for _, tc := range tests {
@@ -317,6 +318,14 @@ func TestCLIRejectsInvalidNumbers(t *testing.T) {
 		if want := (cliResult{"", "ERROR: " + tc.want + "\n", 1}); got != want {
 			t.Errorf("tt %s = %+v, want %+v", strings.Join(tc.args, " "), got, want)
 		}
+	}
+}
+
+func TestCLIPaceWithoutResults(t *testing.T) {
+	got := runCLI(t, t.TempDir(), nil, "-words", "200en", "-n", "10", "-pace", "best")
+
+	if want := (cliResult{"", "ERROR: -pace best needs a saved result of words 200en, 10 words\n", 1}); got != want {
+		t.Errorf("tt -pace best = %+v, want %+v", got, want)
 	}
 }
 
