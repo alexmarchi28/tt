@@ -198,13 +198,7 @@ func formatKeys(ks keyStats, rows []string, color bool) string {
 func printKeys(layout string, color bool) {
 	rows, ok := layouts[layout]
 	if !ok {
-		var names []string
-		for name := range layouts {
-			names = append(names, name)
-		}
-		sort.Strings(names)
-
-		die("unknown layout %s, use one of: %s", layout, strings.Join(names, ", "))
+		die("unknown layout %s, use one of: %s", layout, strings.Join(sortedKeys(layouts), ", "))
 	}
 
 	ks := loadKeyStats()

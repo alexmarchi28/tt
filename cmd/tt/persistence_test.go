@@ -11,8 +11,8 @@ import (
 func TestSavePersistedResult(t *testing.T) {
 	useTempStorage(t)
 
-	if _, err := readPersistedResults(); !os.IsNotExist(err) {
-		t.Fatalf("reading missing results: err = %v, want a not-exist error", err)
+	if got, err := readPersistedResults(); got != nil || err != nil {
+		t.Fatalf("reading missing results: %+v, %v, want none", got, err)
 	}
 
 	first := persistedResult{Wpm: 60, Accuracy: 95.5, Timestamp: 1000}

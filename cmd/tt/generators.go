@@ -143,9 +143,9 @@ func weightedMistakes(mistakes []mistake, n int) []string {
 // generateMistakesTest practices the recently mistyped words, the most
 // frequently mistyped ones coming up more often.
 func generateMistakesTest(o wordOptions) (func() []segment, error) {
-	var mistakes []mistake
-	if err := readValue(mistakeDB, &mistakes); err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("could not read the recorded mistakes: %v", err)
+	mistakes, err := readMistakes()
+	if err != nil {
+		return nil, err
 	}
 
 	words := weightedMistakes(mistakes, recentMistakes)

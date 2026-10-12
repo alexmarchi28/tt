@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"os"
 	"strconv"
 	"strings"
 )
@@ -28,8 +27,8 @@ func exportData(w io.Writer, data string, asJSON bool) error {
 
 func exportResults(w io.Writer, asJSON bool) error {
 	results, err := readPersistedResults()
-	if err != nil && !os.IsNotExist(err) {
-		return unreadableResults(err)
+	if err != nil {
+		return err
 	}
 
 	if asJSON {

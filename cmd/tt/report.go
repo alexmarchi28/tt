@@ -73,14 +73,9 @@ func showReport(scr tcell.Screen, report string) (quit bool) {
 // formats.
 func writeResults(w io.Writer, results []result, asJSON, asCSV bool) error {
 	if asJSON {
-		//Avoid null in serialized JSON.
-		if results == nil {
-			results = []result{}
-		}
+		results = nonNil(results)
 		for i := range results {
-			if results[i].Mistakes == nil {
-				results[i].Mistakes = []mistake{}
-			}
+			results[i].Mistakes = nonNil(results[i].Mistakes)
 		}
 
 		b, err := json.Marshal(results)

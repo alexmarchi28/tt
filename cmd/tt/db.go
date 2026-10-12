@@ -128,15 +128,14 @@ func writeAppConfig(cfg appConfig) error {
 	return writeValue(appConfigPath, cfg)
 }
 
-// unreadableResults describes the error of reading the saved results.
-func unreadableResults(err error) error {
-	return fmt.Errorf("could not read the saved results in %s: %v, fix or remove the file", resultsDB, err)
-}
-
+// readPersistedResults returns the saved results, none if there are none yet.
 func readPersistedResults() ([]persistedResult, error) {
 	var stored []persistedResult
-	err := readValue(resultsDB, &stored)
-	return stored, err
+	if err := readValue(resultsDB, &stored); err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("could not read the saved results in %s: %v, fix or remove the file", resultsDB, err)
+	}
+
+	return stored, nil
 }
 
 func writePersistedResults(stored []persistedResult) error {
@@ -170,8 +169,8 @@ func saveMistakes(mistakes []mistake) {
 // before it.
 func savePersistedResult(r persistedResult) []persistedResult {
 	stored, err := readPersistedResults()
-	if err != nil && !os.IsNotExist(err) {
-		die("%v", unreadableResults(err))
+	if err != nil {
+		die("%v", err)
 	}
 
 	if err := writePersistedResults(append(stored, r)); err != nil {

@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"sort"
 	"strings"
 	"time"
@@ -219,8 +218,8 @@ func formatStats(stored []persistedResult, mistakes []mistake, now time.Time) st
 
 func printStats() {
 	stored, err := readPersistedResults()
-	if err != nil && !os.IsNotExist(err) {
-		die("%v", unreadableResults(err))
+	if err != nil {
+		die("%v", err)
 	}
 
 	if len(stored) == 0 {
@@ -229,10 +228,7 @@ func printStats() {
 	}
 
 	//Mistakes are only an addition to the results, ignore them if they can't be read.
-	var mistakes []mistake
-	if err := readValue(mistakeDB, &mistakes); err != nil {
-		mistakes = nil
-	}
+	mistakes, _ := readMistakes()
 
 	fmt.Print(formatStats(stored, mistakes, time.Now()))
 }

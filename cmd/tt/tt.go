@@ -67,8 +67,8 @@ func main() {
 	}
 
 	//Checked before typing a test whose result could not be saved.
-	if _, err := readPersistedResults(); err != nil && !os.IsNotExist(err) {
-		die("%v", unreadableResults(err))
+	if _, err := readPersistedResults(); err != nil {
+		die("%v", err)
 	}
 
 	testFn, kind, err := newTestGenerator(opts, os.Stdin, isatty.IsTerminal(os.Stdin.Fd()))
