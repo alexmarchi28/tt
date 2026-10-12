@@ -177,7 +177,7 @@ first key press.
 
 -json
 
-: Print the test output in JSON.
+: Print the test output in JSON. See also -export.
 
 -raw
 
@@ -214,6 +214,16 @@ code, are typed with the tab key.
 
     The keyboard layout used by -keys: us, it, de, fr, dvorak or colemak
     (default: us).
+
+**-export** *DATA*\
+
+    Print the saved results (DATA=results) or the recorded mistakes
+    (DATA=mistakes) as CSV, or as JSON with -json. Results are made of the
+    timestamp, the WPM, the accuracy, the duration in seconds, the mode (words,
+    quotes, mistakes, adaptive, file or text), its source (word list, quote
+    file or file), the time limit in seconds, the number of words of untimed
+    word tests and whether punctuation and numbers were added. Mistakes are made
+    of the word and what was typed instead.
 
 **-v**\
 

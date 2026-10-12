@@ -2,6 +2,7 @@ package main
 
 import (
 	"regexp"
+	"sort"
 	"strings"
 
 	"github.com/gdamore/tcell"
@@ -135,4 +136,15 @@ func calcStringDimensions(s string) (nc, nr int) {
 	}
 
 	return
+}
+
+// sortedKeys returns the keys of m in alphabetical order.
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	return keys
 }

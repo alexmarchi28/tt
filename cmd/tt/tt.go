@@ -50,6 +50,14 @@ func main() {
 		os.Exit(0)
 	}
 
+	if opts.export != "" {
+		if err := exportData(os.Stdout, opts.export, opts.json); err != nil {
+			die("%v", err)
+		}
+
+		os.Exit(0)
+	}
+
 	if opts.noTheme {
 		os.Setenv("TCELL_TRUECOLOR", "disable")
 	} else if !opts.themeExplicit {

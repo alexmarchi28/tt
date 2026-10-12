@@ -143,6 +143,16 @@ func writePersistedResults(stored []persistedResult) error {
 	return writeValue(resultsDB, stored)
 }
 
+// readMistakes returns the recorded mistakes, none if there are none yet.
+func readMistakes() ([]mistake, error) {
+	var mistakes []mistake
+	if err := readValue(mistakeDB, &mistakes); err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("could not read the recorded mistakes: %v", err)
+	}
+
+	return mistakes, nil
+}
+
 func saveMistakes(mistakes []mistake) {
 	var db []mistake
 

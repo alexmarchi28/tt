@@ -65,7 +65,7 @@ Scripting
     -noreport           Don't show a report at the end of a test.
     -csv                Print the test results to stdout in the form:
                         [type],[wpm],[cpm],[accuracy],[timestamp].
-    -json               Print the test output in JSON.
+    -json               Print the test output in JSON, see also -export.
     -raw                Don't reflow STDIN text or show one paragraph at a time.
                         Note that line breaks are determined exclusively by the
                         input.
@@ -82,6 +82,8 @@ Misc
                         a keyboard.
     -layout LAYOUT      The keyboard layout used by -keys: us, it, de, fr,
                         dvorak or colemak (default: us).
+    -export DATA        Print the saved results or mistakes (DATA=results or
+                        mistakes) as CSV, or as JSON with -json.
 
 Version
     -v                  Print the current version.
@@ -97,6 +99,7 @@ type options struct {
 
 	listType  string
 	layout    string
+	export    string
 	wordFile  string
 	quoteFile string
 	themeName string
@@ -176,6 +179,7 @@ func parseFlags(args []string) options {
 	fs.StringVar(&opts.listType, "list", "", "")
 	fs.BoolVar(&opts.keys, "keys", false, "")
 	fs.StringVar(&opts.layout, "layout", "us", "")
+	fs.StringVar(&opts.export, "export", "", "")
 
 	fs.Usage = func() { os.Stdout.Write([]byte(usage)) }
 	fs.Parse(args)

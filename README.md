@@ -97,6 +97,7 @@ options.
  - `tt -pace 70` shows a pacer typing at 70 wpm to keep up with.
  - `tt -theme gruvbox` Starts tt with the gruvbox theme.
  - `tt -keys -layout it` Shows on an Italian keyboard which keys you miss most and type slowest.
+ - `tt -export results > results.csv` Exports all your saved results, e.g. to a spreadsheet (`tt -export mistakes` for the mistakes, `-json` for JSON).
  - `tt -stats` Prints your personal best, average WPM and accuracy over time, weekly trend, a chart of your daily progress, results by kind of test and most mistyped words.
 
 `tt` is designed to be easily scriptable and integrate nicely with

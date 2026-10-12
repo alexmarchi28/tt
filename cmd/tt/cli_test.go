@@ -173,6 +173,23 @@ func TestCLIStatsWithCorruptResults(t *testing.T) {
 	}
 }
 
+func TestCLIExport(t *testing.T) {
+	home := t.TempDir()
+	writeFile(t, filepath.Join(home, ".local", "share", "tt", ".errors"), `[{"word":"the","typed":"teh"}]`)
+
+	if got := runCLI(t, home, nil, "-export", "mistakes"); got != (cliResult{"word,typed\nthe,teh\n", "", 0}) {
+		t.Errorf("tt -export mistakes = %+v, want the mistakes as CSV", got)
+	}
+
+	if got := runCLI(t, home, nil, "-export", "mistakes", "-json"); got != (cliResult{`[{"word":"the","typed":"teh"}]` + "\n", "", 0}) {
+		t.Errorf("tt -export mistakes -json = %+v, want the mistakes as JSON", got)
+	}
+
+	if got := runCLI(t, home, nil, "-export", "nope"); got != (cliResult{"", "ERROR: unknown data nope, use one of: mistakes, results\n", 1}) {
+		t.Errorf("tt -export nope = %+v, want an error", got)
+	}
+}
+
 func TestCLIInvalidResources(t *testing.T) {
 	home := t.TempDir()
 	badQuotes := filepath.Join(home, "quotes.json")
