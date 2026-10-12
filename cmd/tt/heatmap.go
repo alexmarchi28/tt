@@ -11,12 +11,16 @@ import (
 // layouts holds the characters of the unshifted keys of keyboard layouts, from
 // the number row to the bottom row.
 var layouts = map[string][]string{
-	"us":      {"1234567890-=", "qwertyuiop[]", "asdfghjkl;'", "zxcvbnm,./"},
-	"it":      {"1234567890'ì", "qwertyuiopè+", "asdfghjklòàù", "zxcvbnm,.-"},
-	"de":      {"1234567890ß", "qwertzuiopü+", "asdfghjklöä#", "yxcvbnm,.-"},
-	"fr":      {"&é\"'(-è_çà)=", "azertyuiop^$", "qsdfghjklmù*", "wxcvbn,;:!"},
-	"dvorak":  {"1234567890[]", "',.pyfgcrl/=", "aoeuidhtns-", ";qjkxbmwvz"},
-	"colemak": {"1234567890-=", "qwfpgjluy;[]", "arstdhneio'", "zxcvbkm,./"},
+	"us":         {"1234567890-=", "qwertyuiop[]", "asdfghjkl;'", "zxcvbnm,./"},
+	"uk":         {"1234567890-=", "qwertyuiop[]", "asdfghjkl;'#", "zxcvbnm,./"},
+	"it":         {"1234567890'ì", "qwertyuiopè+", "asdfghjklòàù", "zxcvbnm,.-"},
+	"es":         {"1234567890'¡", "qwertyuiop`+", "asdfghjklñ´ç", "zxcvbnm,.-"},
+	"de":         {"1234567890ß", "qwertzuiopü+", "asdfghjklöä#", "yxcvbnm,.-"},
+	"fr":         {"&é\"'(-è_çà)=", "azertyuiop^$", "qsdfghjklmù*", "wxcvbn,;:!"},
+	"dvorak":     {"1234567890[]", "',.pyfgcrl/=", "aoeuidhtns-", ";qjkxbmwvz"},
+	"colemak":    {"1234567890-=", "qwfpgjluy;[]", "arstdhneio'", "zxcvbkm,./"},
+	"colemak-dh": {"1234567890-=", "qwfpbjluy;[]", "arstgmneio'", "zxcdvkh,./"},
+	"workman":    {"1234567890-=", "qdrwbjfup;[]", "ashtgyneoi'", "zxmcvkl,./"},
 }
 
 const (

@@ -213,8 +213,8 @@ code, are typed with the tab key.
 
 **-layout** *LAYOUT*\
 
-    The keyboard layout used by -keys: us, it, de, fr, dvorak or colemak
-    (default: us).
+    The keyboard layout used by -keys: us, uk, it, es, de, fr, dvorak, colemak,
+    colemak-dh or workman (default: us).
 
 **-export** *DATA*\
 

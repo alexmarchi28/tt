@@ -34,6 +34,13 @@ func TestLayouts(t *testing.T) {
 	}
 }
 
+func TestLayoutNames(t *testing.T) {
+	want := []string{"colemak", "colemak-dh", "de", "dvorak", "es", "fr", "it", "uk", "us", "workman"}
+	if got := sortedKeys(layouts); !reflect.DeepEqual(got, want) {
+		t.Errorf("layouts %q, want %q", got, want)
+	}
+}
+
 func TestMergeKeyStats(t *testing.T) {
 	a := keyStat{Count: 30, ErrorRate: 0.25, Timed: 10, Latency: 100}
 	b := keyStat{Count: 10, ErrorRate: 0.75, Timed: 30, Latency: 200}

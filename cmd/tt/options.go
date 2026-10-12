@@ -83,8 +83,9 @@ Misc
                         results by kind of test and most mistyped words.
     -keys               Print how accurately and quickly each key is typed on
                         a keyboard.
-    -layout LAYOUT      The keyboard layout used by -keys: us, it, de, fr,
-                        dvorak or colemak (default: us).
+    -layout LAYOUT      The keyboard layout used by -keys: us, uk, it, es, de,
+                        fr, dvorak, colemak, colemak-dh or workman
+                        (default: us).
     -export DATA        Print the saved results or mistakes (DATA=results or
                         mistakes) as CSV, or as JSON with -json.
 
