@@ -50,6 +50,7 @@ Aesthetics
 
 Test Parameters
     -t SECONDS          Terminate the test after the given number of seconds.
+                        Word tests have enough words to last until then.
     -noskip             Disable word skipping when space is pressed.
     -nobackspace        Disable the backspace key.
     -blind              Don't show mistakes while typing, they are still

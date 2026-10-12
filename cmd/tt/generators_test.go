@@ -259,6 +259,9 @@ func TestNewTestGenerator(t *testing.T) {
 		{"mistakes over stdin", []string{"-mistakes", "-n", "2"}, "piped text", false, exactly("ab ab"), testKind{"mistakes", ""}},
 		{"adaptive", []string{"-adaptive", "-n", "5"}, "", true, wordsPerSegment(5), testKind{"adaptive", "1000en"}},
 		{"adaptive word list", []string{"-adaptive", "-words", "200en", "-n", "5"}, "piped text", false, wordsPerSegment(5), testKind{"adaptive", "200en"}},
+		{"timed words", []string{"-t", "10", "-n", "5"}, "", true, lastsAtLeast(10*time.Second, 5), testKind{"words", "1000en"}},
+		{"timed mistakes", []string{"-mistakes", "-t", "10", "-n", "5"}, "", true, lastsAtLeast(10*time.Second, 5), testKind{"mistakes", ""}},
+		{"timed adaptive", []string{"-adaptive", "-t", "10", "-n", "5"}, "", true, lastsAtLeast(10*time.Second, 5), testKind{"adaptive", "1000en"}},
 	}
 
 	for _, tc := range tests {
@@ -286,6 +289,24 @@ func wordsPerSegment(n ...int) func(t *testing.T, segments []segment) {
 		}
 		for i, s := range segments {
 			assertWords(t, s.Text, n[i])
+		}
+	}
+}
+
+// lastsAtLeast checks that the segments, of n words each, are too long to be
+// typed before the time limit even by a fast typist (300 wpm).
+func lastsAtLeast(limit time.Duration, n int) func(t *testing.T, segments []segment) {
+	return func(t *testing.T, segments []segment) {
+		t.Helper()
+
+		chars := 0
+		for _, s := range segments {
+			assertWords(t, s.Text, n)
+			chars += utf8.RuneCountInString(s.Text)
+		}
+
+		if typed := int(limit.Minutes() * 300 * 5); chars < typed {
+			t.Errorf("%d segments of %d characters, a typist at 300 wpm types %d in %v", len(segments), chars, typed, limit)
 		}
 	}
 }
@@ -531,6 +552,34 @@ func TestGenerateWordTestDecorations(t *testing.T) {
 
 	if !digits {
 		t.Error("no number in 40 segments")
+	}
+}
+
+func TestGenerateWordTestMinChars(t *testing.T) {
+	dir := useTempStorage(t)
+	writeUserResource(t, dir, "words", "greek", "alpha beta gamma delta")
+
+	gen := mustGen(generateWordTest("greek", wordOptions{n: 3, g: 1, minChars: 100}))
+	for i := 0; i < 20; i++ {
+		segments := gen()
+
+		chars := 0
+		for _, s := range segments {
+			assertWords(t, s.Text, 3)
+			chars += utf8.RuneCountInString(s.Text)
+		}
+
+		// Groups are added until there are enough characters, and no more.
+		last := utf8.RuneCountInString(segments[len(segments)-1].Text)
+		if chars < 100 || chars-last >= 100 {
+			t.Fatalf("%d segments of %d characters, want just enough groups for 100", len(segments), chars)
+		}
+	}
+
+	// -g still sets the least number of groups.
+	gen = mustGen(generateWordTest("greek", wordOptions{n: 3, g: 50, minChars: 100}))
+	if segments := gen(); len(segments) != 50 {
+		t.Errorf("got %d segments, want 50", len(segments))
 	}
 }
 

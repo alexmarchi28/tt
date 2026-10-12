@@ -50,7 +50,7 @@ func (k testKind) String() string {
 // requested on the command line, or nil once there are no more, and what they
 // are made of. Text piped to stdin is used unless stdin is a terminal.
 func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func() []segment, testKind, error) {
-	words := wordOptions{n: opts.n, g: opts.g, punctuation: opts.punct, numbers: opts.numbers}
+	words := newWordOptions(opts)
 
 	switch {
 	case opts.adaptive:
@@ -86,12 +86,28 @@ func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func
 	}
 }
 
+// fastestCpm is a speed beyond the reach of any typist (500 wpm), at which
+// timed word tests still don't run out of words.
+const fastestCpm = 2500
+
 // wordOptions describes the tests made of random words.
 type wordOptions struct {
 	n           int  // Words per segment.
-	g           int  // Segments per test.
+	g           int  // Least number of segments per test.
 	punctuation bool // Turn the words into sentences.
 	numbers     bool // Replace some of the words with numbers.
+	minChars    int  // Groups are added until the test has this many characters.
+}
+
+// newWordOptions returns the options of word tests given on the command line.
+// Timed tests get enough words to last until the time is up.
+func newWordOptions(opts options) wordOptions {
+	o := wordOptions{n: opts.n, g: opts.g, punctuation: opts.punct, numbers: opts.numbers}
+	if opts.timeout != -1 {
+		o.minChars = int(opts.timeout.Minutes() * fastestCpm)
+	}
+
+	return o
 }
 
 func generateWordTest(name string, o wordOptions) (func() []segment, error) {
@@ -156,24 +172,32 @@ func generateMistakesTest(o wordOptions) (func() []segment, error) {
 	return wordTest(func(n int) []string { return randomWords(n, words) }, o), nil
 }
 
-// wordTest makes tests of words drawn by draw.
+// wordTest makes tests of words drawn by draw, one segment per group.
 func wordTest(draw func(n int) []string, o wordOptions) func() []segment {
 	return func() []segment {
-		segments := make([]segment, o.g)
-		for i := range segments {
-			text := draw(o.n)
-			if o.numbers {
-				text = addNumbers(text)
-			}
-			if o.punctuation {
-				text = punctuate(text)
-			}
-
-			segments[i] = segment{strings.Join(text, " "), ""}
+		var segments []segment
+		for chars := 0; len(segments) < o.g || chars < o.minChars; {
+			text := wordGroup(draw, o)
+			segments = append(segments, segment{text, ""})
+			chars += utf8.RuneCountInString(text)
 		}
 
 		return segments
 	}
+}
+
+// wordGroup draws a group of words and adds numbers and punctuation to them
+// if requested.
+func wordGroup(draw func(n int) []string, o wordOptions) string {
+	words := draw(o.n)
+	if o.numbers {
+		words = addNumbers(words)
+	}
+	if o.punctuation {
+		words = punctuate(words)
+	}
+
+	return strings.Join(words, " ")
 }
 
 // randomWords draws n words, avoiding consecutive repetitions when possible.

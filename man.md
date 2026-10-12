@@ -114,7 +114,9 @@ the top of the screen. -n and -g apply.
 
 -t *SECONDS*
 
-: Terminate the test after the given number of seconds.
+: Terminate the test after the given number of seconds. Word tests (including
+-mistakes and -adaptive) have enough words to last until then, -g only sets
+the least number of groups.
 
 -noskip
 
