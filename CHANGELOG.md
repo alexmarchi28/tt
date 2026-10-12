@@ -1,4 +1,4 @@
-# Unreleased:
+# 1.1.0:
 
 New:
  - -export prints the saved results or mistakes as CSV, or as JSON with -json.
