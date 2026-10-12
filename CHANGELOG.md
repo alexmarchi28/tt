@@ -1,3 +1,16 @@
+# Unreleased:
+
+Changed:
+ - Timed word tests (-t, also with -mistakes and -adaptive) have enough words to
+   last until the time is up.
+ - Personal bests and the results of -stats are kept apart for each time limit,
+   number of words, punctuation and numbers. Results saved by earlier versions,
+   whose variant is unknown, are shown on their own.
+
+Fixed:
+ - Timed tests ended up to half a second after the time limit, counting the keys
+   pressed in the meantime.
+
 # 1.0.0:
 
 New:
