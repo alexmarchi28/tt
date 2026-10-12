@@ -1,5 +1,13 @@
 # Unreleased:
 
+New:
+ - -export prints the saved results or mistakes as CSV, or as JSON with -json.
+ - -pace best and -pace avg show a pacer at your best speed or at your average
+   over the last 10 tests of the same kind.
+ - The uk, es, colemak-dh and workman layouts for -keys.
+ - 1000 common Italian words (-words 1000it) and quotes from Italian literature
+   (-quotes it).
+
 Changed:
  - Timed word tests (-t, also with -mistakes and -adaptive) have enough words to
    last until the time is up.
