@@ -153,7 +153,7 @@ func TestAppShowsAdaptiveFocus(t *testing.T) {
 	opts := parseFlags(nil)
 	opts.noReport = true
 	a, sim := newTestApp(t, opts)
-	a.kind = testKind{"adaptive", "list"}
+	a.kind = testKind{mode: "adaptive", source: "list"}
 	if err := writeValue(keyStatsDB, weakTH()); err != nil {
 		t.Fatal(err)
 	}

@@ -19,37 +19,21 @@ import (
 // session, each made of one or more segments. They return nil once there are
 // no more tests.
 
-// Modes of tests, saved with their results.
-const (
-	modeWords    = "words"
-	modeQuotes   = "quotes"
-	modeMistakes = "mistakes"
-	modeAdaptive = "adaptive"
-	modeFile     = "file"
-	modeText     = "text"
-)
-
-// testKind describes where the text of the tests comes from.
-type testKind struct {
-	mode   string // One of the modes above.
-	source string // The word list, quote file or file used, if any.
-}
-
-func (k testKind) String() string {
-	switch {
-	case k.mode == "":
-		return "unknown"
-	case k.source == "":
-		return k.mode
-	default:
-		return k.mode + " " + k.source
-	}
-}
-
 // newTestGenerator returns a function producing the successive tests
 // requested on the command line, or nil once there are no more, and what they
 // are made of. Text piped to stdin is used unless stdin is a terminal.
 func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func() []segment, testKind, error) {
+	gen, kind, err := selectTestGenerator(opts, stdin, stdinIsTerminal)
+	if err != nil {
+		return nil, testKind{}, err
+	}
+
+	return gen, kind.withVariant(opts), nil
+}
+
+// selectTestGenerator returns the generator of the tests requested on the
+// command line and where their text comes from, see newTestGenerator.
+func selectTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func() []segment, testKind, error) {
 	words := newWordOptions(opts)
 
 	switch {
@@ -59,16 +43,16 @@ func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func
 			list = "1000en"
 		}
 		gen, err := generateAdaptiveTest(list, words)
-		return gen, testKind{modeAdaptive, filepath.Base(list)}, err
+		return gen, testKind{mode: modeAdaptive, source: filepath.Base(list)}, err
 	case opts.wordFile != "":
 		gen, err := generateWordTest(opts.wordFile, words)
-		return gen, testKind{modeWords, filepath.Base(opts.wordFile)}, err
+		return gen, testKind{mode: modeWords, source: filepath.Base(opts.wordFile)}, err
 	case opts.quoteFile != "":
 		gen, err := generateQuoteTest(opts.quoteFile)
-		return gen, testKind{modeQuotes, filepath.Base(opts.quoteFile)}, err
+		return gen, testKind{mode: modeQuotes, source: filepath.Base(opts.quoteFile)}, err
 	case opts.mistakes:
 		gen, err := generateMistakesTest(words)
-		return gen, testKind{modeMistakes, ""}, err
+		return gen, testKind{mode: modeMistakes}, err
 	case !stdinIsTerminal:
 		b, err := io.ReadAll(stdin)
 		if err != nil {
@@ -76,13 +60,13 @@ func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func
 		}
 
 		gen, err := generateTestFromData(b, opts.raw, opts.multi)
-		return gen, testKind{modeText, ""}, err
+		return gen, testKind{mode: modeText}, err
 	case len(opts.files) > 0:
 		gen, err := generateTestFromFile(opts.files[0], opts.startParagraph)
-		return gen, testKind{modeFile, filepath.Base(opts.files[0])}, err
+		return gen, testKind{mode: modeFile, source: filepath.Base(opts.files[0])}, err
 	default:
 		gen, err := generateWordTest("1000en", words)
-		return gen, testKind{modeWords, "1000en"}, err
+		return gen, testKind{mode: modeWords, source: "1000en"}, err
 	}
 }
 

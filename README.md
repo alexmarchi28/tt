@@ -68,7 +68,9 @@ By default 50 words from the top 1000 words in the English language are used to
 constitute the test. Custom text can be supplied by piping arbitrary text to the
 program. Each paragraph in the input is shown as a separate segment of the text.
 At the end of each test a report shows your speed, accuracy and mistakes, and
-whether you set a new personal best for that kind of test.
+whether you set a new personal best for that kind of test: the same word list,
+quote file or file, with the same time limit, number of words, punctuation and
+numbers.
 See `man tt` or `man.md` for a complete description and a comprehensive set of
 options.
 
@@ -137,6 +139,7 @@ themes, word lists and quotes into the binary.
 | `session.go` | Typing a segment of a test: keys, timer, redrawing |
 | `typing.go` | The typing logic, independent of the screen |
 | `generators.go` | The texts of the tests: words, quotes, files, stdin, mistakes |
+| `kind.go` | The kinds of tests whose results are compared |
 | `adaptive.go` | The choice of words of `-adaptive` |
 | `keystats.go` | Statistics about each key and pair of keys |
 | `db.go` | The saved data: results, mistakes, key statistics, settings |

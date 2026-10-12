@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -19,7 +20,7 @@ func TestSavePersistedResult(t *testing.T) {
 		t.Errorf("results saved before the first one: %+v", previous)
 	}
 
-	second := persistedResult{Wpm: 72, Accuracy: 100, Timestamp: 2000, Mode: "quotes", Source: "en", Duration: 12.5}
+	second := persistedResult{Wpm: 72, Accuracy: 100, Timestamp: 2000, Mode: "quotes", Source: "en", Duration: 12.5, Seconds: 30}
 	if previous := savePersistedResult(second); !reflect.DeepEqual(previous, []persistedResult{first}) {
 		t.Errorf("results saved before the second one: %+v, want the first one", previous)
 	}
@@ -31,10 +32,54 @@ func TestSavePersistedResult(t *testing.T) {
 
 	want := []persistedResult{
 		{Wpm: 60, Accuracy: 95.5, Timestamp: 1000},
-		{Wpm: 72, Accuracy: 100, Timestamp: 2000, Mode: "quotes", Source: "en", Duration: 12.5},
+		{Wpm: 72, Accuracy: 100, Timestamp: 2000, Mode: "quotes", Source: "en", Duration: 12.5, Seconds: 30},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("stored results = %+v, want %+v", got, want)
+	}
+}
+
+func TestPersistedResultKind(t *testing.T) {
+	kinds := []testKind{
+		{},
+		{mode: "quotes", source: "en"},
+		{mode: "words", source: "1000en", words: 50, punct: true},
+		{mode: "mistakes", seconds: 60, numbers: true},
+	}
+
+	for _, kind := range kinds {
+		r := persistedResult{Wpm: 60, Accuracy: 95, Timestamp: 1000, Duration: 30}.withKind(kind)
+		if got := r.kind(); got != kind {
+			t.Errorf("kind() = %+v, want %+v", got, kind)
+		}
+		if r.Wpm != 60 || r.Accuracy != 95 || r.Timestamp != 1000 || r.Duration != 30 {
+			t.Errorf("withKind() altered the result: %+v", r)
+		}
+	}
+}
+
+// The saved results must remain readable by other versions of tt.
+func TestPersistedResultFormat(t *testing.T) {
+	r := persistedResult{Wpm: 60, Accuracy: 95.5, Timestamp: 1000, Duration: 30}.
+		withKind(testKind{mode: "words", source: "1000en", seconds: 15, words: 50, punct: true, numbers: true})
+
+	b, err := json.Marshal(r)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	want := `{"wpm":60,"accuracy":95.5,"timestamp":1000,"mode":"words","source":"1000en","duration":30,"seconds":15,"words":50,"punct":true,"numbers":true}`
+	if string(b) != want {
+		t.Errorf("saved as\n%s\nwant\n%s", b, want)
+	}
+
+	// Results saved by older versions have no kind or variant.
+	var old persistedResult
+	if err := json.Unmarshal([]byte(`{"wpm":60,"accuracy":95.5,"timestamp":1000}`), &old); err != nil {
+		t.Fatal(err)
+	}
+	if old.kind() != (testKind{}) {
+		t.Errorf("kind of an old result = %+v, want none", old.kind())
 	}
 }
 

@@ -22,8 +22,9 @@ usage: tt \[OPTION\]... \[FILE\]
   supplied in which case each paragraph is treated as a separate test. 
 
   At the end of each test a report shows the speed, accuracy and mistakes, and
-  whether a new personal best was set for that kind of test (word list, quote
-  file, file...).
+  whether a new personal best was set for that kind of test: the same word
+  list, quote file or file, with the same time limit, number of words,
+  punctuation and numbers.
 
 # OPTIONS
 
@@ -200,7 +201,8 @@ code, are typed with the tab key.
     typing, personal best, average WPM and accuracy over the last hour, day,
     week and all time, trend compared to the previous week, a chart of the
     average WPM of each of the last 30 days, results by kind of test (word list,
-    quotes, file...) and most mistyped words.
+    quotes, file..., time limit, number of words, punctuation and numbers) and
+    most mistyped words.
 
 **-keys**\
 

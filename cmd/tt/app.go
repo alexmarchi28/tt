@@ -136,10 +136,8 @@ func (a *app) record(res testResult) personalBest {
 		Wpm:       res.wpm(),
 		Accuracy:  res.accuracy(),
 		Timestamp: timestamp,
-		Mode:      a.kind.mode,
-		Source:    a.kind.source,
 		Duration:  res.duration.Seconds(),
-	})
+	}.withKind(a.kind))
 	saveMistakes(res.mistakes)
 	saveKeyStats(res.keystrokes)
 

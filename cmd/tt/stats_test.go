@@ -160,15 +160,17 @@ func TestFormatTypingTime(t *testing.T) {
 
 func TestSummarizeByKind(t *testing.T) {
 	quote := persistedResult{Wpm: 50, Accuracy: 90, Mode: "quotes", Source: "en"}
-	words := persistedResult{Wpm: 70, Accuracy: 100, Mode: "words", Source: "1000en"}
+	words := persistedResult{Wpm: 70, Accuracy: 100, Mode: "words", Source: "1000en", Words: 50}
+	timed := persistedResult{Wpm: 80, Accuracy: 100, Mode: "words", Source: "1000en", Seconds: 30}
 	old := persistedResult{Wpm: 40, Accuracy: 80}
 
-	got := summarizeByKind([]persistedResult{old, quote, words, words, quote, words})
+	got := summarizeByKind([]persistedResult{old, quote, words, timed, words, quote, words})
 
 	want := []kindSummary{
-		{testKind{"words", "1000en"}, summarize([]persistedResult{words, words, words})},
-		{testKind{"quotes", "en"}, summarize([]persistedResult{quote, quote})},
+		{testKind{mode: "words", source: "1000en", words: 50}, summarize([]persistedResult{words, words, words})},
+		{testKind{mode: "quotes", source: "en"}, summarize([]persistedResult{quote, quote})},
 		{testKind{}, summarize([]persistedResult{old})},
+		{testKind{mode: "words", source: "1000en", seconds: 30}, summarize([]persistedResult{timed})},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("summarizeByKind() =\n%+v\nwant\n%+v", got, want)
@@ -178,24 +180,26 @@ func TestSummarizeByKind(t *testing.T) {
 func TestFormatStatsByTest(t *testing.T) {
 	stored := []persistedResult{
 		{Wpm: 40, Accuracy: 80, Timestamp: statsNow.Add(-time.Hour).Unix()},
-		{Wpm: 70, Accuracy: 100, Timestamp: statsNow.Add(-time.Minute).Unix(), Mode: "words", Source: "1000en", Duration: 30},
+		{Wpm: 70, Accuracy: 100, Timestamp: statsNow.Add(-time.Minute).Unix(), Mode: "words", Source: "1000en", Duration: 30, Words: 50},
 		{Wpm: 50, Accuracy: 90, Timestamp: statsNow.Add(-time.Minute).Unix(), Mode: "quotes", Source: "en", Duration: 45.5},
-		{Wpm: 60, Accuracy: 96, Timestamp: statsNow.Add(-time.Minute).Unix(), Mode: "words", Source: "1000en", Duration: 20},
+		{Wpm: 60, Accuracy: 96, Timestamp: statsNow.Add(-time.Minute).Unix(), Mode: "words", Source: "1000en", Duration: 20, Words: 50},
+		{Wpm: 66, Accuracy: 90, Timestamp: statsNow.Add(-time.Minute).Unix(), Mode: "words", Source: "1000en", Duration: 15, Seconds: 15, Punct: true},
 	}
 
 	want := "" +
 		"Typing stats\n" +
-		"Tests      4 (1m 35s of typing)\n" +
-		"Best       70 wpm (2026-10-10, words 1000en)\n" +
-		"Last hour  avg wpm 55.00, avg accuracy 91.50% (4 tests)\n" +
-		"Last day   avg wpm 55.00, avg accuracy 91.50% (4 tests)\n" +
-		"Last week  avg wpm 55.00, avg accuracy 91.50% (4 tests)\n" +
-		"All time   avg wpm 55.00, avg accuracy 91.50% (4 tests)\n" +
+		"Tests      5 (1m 50s of typing)\n" +
+		"Best       70 wpm (2026-10-10, words 1000en, 50 words)\n" +
+		"Last hour  avg wpm 57.20, avg accuracy 91.20% (5 tests)\n" +
+		"Last day   avg wpm 57.20, avg accuracy 91.20% (5 tests)\n" +
+		"Last week  avg wpm 57.20, avg accuracy 91.20% (5 tests)\n" +
+		"All time   avg wpm 57.20, avg accuracy 91.20% (5 tests)\n" +
 		"\n" +
 		"By test\n" +
-		"words 1000en  avg wpm 65.00, avg accuracy 98.00% (2 tests), best 70 wpm\n" +
-		"quotes en     avg wpm 50.00, avg accuracy 90.00% (1 tests), best 50 wpm\n" +
-		"unknown       avg wpm 40.00, avg accuracy 80.00% (1 tests), best 40 wpm\n"
+		"words 1000en, 50 words          avg wpm 65.00, avg accuracy 98.00% (2 tests), best 70 wpm\n" +
+		"quotes en                       avg wpm 50.00, avg accuracy 90.00% (1 tests), best 50 wpm\n" +
+		"unknown                         avg wpm 40.00, avg accuracy 80.00% (1 tests), best 40 wpm\n" +
+		"words 1000en, 15s, punctuation  avg wpm 66.00, avg accuracy 90.00% (1 tests), best 66 wpm\n"
 
 	if got := formatStats(stored, nil, statsNow); got != want {
 		t.Errorf("got\n%s\nwant\n%s", got, want)
@@ -205,17 +209,19 @@ func TestFormatStatsByTest(t *testing.T) {
 func TestBestWpm(t *testing.T) {
 	stored := []persistedResult{
 		{Wpm: 90},
-		{Wpm: 50, Mode: "words", Source: "1000en"},
-		{Wpm: 70, Mode: "words", Source: "1000en"},
-		{Wpm: 80, Mode: "words", Source: "200en"},
-		{Wpm: 60, Mode: "words", Source: "1000en"},
+		{Wpm: 50, Mode: "words", Source: "1000en", Words: 50},
+		{Wpm: 70, Mode: "words", Source: "1000en", Words: 50},
+		{Wpm: 80, Mode: "words", Source: "200en", Words: 50},
+		{Wpm: 85, Mode: "words", Source: "1000en", Words: 10},
+		{Wpm: 75, Mode: "words", Source: "1000en", Words: 50, Numbers: true},
+		{Wpm: 60, Mode: "words", Source: "1000en", Words: 50},
 	}
 
-	if best, ok := bestWpm(stored, testKind{"words", "1000en"}); best != 70 || !ok {
-		t.Errorf("bestWpm(words 1000en) = %d, %t, want 70, true", best, ok)
+	if best, ok := bestWpm(stored, testKind{mode: "words", source: "1000en", words: 50}); best != 70 || !ok {
+		t.Errorf("bestWpm(words 1000en, 50 words) = %d, %t, want 70, true", best, ok)
 	}
 
-	if best, ok := bestWpm(stored, testKind{"quotes", "en"}); ok {
+	if best, ok := bestWpm(stored, testKind{mode: "quotes", source: "en"}); ok {
 		t.Errorf("bestWpm(quotes en) = %d, %t, want no result", best, ok)
 	}
 }
