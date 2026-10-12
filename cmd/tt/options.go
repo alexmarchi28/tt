@@ -56,9 +56,9 @@ Test Parameters
     -nobackspace        Disable the backspace key.
     -blind              Don't show mistakes while typing, they are still
                         reported at the end of the test.
-    -pace WPM           Show a pacer going through the text at the given speed,
-                        or at your personal best (best) or recent average (avg)
-                        on the same kind of test.
+    -pace WPM|best|avg  Show a pacer going through the text at the given speed,
+                        or at your best or recent average speed on the same
+                        kind of test.
     -nohighlight        Disable current and next word highlighting.
     -highlight1         Only highlight the current word.
     -highlight2         Only highlight the next word.
