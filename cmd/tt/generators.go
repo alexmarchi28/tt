@@ -39,7 +39,7 @@ func selectTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (f
 	switch {
 	case opts.adaptive:
 		list := adaptiveWordList(opts)
-		gen, err := generateAdaptiveTest(list, words)
+		gen, err := generateAdaptiveTest(list, words, opts.focus)
 		return gen, testKind{mode: modeAdaptive, source: filepath.Base(list)}, err
 	case opts.wordFile != "":
 		gen, err := generateWordTest(opts.wordFile, words)

@@ -311,6 +311,8 @@ func TestCLIRejectsInvalidNumbers(t *testing.T) {
 		{[]string{"-t", "-5"}, "-t must be at least 1"},
 		{[]string{"-pace", "-10"}, "-pace can't be negative"},
 		{[]string{"-pace", "fast"}, "-pace must be a speed in wpm, best or avg"},
+		{[]string{"-focus", "-1"}, "-focus must be between 0 and 100"},
+		{[]string{"-focus", "101"}, "-focus must be between 0 and 100"},
 	}
 
 	for _, tc := range tests {

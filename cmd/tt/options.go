@@ -24,6 +24,9 @@ Modes
     -adaptive           Practice the words of the word list (see -words) with
                         the pairs of letters you type the slowest or miss the
                         most.
+    -focus PERCENT      The percentage of the words of -adaptive drawn among
+                        those with the pairs of letters being practiced
+                        (default: 40).
 
 Word Mode (also applies to -mistakes and -adaptive)
     -n GROUPSZ          Sets the number of words which constitute a group.
@@ -100,6 +103,7 @@ type options struct {
 	maxLineLen     int
 	timeout        time.Duration // -1 for no time limit.
 	pace           int           // 0 for no pacer.
+	focus          int           // Percentage of the words of -adaptive with the pairs practiced.
 	paceTarget     string        // -pace best or avg, see paceFromResults.
 
 	listType  string
@@ -158,6 +162,7 @@ func parseFlags(args []string) options {
 	fs.StringVar(&opts.quoteFile, "quotes", "", "")
 	fs.BoolVar(&opts.mistakes, "mistakes", false, "")
 	fs.BoolVar(&opts.adaptive, "adaptive", false, "")
+	fs.IntVar(&opts.focus, "focus", 40, "")
 	fs.BoolVar(&opts.punct, "punct", false, "")
 	fs.BoolVar(&opts.numbers, "numbers", false, "")
 
@@ -227,6 +232,8 @@ func (o options) validate() error {
 		return errors.New("-pace can't be negative")
 	case o.paceTarget != "" && o.paceTarget != paceBest && o.paceTarget != paceAverage:
 		return errors.New("-pace must be a speed in wpm, best or avg")
+	case o.focus < 0 || o.focus > 100:
+		return errors.New("-focus must be between 0 and 100")
 	}
 
 	return nil

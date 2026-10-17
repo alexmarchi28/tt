@@ -297,11 +297,12 @@ func TestNewTestGenerator(t *testing.T) {
 			}
 		}, testKind{mode: "words", source: "1000en", words: 200, punct: true, numbers: true}},
 		{"mistakes over stdin", []string{"-mistakes", "-n", "2"}, "piped text", false, exactly("ab ab"), testKind{mode: "mistakes", words: 2}},
-		{"adaptive", []string{"-adaptive", "-n", "5"}, "", true, wordsPerSegment(5), testKind{mode: "adaptive", source: "1000en", words: 5}},
-		{"adaptive word list", []string{"-adaptive", "-words", "200en", "-n", "5"}, "piped text", false, wordsPerSegment(5), testKind{mode: "adaptive", source: "200en", words: 5}},
+		{"adaptive", []string{"-adaptive", "-n", "5"}, "", true, wordsPerSegment(5), testKind{mode: "adaptive", source: "1000en", words: 5, focus: 40}},
+		{"adaptive word list", []string{"-adaptive", "-words", "200en", "-n", "5", "-focus", "70"}, "piped text", false, wordsPerSegment(5), testKind{mode: "adaptive", source: "200en", words: 5, focus: 70}},
+		{"focus without -adaptive", []string{"-n", "5", "-focus", "70"}, "", true, wordsPerSegment(5), testKind{mode: "words", source: "1000en", words: 5}},
 		{"timed words", []string{"-t", "10", "-n", "5"}, "", true, lastsAtLeast(10*time.Second, 5), testKind{mode: "words", source: "1000en", seconds: 10}},
 		{"timed mistakes", []string{"-mistakes", "-t", "10", "-n", "5"}, "", true, lastsAtLeast(10*time.Second, 5), testKind{mode: "mistakes", seconds: 10}},
-		{"timed adaptive", []string{"-adaptive", "-t", "10", "-n", "5"}, "", true, lastsAtLeast(10*time.Second, 5), testKind{mode: "adaptive", source: "1000en", seconds: 10}},
+		{"timed adaptive", []string{"-adaptive", "-t", "10", "-n", "5"}, "", true, lastsAtLeast(10*time.Second, 5), testKind{mode: "adaptive", source: "1000en", seconds: 10, focus: 40}},
 		{"timed quotes", []string{"-quotes", "en", "-t", "30"}, "", true, func(t *testing.T, segments []segment) {
 			if len(segments) != 1 || segments[0].Text == "" {
 				t.Errorf("got %q, want a quote", segments)

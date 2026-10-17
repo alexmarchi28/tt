@@ -91,7 +91,7 @@ options.
  - `tt -quotes en` Starts quote mode with the builtin quote list 'en' ('it' for Italian literature).
  - `tt -words 1000it` Draws the words from 1000 common Italian words, see `tt -list words` for the other languages.
  - `tt -mistakes` Practices the words you recently mistyped, the most frequent ones more often.
- - `tt -adaptive` Practices the words containing the pairs of letters you miss or type slowly.
+ - `tt -adaptive` Practices the words containing the pairs of letters you miss or type slowly (`-focus 70 -n 20` for a short drill on them).
  - `tt -n 10 -g 5` produces a test consisting of 50 randomly drawn words in 5 groups of 10 words each.
  - `tt -punct -numbers` adds capital letters, punctuation and numbers to the words.
  - `tt -t 10` starts a timed test lasting 10 seconds.

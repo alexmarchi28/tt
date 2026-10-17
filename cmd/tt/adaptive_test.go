@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gdamore/tcell"
 )
@@ -181,7 +182,7 @@ func TestGenerateAdaptiveTestFavoursWeakWords(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got := drawShares(t, mustGen(generateAdaptiveTest("list", wordOptions{n: 100, g: 4})))
+	got := drawShares(t, mustGen(generateAdaptiveTest("list", wordOptions{n: 100, g: 4}, 0)))
 
 	// Uniformly drawn every word would make a quarter of the test.
 	for _, w := range []string{"her", "err", "rare"} {
@@ -195,12 +196,72 @@ func TestGenerateAdaptiveTestWithoutStatistics(t *testing.T) {
 	dir := useTempStorage(t)
 	writeUserResource(t, dir, "words", "list", "the her err rare")
 
-	got := drawShares(t, mustGen(generateAdaptiveTest("list", wordOptions{n: 100, g: 4})))
+	got := drawShares(t, mustGen(generateAdaptiveTest("list", wordOptions{n: 100, g: 4}, 40)))
 
 	for _, w := range []string{"the", "her", "err", "rare"} {
 		if got[w] < 0.18 || got[w] > 0.32 {
 			t.Errorf("shares %v, want words drawn uniformly without statistics", got)
 		}
+	}
+}
+
+// thShare returns the share of the words containing th in 10 tests of
+// adaptive words, practicing th with the given focus.
+func thShare(t *testing.T, focus int) float64 {
+	t.Helper()
+
+	dir := useTempStorage(t)
+	writeUserResource(t, dir, "words", "list", "the this that them then ab cd fg ij kl mn op qu vw xz ac bd ce df eg")
+	if err := writeValue(keyStatsDB, weakTH()); err != nil {
+		t.Fatal(err)
+	}
+
+	share := 0.0
+	for w, s := range drawShares(t, mustGen(generateAdaptiveTest("list", wordOptions{n: 100, g: 4}, focus))) {
+		if strings.Contains(w, "th") {
+			share += s
+		}
+	}
+
+	return share
+}
+
+func TestGenerateAdaptiveTestFocus(t *testing.T) {
+	// Without focus the words with th are only favoured.
+	share := thShare(t, 0)
+	if share < 0.3 || share > 0.5 {
+		t.Errorf("share of the words with th without focus = %.2f, want about 0.4", share)
+	}
+
+	// With focus 40, 40% of the words have th and the others are drawn as
+	// without focus.
+	want := 0.4 + 0.6*share
+	if got := thShare(t, 40); math.Abs(got-want) > 0.05 {
+		t.Errorf("share of the words with th with focus 40 = %.2f, want %.2f", got, want)
+	}
+
+	if got := thShare(t, 100); !near(got, 1) {
+		t.Errorf("share of the words with th with focus 100 = %.2f, want all of them", got)
+	}
+}
+
+func TestGenerateAdaptiveTestFocusOnASingleWord(t *testing.T) {
+	dir := useTempStorage(t)
+	writeUserResource(t, dir, "words", "list", "the ab cd")
+	if err := writeValue(keyStatsDB, weakTH()); err != nil {
+		t.Fatal(err)
+	}
+
+	done := make(chan []segment, 1)
+	go func() { done <- mustGen(generateAdaptiveTest("list", wordOptions{n: 4, g: 1}, 100))() }()
+
+	select {
+	case got := <-done:
+		if want := []segment{{"the the the the", ""}}; !reflect.DeepEqual(got, want) {
+			t.Errorf("got %q, want %q", got, want)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("the test was not generated")
 	}
 }
 

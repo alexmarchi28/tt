@@ -1,3 +1,14 @@
+# Unreleased:
+
+New:
+ - -focus sets the percentage of the words of -adaptive with the pairs of
+   letters being practiced, 40 by default.
+
+Changed:
+ - -adaptive practices the weak pairs of letters costing the most time, those
+   frequent in the word list, and judges the pairs typed a few times
+   cautiously, rather than chasing rare pairs missed once.
+
 # 1.1.0:
 
 New:

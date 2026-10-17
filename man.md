@@ -48,9 +48,19 @@ mistyped ones coming up more often. -n and -g apply.
 -adaptive
 
 : Practice the words of the word list (see -words) containing the pairs of
-letters you miss the most or type the slowest compared to the others, as
-recorded during the previous tests. The pairs being practiced are shown at
-the top of the screen. -n and -g apply.
+letters costing you the most time: those you miss the most or type the
+slowest compared to the others, as recorded during the previous tests, and
+that are frequent in the word list. Pairs typed only a few times are judged
+cautiously. The 3 pairs being practiced are shown at the top of the screen.
+-n and -g apply.
+
+-focus *PERCENT*
+
+: The percentage of the words of -adaptive drawn among those containing the
+pairs being practiced (default: 40). The other words are drawn among all the
+words of the list, favouring those with weak pairs, so that the pairs
+practiced make up a bit more. 30 to 50 suits regular practice, 70 to 100 short
+drills, 0 only favours the words with weak pairs.
 
 ## Word Mode (also applies to -mistakes and -adaptive)
 

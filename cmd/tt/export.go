@@ -35,7 +35,7 @@ func exportResults(w io.Writer, asJSON bool) error {
 		return writeJSON(w, nonNil(results))
 	}
 
-	rows := [][]string{{"timestamp", "wpm", "accuracy", "duration", "mode", "source", "seconds", "words", "punct", "numbers"}}
+	rows := [][]string{{"timestamp", "wpm", "accuracy", "duration", "mode", "source", "seconds", "words", "punct", "numbers", "focus"}}
 	for _, r := range results {
 		rows = append(rows, []string{
 			strconv.FormatInt(r.Timestamp, 10),
@@ -48,6 +48,7 @@ func exportResults(w io.Writer, asJSON bool) error {
 			strconv.Itoa(r.Words),
 			strconv.FormatBool(r.Punct),
 			strconv.FormatBool(r.Numbers),
+			strconv.Itoa(r.Focus),
 		})
 	}
 

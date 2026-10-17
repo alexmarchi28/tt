@@ -30,6 +30,7 @@ type persistedResult struct {
 	Words    int     `json:"words,omitempty"`    //See testKind.
 	Punct    bool    `json:"punct,omitempty"`    //See testKind.
 	Numbers  bool    `json:"numbers,omitempty"`  //See testKind.
+	Focus    int     `json:"focus,omitempty"`    //See testKind.
 }
 
 func (r persistedResult) kind() testKind {
@@ -40,13 +41,14 @@ func (r persistedResult) kind() testKind {
 		words:   r.Words,
 		punct:   r.Punct,
 		numbers: r.Numbers,
+		focus:   r.Focus,
 	}
 }
 
 // withKind returns r as the result of the given kind of test.
 func (r persistedResult) withKind(k testKind) persistedResult {
 	r.Mode, r.Source = k.mode, k.source
-	r.Seconds, r.Words, r.Punct, r.Numbers = k.seconds, k.words, k.punct, k.numbers
+	r.Seconds, r.Words, r.Punct, r.Numbers, r.Focus = k.seconds, k.words, k.punct, k.numbers, k.focus
 
 	return r
 }

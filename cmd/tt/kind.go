@@ -26,6 +26,7 @@ type testKind struct {
 	words   int  // Words of untimed tests made of words, 0 for other tests.
 	punct   bool // Whether the words are turned into sentences.
 	numbers bool // Whether some of the words are replaced with numbers.
+	focus   int  // Percentage of the words of adaptive tests with the pairs practiced.
 }
 
 func (k testKind) String() string {
@@ -56,6 +57,9 @@ func (k testKind) variant() []string {
 	if k.numbers {
 		v = append(v, "numbers")
 	}
+	if k.focus > 0 {
+		v = append(v, fmt.Sprintf("focus %d%%", k.focus))
+	}
 
 	return v
 }
@@ -78,6 +82,10 @@ func (k testKind) withVariant(opts options) testKind {
 		if opts.timeout == -1 {
 			k.words = opts.n * opts.g
 		}
+	}
+
+	if k.mode == modeAdaptive {
+		k.focus = opts.focus
 	}
 
 	return k

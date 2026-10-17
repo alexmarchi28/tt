@@ -190,27 +190,78 @@ func (a adaptiveWords) describe(ks keyStats) string {
 	return "Practicing " + strings.Join(pairs, ", ")
 }
 
-// generateAdaptiveTest draws words from the given word list, favouring those
-// with the pairs of letters typed the worst according to the latest key
-// statistics.
-func generateAdaptiveTest(name string, o wordOptions) (func() []segment, error) {
+// draw draws n words according to the given key statistics: the given
+// share of them (from 0 to 1) among the words with the pairs of letters to
+// practice, see focus, the others among all words, favouring those with weak
+// pairs.
+func (a adaptiveWords) draw(n int, ks keyStats, share float64) []string {
+	w := newWeaknesses(ks)
+	favoured := weightedPick(a.words, func(word string) float64 { return math.Pow(w.word(word), adaptivePower) })
+
+	focused := a.containing(w.focus(focusPairs, a.frequency))
+	if len(focused) == 0 {
+		return drawWords(n, a.words, favoured)
+	}
+
+	candidates := a.words
+	if share >= 1 {
+		candidates = focused
+	}
+
+	return drawWords(n, candidates, func() string {
+		if rand.Float64() < share {
+			return focused[rand.Intn(len(focused))]
+		}
+		return favoured()
+	})
+}
+
+// containing returns the words containing at least one of the given pairs of
+// letters.
+func (a adaptiveWords) containing(pairs []string) []string {
+	wanted := map[string]bool{}
+	for _, pair := range pairs {
+		wanted[pair] = true
+	}
+
+	var words []string
+	for _, word := range a.words {
+		for _, pair := range letterPairs(word) {
+			if wanted[pair] {
+				words = append(words, word)
+				break
+			}
+		}
+	}
+
+	return words
+}
+
+// weightedPick returns a function drawing one of words at random, in
+// proportion to their weight.
+func weightedPick(words []string, weight func(word string) float64) func() string {
+	cumulative := make([]float64, len(words))
+	total := 0.0
+	for i, word := range words {
+		total += weight(word)
+		cumulative[i] = total
+	}
+
+	return func() string {
+		return words[sort.SearchFloat64s(cumulative, rand.Float64()*total)]
+	}
+}
+
+// generateAdaptiveTest draws words from the given word list according to the
+// latest key statistics, focus percent of them with the pairs of letters to
+// practice, see adaptiveWords.draw.
+func generateAdaptiveTest(name string, o wordOptions, focus int) (func() []segment, error) {
 	a, err := loadAdaptiveWords(name)
 	if err != nil {
 		return nil, err
 	}
 
 	return wordTest(func(n int) []string {
-		w := newWeaknesses(loadKeyStats())
-
-		cumulative := make([]float64, len(a.words))
-		total := 0.0
-		for i, word := range a.words {
-			total += math.Pow(w.word(word), adaptivePower)
-			cumulative[i] = total
-		}
-
-		return drawWords(n, a.words, func() string {
-			return a.words[sort.SearchFloat64s(cumulative, rand.Float64()*total)]
-		})
+		return a.draw(n, loadKeyStats(), float64(focus)/100)
 	}, o), nil
 }

@@ -29,6 +29,8 @@ func saveExportedResults(t *testing.T) []persistedResult {
 			withKind(testKind{mode: "words", source: "1000en", seconds: 15, punct: true, numbers: true}),
 		persistedResult{Wpm: 65, Accuracy: 100, Timestamp: 3000, Duration: 30}.
 			withKind(testKind{mode: "quotes", source: "my, quotes"}),
+		persistedResult{Wpm: 55, Accuracy: 98, Timestamp: 4000, Duration: 20}.
+			withKind(testKind{mode: "adaptive", source: "1000en", words: 50, focus: 40}),
 	}
 	if err := writePersistedResults(results); err != nil {
 		t.Fatal(err)
@@ -42,10 +44,11 @@ func TestExportResultsAsCSV(t *testing.T) {
 	saveExportedResults(t)
 
 	want := "" +
-		"timestamp,wpm,accuracy,duration,mode,source,seconds,words,punct,numbers\n" +
-		"1000,40,80.00,0.00,,,0,0,false,false\n" +
-		"2000,72,96.50,12.50,words,1000en,15,0,true,true\n" +
-		"3000,65,100.00,30.00,quotes,\"my, quotes\",0,0,false,false\n"
+		"timestamp,wpm,accuracy,duration,mode,source,seconds,words,punct,numbers,focus\n" +
+		"1000,40,80.00,0.00,,,0,0,false,false,0\n" +
+		"2000,72,96.50,12.50,words,1000en,15,0,true,true,0\n" +
+		"3000,65,100.00,30.00,quotes,\"my, quotes\",0,0,false,false,0\n" +
+		"4000,55,98.00,20.00,adaptive,1000en,0,50,false,false,40\n"
 	if got := export(t, "results", false); got != want {
 		t.Errorf("got\n%s\nwant\n%s", got, want)
 	}
@@ -85,7 +88,7 @@ func TestExportWithoutData(t *testing.T) {
 		asJSON bool
 		want   string
 	}{
-		{"results", false, "timestamp,wpm,accuracy,duration,mode,source,seconds,words,punct,numbers\n"},
+		{"results", false, "timestamp,wpm,accuracy,duration,mode,source,seconds,words,punct,numbers,focus\n"},
 		{"results", true, "[]\n"},
 		{"mistakes", false, "word,typed\n"},
 		{"mistakes", true, "[]\n"},

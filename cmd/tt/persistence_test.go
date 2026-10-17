@@ -45,6 +45,7 @@ func TestPersistedResultKind(t *testing.T) {
 		{mode: "quotes", source: "en"},
 		{mode: "words", source: "1000en", words: 50, punct: true},
 		{mode: "mistakes", seconds: 60, numbers: true},
+		{mode: "adaptive", source: "1000en", words: 50, focus: 40},
 	}
 
 	for _, kind := range kinds {
@@ -61,14 +62,14 @@ func TestPersistedResultKind(t *testing.T) {
 // The saved results must remain readable by other versions of tt.
 func TestPersistedResultFormat(t *testing.T) {
 	r := persistedResult{Wpm: 60, Accuracy: 95.5, Timestamp: 1000, Duration: 30}.
-		withKind(testKind{mode: "words", source: "1000en", seconds: 15, words: 50, punct: true, numbers: true})
+		withKind(testKind{mode: "adaptive", source: "1000en", seconds: 15, words: 50, punct: true, numbers: true, focus: 40})
 
 	b, err := json.Marshal(r)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	want := `{"wpm":60,"accuracy":95.5,"timestamp":1000,"mode":"words","source":"1000en","duration":30,"seconds":15,"words":50,"punct":true,"numbers":true}`
+	want := `{"wpm":60,"accuracy":95.5,"timestamp":1000,"mode":"adaptive","source":"1000en","duration":30,"seconds":15,"words":50,"punct":true,"numbers":true,"focus":40}`
 	if string(b) != want {
 		t.Errorf("saved as\n%s\nwant\n%s", b, want)
 	}
