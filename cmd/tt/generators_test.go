@@ -168,28 +168,41 @@ func TestBuiltinQuotesAreValid(t *testing.T) {
 	}
 }
 
-func TestItalianWordList(t *testing.T) {
+// The builtin word lists whose words are checked: made of the given letters,
+// distinct and, if given, as many as the size.
+var checkedWordLists = []struct {
+	name    string
+	letters string
+	size    int
+}{
+	{"1000it", "abcdefghijklmnopqrstuvwxyzàèéìòù", 1000},
+	{"ru", "абвгдеёжзийклмнопрстуфхцчшщъыьэюя", 0},
+}
+
+func TestBuiltinWordLists(t *testing.T) {
 	useTempStorage(t)
 
-	words, err := loadWords("1000it")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	seen := map[string]bool{}
-	for _, w := range words {
-		if seen[w] {
-			t.Errorf("%q appears twice", w)
+	for _, list := range checkedWordLists {
+		words, err := loadWords(list.name)
+		if err != nil {
+			t.Fatal(err)
 		}
-		seen[w] = true
 
-		if strings.Trim(w, "abcdefghijklmnopqrstuvwxyzàèéìòù") != "" {
-			t.Errorf("%q is not a lower case Italian word", w)
+		seen := map[string]bool{}
+		for _, w := range words {
+			if seen[w] {
+				t.Errorf("%s: %q appears twice", list.name, w)
+			}
+			seen[w] = true
+
+			if strings.Trim(w, list.letters) != "" {
+				t.Errorf("%s: %q is not made of lower case letters of the language", list.name, w)
+			}
 		}
-	}
 
-	if len(seen) != 1000 {
-		t.Errorf("got %d distinct words, want 1000", len(seen))
+		if list.size > 0 && len(seen) != list.size {
+			t.Errorf("%s: got %d distinct words, want %d", list.name, len(seen), list.size)
+		}
 	}
 }
 
