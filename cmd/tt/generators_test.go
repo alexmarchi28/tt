@@ -177,6 +177,7 @@ var checkedWordLists = []struct {
 }{
 	{"1000it", "abcdefghijklmnopqrstuvwxyzàèéìòù", 1000},
 	{"ru", "абвгдеёжзийклмнопрстуфхцчшщъыьэюя", 0},
+	{"1000ru", "абвгдеёжзийклмнопрстуфхцчшщъыьэюя", 1000},
 }
 
 func TestBuiltinWordLists(t *testing.T) {

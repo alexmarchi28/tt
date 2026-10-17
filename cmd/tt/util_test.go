@@ -138,7 +138,7 @@ func TestListResourceNames(t *testing.T) {
 	}
 
 	words := listResourceNames("words")
-	for _, want := range []string{"1000en", "200en", "1000it", "it"} {
+	for _, want := range []string{"1000en", "200en", "1000it", "it", "1000ru", "ru"} {
 		if indexResourceName(words, want) == -1 {
 			t.Errorf("word list %q missing from %v", want, words)
 		}

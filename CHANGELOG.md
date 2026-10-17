@@ -3,11 +3,16 @@
 New:
  - -focus sets the percentage of the words of -adaptive with the pairs of
    letters being practiced, 40 by default.
+ - 1000 common Russian words (-words 1000ru): the most frequent pronouns,
+   prepositions, verbs and adjectives besides the nouns of the ru list.
 
 Changed:
  - -adaptive practices the weak pairs of letters costing the most time, those
    frequent in the word list, and judges the pairs typed a few times
    cautiously, rather than chasing rare pairs missed once.
+
+Fixed:
+ - The Russian word list contained the English word TRUE.
 
 # 1.1.0:
 
