@@ -38,10 +38,7 @@ func selectTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (f
 
 	switch {
 	case opts.adaptive:
-		list := opts.wordFile
-		if list == "" {
-			list = "1000en"
-		}
+		list := adaptiveWordList(opts)
 		gen, err := generateAdaptiveTest(list, words)
 		return gen, testKind{mode: modeAdaptive, source: filepath.Base(list)}, err
 	case opts.wordFile != "":
@@ -65,9 +62,21 @@ func selectTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (f
 		gen, err := generateTestFromFile(opts.files[0], opts.startParagraph)
 		return gen, testKind{mode: modeFile, source: filepath.Base(opts.files[0])}, err
 	default:
-		gen, err := generateWordTest("1000en", words)
-		return gen, testKind{mode: modeWords, source: "1000en"}, err
+		gen, err := generateWordTest(defaultWordList, words)
+		return gen, testKind{mode: modeWords, source: defaultWordList}, err
 	}
+}
+
+// defaultWordList is the word list of word tests unless -words is given.
+const defaultWordList = "1000en"
+
+// adaptiveWordList returns the word list of adaptive tests.
+func adaptiveWordList(opts options) string {
+	if opts.wordFile != "" {
+		return opts.wordFile
+	}
+
+	return defaultWordList
 }
 
 // fastestCpm is a speed beyond the reach of any typist (500 wpm), at which

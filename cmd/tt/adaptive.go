@@ -14,6 +14,7 @@ const (
 	errorFloor      = 0.02 // Added to error rates so that tiny ones aren't overrated.
 	adaptivePower   = 2    // How strongly words with weak pairs of letters are favoured.
 	averageWeakness = 2    // Weakness of an average pair of letters, see newWeaknesses.
+	focusPairs      = 3    // Weak pairs of letters practiced at once.
 )
 
 // weaknesses rates how badly each pair of letters is typed, as the sum of its
@@ -91,34 +92,32 @@ func (w weaknesses) of(pair string) float64 {
 // word returns the weakness of the weakest pair of letters of word, so that
 // weak pairs aren't diluted in long words.
 func (w weaknesses) word(word string) float64 {
-	r := []rune(strings.ToLower(word))
-	if len(r) < 2 {
+	pairs := letterPairs(word)
+	if len(pairs) == 0 {
 		return averageWeakness
 	}
 
 	weakest := 0.0
-	for i := 1; i < len(r); i++ {
-		weakest = math.Max(weakest, w.of(string(r[i-1:i+1])))
+	for _, pair := range pairs {
+		weakest = math.Max(weakest, w.of(pair))
 	}
 
 	return weakest
 }
 
-// focus returns up to n of the pairs weaker than average, the weakest first.
-func (w weaknesses) focus(n int) []string {
-	var pairs []string
+// focus returns up to n of the pairs weaker than average, those costing the
+// most time first: the weakest and most frequent ones, given the share of
+// each pair among the pairs typed.
+func (w weaknesses) focus(n int, frequency map[string]float64) []string {
+	cost := map[string]float64{}
 	for pair, v := range w {
-		if v > averageWeakness {
-			pairs = append(pairs, pair)
+		if v > averageWeakness && frequency[pair] > 0 {
+			cost[pair] = (v - averageWeakness) * frequency[pair]
 		}
 	}
 
-	sort.Slice(pairs, func(i, j int) bool {
-		if w[pairs[i]] != w[pairs[j]] {
-			return w[pairs[i]] > w[pairs[j]]
-		}
-		return pairs[i] < pairs[j]
-	})
+	pairs := sortedKeys(cost)
+	sort.SliceStable(pairs, func(i, j int) bool { return cost[pairs[i]] > cost[pairs[j]] })
 
 	if len(pairs) > n {
 		pairs = pairs[:n]
@@ -127,9 +126,63 @@ func (w weaknesses) focus(n int) []string {
 	return pairs
 }
 
-// adaptiveFocus describes what adaptive tests practice.
-func adaptiveFocus(ks keyStats) string {
-	pairs := newWeaknesses(ks).focus(3)
+// letterPairs returns the pairs of consecutive letters of word, in lower
+// case.
+func letterPairs(word string) []string {
+	r := []rune(strings.ToLower(word))
+
+	var pairs []string
+	for i := 1; i < len(r); i++ {
+		if unicode.IsLetter(r[i-1]) && unicode.IsLetter(r[i]) {
+			pairs = append(pairs, string(r[i-1:i+1]))
+		}
+	}
+
+	return pairs
+}
+
+// pairFrequencies returns the share of each pair of letters among the pairs
+// of letters of words.
+func pairFrequencies(words []string) map[string]float64 {
+	counts, total := map[string]float64{}, 0.0
+	for _, word := range words {
+		for _, pair := range letterPairs(word) {
+			counts[pair]++
+			total++
+		}
+	}
+
+	for pair := range counts {
+		counts[pair] /= total
+	}
+
+	return counts
+}
+
+// adaptiveWords is the word list of adaptive tests.
+type adaptiveWords struct {
+	words     []string
+	frequency map[string]float64 // See pairFrequencies.
+}
+
+func loadAdaptiveWords(name string) (adaptiveWords, error) {
+	words, err := loadWords(name)
+	if err != nil {
+		return adaptiveWords{}, err
+	}
+
+	return adaptiveWords{words, pairFrequencies(words)}, nil
+}
+
+// focus returns the weak pairs of letters to practice according to the
+// given key statistics.
+func (a adaptiveWords) focus(ks keyStats) []string {
+	return newWeaknesses(ks).focus(focusPairs, a.frequency)
+}
+
+// describe tells what adaptive tests practice.
+func (a adaptiveWords) describe(ks keyStats) string {
+	pairs := a.focus(ks)
 	if len(pairs) == 0 {
 		return "Practicing all keys until enough keystrokes are recorded"
 	}
@@ -141,7 +194,7 @@ func adaptiveFocus(ks keyStats) string {
 // with the pairs of letters typed the worst according to the latest key
 // statistics.
 func generateAdaptiveTest(name string, o wordOptions) (func() []segment, error) {
-	words, err := loadWords(name)
+	a, err := loadAdaptiveWords(name)
 	if err != nil {
 		return nil, err
 	}
@@ -149,15 +202,15 @@ func generateAdaptiveTest(name string, o wordOptions) (func() []segment, error) 
 	return wordTest(func(n int) []string {
 		w := newWeaknesses(loadKeyStats())
 
-		cumulative := make([]float64, len(words))
+		cumulative := make([]float64, len(a.words))
 		total := 0.0
-		for i, word := range words {
+		for i, word := range a.words {
 			total += math.Pow(w.word(word), adaptivePower)
 			cumulative[i] = total
 		}
 
-		return drawWords(n, words, func() string {
-			return words[sort.SearchFloat64s(cumulative, rand.Float64()*total)]
+		return drawWords(n, a.words, func() string {
+			return a.words[sort.SearchFloat64s(cumulative, rand.Float64()*total)]
 		})
 	}, o), nil
 }

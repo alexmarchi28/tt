@@ -15,11 +15,20 @@ type app struct {
 	scr     tcell.Screen
 	typer   *typer
 	results []result
-	theme   string // Theme to remember on exit, empty if none.
+	theme   string         // Theme to remember on exit, empty if none.
+	words   *adaptiveWords // The word list of adaptive tests, nil for other tests.
 }
 
 func newApp(scr tcell.Screen, opts options, kind testKind) *app {
 	a := &app{opts: opts, kind: kind, scr: scr}
+
+	if kind.mode == modeAdaptive {
+		words, err := loadAdaptiveWords(adaptiveWordList(opts))
+		if err != nil {
+			die("%v", err)
+		}
+		a.words = &words
+	}
 
 	if opts.noTheme {
 		a.typer = NewTyper(scr, true, terminalTheme)
@@ -84,8 +93,8 @@ func (a *app) run(testFn func() []segment) int {
 			}
 		}
 
-		if a.kind.mode == modeAdaptive {
-			a.typer.ShowStatusMessage(adaptiveFocus(loadKeyStats()), 0)
+		if a.words != nil {
+			a.typer.ShowStatusMessage(a.words.describe(loadKeyStats()), 0)
 		}
 
 		res := a.typer.Start(tests[idx], a.opts.timeout)

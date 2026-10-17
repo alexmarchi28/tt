@@ -1,6 +1,7 @@
 package main
 
 import (
+	"io"
 	"math"
 	"reflect"
 	"strings"
@@ -109,24 +110,67 @@ func TestWordWeakness(t *testing.T) {
 	}
 }
 
-func TestWeaknessFocus(t *testing.T) {
-	w := newWeaknesses(weakTH())
-	w["er"] = 3
+func TestPairFrequencies(t *testing.T) {
+	got := pairFrequencies([]string{"the", "There", "a", "can't"})
 
-	if got := w.focus(3); !reflect.DeepEqual(got, []string{"th", "er"}) {
-		t.Errorf("focus(3) = %q, want the pairs weaker than average, the weakest first", got)
-	}
-	if got := w.focus(1); !reflect.DeepEqual(got, []string{"th"}) {
-		t.Errorf("focus(1) = %q, want [th]", got)
+	// th, he, th, he, er, re, ca, an: the apostrophe isn't a letter.
+	want := map[string]float64{"th": 0.25, "he": 0.25, "er": 0.125, "re": 0.125, "ca": 0.125, "an": 0.125}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("pairFrequencies() = %v, want %v", got, want)
 	}
 }
 
-func TestAdaptiveFocus(t *testing.T) {
-	if got := adaptiveFocus(weakTH()); got != "Practicing th" {
-		t.Errorf("adaptiveFocus() = %q", got)
+func TestWeaknessFocus(t *testing.T) {
+	w := newWeaknesses(weakTH())
+	w["er"] = 3
+	w["xy"] = 5
+	frequency := map[string]float64{"th": 0.01, "he": 0.1, "er": 0.05}
+
+	// er is less weak than th but much more frequent, he is typed well and xy
+	// is never typed.
+	if got := w.focus(3, frequency); !reflect.DeepEqual(got, []string{"er", "th"}) {
+		t.Errorf("focus(3) = %q, want the weak pairs costing the most time first", got)
 	}
-	if got := adaptiveFocus(newKeyStats()); got != "Practicing all keys until enough keystrokes are recorded" {
-		t.Errorf("adaptiveFocus() without statistics = %q", got)
+	if got := w.focus(1, frequency); !reflect.DeepEqual(got, []string{"er"}) {
+		t.Errorf("focus(1) = %q, want [er]", got)
+	}
+}
+
+func TestAdaptiveWordsFocusOnFrequentWeakPairs(t *testing.T) {
+	dir := useTempStorage(t)
+	writeUserResource(t, dir, "words", "list", "in into begin rain think during point inside soccer here")
+
+	// cc, rare in the list, was typed a few times with a mistake and slowly,
+	// in, frequent, was typed often with mistakes and a bit slowly.
+	ks := newKeyStats()
+	ks.Bigrams["cc"] = keyStat{Count: 7, ErrorRate: 1.0 / 7, Timed: 6, Latency: 165}
+	ks.Bigrams["in"] = keyStat{Count: 190, ErrorRate: 0.1, Timed: 185, Latency: 120}
+	ks.Bigrams["er"] = keyStat{Count: 230, ErrorRate: 0, Timed: 230, Latency: 100}
+	ks.Bigrams["he"] = keyStat{Count: 96, ErrorRate: 0, Timed: 95, Latency: 71}
+
+	a, err := loadAdaptiveWords("list")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := a.focus(ks); len(got) == 0 || got[0] != "in" {
+		t.Errorf("focus = %q, want in first", got)
+	}
+}
+
+func TestAdaptiveWordsDescribe(t *testing.T) {
+	dir := useTempStorage(t)
+	writeUserResource(t, dir, "words", "list", "the her err rare")
+
+	a, err := loadAdaptiveWords("list")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := a.describe(weakTH()); got != "Practicing th" {
+		t.Errorf("describe() = %q", got)
+	}
+	if got := a.describe(newKeyStats()); got != "Practicing all keys until enough keystrokes are recorded" {
+		t.Errorf("describe() without statistics = %q", got)
 	}
 }
 
@@ -182,13 +226,15 @@ func drawShares(t *testing.T, gen func() []segment) map[string]float64 {
 }
 
 func TestAppShowsAdaptiveFocus(t *testing.T) {
-	opts := parseFlags(nil)
-	opts.noReport = true
-	a, sim := newTestApp(t, opts)
-	a.kind = testKind{mode: "adaptive", source: "list"}
+	dir := useTempStorage(t)
+	writeUserResource(t, dir, "words", "list", "the her err rare")
 	if err := writeValue(keyStatsDB, weakTH()); err != nil {
 		t.Fatal(err)
 	}
+
+	sim := newSimScreen(t)
+	a := newApp(sim, parseFlags([]string{"-adaptive", "-words", "list", "-noreport"}), testKind{mode: "adaptive", source: "list"})
+	a.typer.tty = io.Discard
 
 	var calls int
 	done := startApp(a, testSequence(&calls, "ab"))
