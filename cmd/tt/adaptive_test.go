@@ -28,11 +28,15 @@ func near(a, b float64) bool {
 func TestNewWeaknesses(t *testing.T) {
 	w := newWeaknesses(weakTH())
 
-	// The average error rate is 0.1 and the average latency 166.67ms.
+	// The average error rate is 0.1 and the average latency 166.67ms. The
+	// keystrokes of each pair (20 for th and TH) are completed by 20 at the
+	// averages.
+	errTH, latencyTH := (0.3*20+0.1*20)/40, (300*20+500.0/3*20)/40
+	errHE, latencyHE := (0*10+0.1*20)/30, (100*10+500.0/3*20)/30
 	want := map[string]float64{
-		"th": (0.3+errorFloor)/(0.1+errorFloor) + 300/(500.0/3),
-		"he": errorFloor/(0.1+errorFloor) + 100/(500.0/3),
-		"er": errorFloor/(0.1+errorFloor) + 100/(500.0/3),
+		"th": (errTH+errorFloor)/(0.1+errorFloor) + latencyTH/(500.0/3),
+		"he": (errHE+errorFloor)/(0.1+errorFloor) + latencyHE/(500.0/3),
+		"er": (errHE+errorFloor)/(0.1+errorFloor) + latencyHE/(500.0/3),
 	}
 
 	if len(w) != len(want) {
@@ -46,6 +50,32 @@ func TestNewWeaknesses(t *testing.T) {
 
 	if got := w.of("zz"); got != averageWeakness {
 		t.Errorf("weakness of an unrated pair = %v, want the average %v", got, averageWeakness)
+	}
+}
+
+func TestNewWeaknessesTrustsPairsWithMoreKeystrokes(t *testing.T) {
+	ks := newKeyStats()
+	ks.Bigrams["ab"] = keyStat{Count: 6, ErrorRate: 1.0 / 6, Timed: 6, Latency: 200}
+	ks.Bigrams["cd"] = keyStat{Count: 100, ErrorRate: 1.0 / 6, Timed: 100, Latency: 200}
+	ks.Bigrams["ef"] = keyStat{Count: 100, ErrorRate: 0, Timed: 100, Latency: 100}
+
+	// A single mistake in a few keystrokes may be bad luck.
+	w := newWeaknesses(ks)
+	if w["ab"] >= w["cd"] {
+		t.Errorf("weaknesses = %v, want ab, typed as badly as cd but less often, to be judged less weak", w)
+	}
+}
+
+func TestNewWeaknessesOfRecentKeystrokes(t *testing.T) {
+	ks := newKeyStats()
+	ks.Bigrams["ab"] = keyStat{Count: recentKeystrokes, ErrorRate: 0.2, Timed: recentKeystrokes, Latency: 200}
+	ks.Bigrams["cd"] = keyStat{Count: 1000, ErrorRate: 0.2, Timed: 1000, Latency: 200}
+	ks.Bigrams["ef"] = keyStat{Count: 100, ErrorRate: 0, Timed: 100, Latency: 100}
+
+	// The rates are recent averages: older keystrokes don't make them surer.
+	w := newWeaknesses(ks)
+	if !near(w["ab"], w["cd"]) {
+		t.Errorf("weaknesses = %v, want ab and cd to be as weak", w)
 	}
 }
 
@@ -110,8 +140,10 @@ func TestGenerateAdaptiveTestFavoursWeakWords(t *testing.T) {
 	got := drawShares(t, mustGen(generateAdaptiveTest("list", wordOptions{n: 100, g: 4})))
 
 	// Uniformly drawn every word would make a quarter of the test.
-	if got["the"] < 0.4 {
-		t.Errorf("shares %v, want the word with the weak pair to come up most", got)
+	for _, w := range []string{"her", "err", "rare"} {
+		if got["the"] < 0.3 || got["the"] <= got[w] {
+			t.Errorf("shares %v, want the word with the weak pair to come up most", got)
+		}
 	}
 }
 

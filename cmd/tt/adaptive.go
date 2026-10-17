@@ -10,6 +10,7 @@ import (
 
 const (
 	minPairCount    = 5    // Keystrokes needed to rate a pair of letters.
+	priorKeystrokes = 20   // Keystrokes at the average rates assumed for every pair, see newWeaknesses.
 	errorFloor      = 0.02 // Added to error rates so that tiny ones aren't overrated.
 	adaptivePower   = 2    // How strongly words with weak pairs of letters are favoured.
 	averageWeakness = 2    // Weakness of an average pair of letters, see newWeaknesses.
@@ -17,7 +18,9 @@ const (
 
 // weaknesses rates how badly each pair of letters is typed, as the sum of its
 // error rate and latency relative to the average ones: 2 is the average and
-// higher is worse.
+// higher is worse. The rates of a pair are drawn towards the averages as if
+// it had priorKeystrokes more keystrokes at the average rates, so that pairs
+// typed a few times aren't judged on luck.
 type weaknesses map[string]float64
 
 // newWeaknesses rates the pairs of letters with enough keystrokes, ignoring
@@ -48,18 +51,31 @@ func newWeaknesses(ks keyStats) weaknesses {
 		}
 	}
 
+	errorAvg, latencyAvg := errorSum/float64(rated), latencySum/float64(timed)
+
 	w := weaknesses{}
 	for pair, s := range pairs {
-		w[pair] = (s.ErrorRate + errorFloor) / (errorSum/float64(rated) + errorFloor)
+		errorRate := towardsAverage(s.ErrorRate, s.Count, errorAvg)
+		w[pair] = (errorRate + errorFloor) / (errorAvg + errorFloor)
 
-		if s.Timed >= minKeyTimed {
-			w[pair] += s.Latency / (latencySum / float64(timed))
+		if timed > 0 {
+			w[pair] += towardsAverage(s.Latency, s.Timed, latencyAvg) / latencyAvg
 		} else {
 			w[pair]++
 		}
 	}
 
 	return w
+}
+
+// towardsAverage returns a recent average of n values drawn towards the
+// average of all pairs, see weaknesses.
+func towardsAverage(recent float64, n int, average float64) float64 {
+	if n > recentKeystrokes {
+		n = recentKeystrokes
+	}
+
+	return (recent*float64(n) + average*priorKeystrokes) / float64(n+priorKeystrokes)
 }
 
 // of returns the weakness of a pair of lower case letters, the average one if

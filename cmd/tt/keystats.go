@@ -5,6 +5,11 @@ import "time"
 const (
 	keyWeight  = 0.05            // Smallest weight of the latest keystroke in recent averages.
 	maxLatency = 2 * time.Second // Longer intervals between keystrokes are pauses.
+
+	// recentKeystrokes is how many keystrokes a recent average is as reliable
+	// as, however many were typed: that of a plain average with the same
+	// variance.
+	recentKeystrokes = int(2/keyWeight - 1)
 )
 
 // keyStat describes how a character, or a pair of consecutive characters, is
