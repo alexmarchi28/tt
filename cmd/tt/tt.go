@@ -28,6 +28,8 @@ type environment struct {
 	// newScreen returns the screen tests are typed on, with true colour
 	// disabled unless trueColor is set.
 	newScreen func(trueColor bool) (tcell.Screen, error)
+	// openTTY opens the terminal for writing, nil if it can't be.
+	openTTY func() (io.WriteCloser, error)
 }
 
 func processEnvironment() environment {
@@ -40,6 +42,7 @@ func processEnvironment() environment {
 		getenv:           os.Getenv,
 		now:              time.Now,
 		homeDir:          os.UserHomeDir, //$HOME on unix, %USERPROFILE% on windows.
+		openTTY:          func() (io.WriteCloser, error) { return os.OpenFile("/dev/tty", os.O_WRONLY, 0) },
 		newScreen: func(trueColor bool) (tcell.Screen, error) {
 			if !trueColor {
 				if err := os.Setenv("TCELL_TRUECOLOR", "disable"); err != nil {
@@ -195,7 +198,16 @@ func runTests(s settings, env environment, deps dependencies) (int, error) {
 	restore := func() { fini.Do(scr.Fini) }
 	defer restore()
 
-	a, err := newApp(scr, s, appDeps{st, res, env.now})
+	cursor := cursorShaper(keptCursor{})
+	if !s.display.blockCursor && env.openTTY != nil {
+		//Fails on windows, where tt is still mostly usable via tcell.
+		if tty, err := env.openTTY(); err == nil {
+			defer tty.Close()
+			cursor = ttyCursor{tty}
+		}
+	}
+
+	a, err := newApp(scr, s, appDeps{st, res, env.now, cursor})
 	if err != nil {
 		return 0, err
 	}

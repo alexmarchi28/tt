@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -18,6 +19,19 @@ type testRun struct {
 	sim            tcell.SimulationScreen
 	trueColor      bool          // As requested by run.
 	initialized    chan struct{} // Closed once run initializes the screen.
+	tty            ttyBuffer     // What run writes to the terminal.
+}
+
+// ttyBuffer records what is written to the terminal, and whether it is
+// closed.
+type ttyBuffer struct {
+	bytes.Buffer
+	closed bool
+}
+
+func (b *ttyBuffer) Close() error {
+	b.closed = true
+	return nil
 }
 
 // initSignallingScreen tells when it is initialized, before which it can't
@@ -54,6 +68,7 @@ func (r *testRun) environment(text string) environment {
 			r.trueColor = trueColor
 			return initSignallingScreen{r.sim, r.initialized}, nil
 		},
+		openTTY: func() (io.WriteCloser, error) { return &r.tty, nil },
 	}
 }
 
@@ -65,15 +80,14 @@ func (r *testRun) store(t *testing.T) *jsonStore {
 }
 
 // startRun runs tt in the background with the given stdin text and
-// arguments, and waits for its screen. The block cursor keeps the typer from
-// writing to the terminal.
+// arguments, and waits for its screen.
 func startRun(t *testing.T, text string, args ...string) (*testRun, <-chan int) {
 	t.Helper()
 
 	r := newTestRun(t)
 	env := r.environment(text)
 	done := make(chan int, 1)
-	go func() { done <- run(append([]string{"-blockcursor"}, args...), env) }()
+	go func() { done <- run(args, env) }()
 
 	select {
 	case <-r.initialized:
@@ -147,6 +161,29 @@ func TestRunWithoutTheme(t *testing.T) {
 	}
 }
 
+// The cursor has the shape of typing while typing, unless -blockcursor is
+// given.
+func TestRunShapesTheCursor(t *testing.T) {
+	for _, tc := range []struct {
+		args []string
+		want string
+	}{
+		{[]string{"-oneshot", "-noreport"}, "\033[5 q\033[2 q"},
+		{[]string{"-oneshot", "-noreport", "-blockcursor"}, ""},
+	} {
+		r, done := startRun(t, "hi", tc.args...)
+		sendKeys(t, r.sim, "hi")
+		waitExitCode(t, done)
+
+		if got := r.tty.String(); got != tc.want {
+			t.Errorf("tt %s: the terminal got %q, want %q", strings.Join(tc.args, " "), got, tc.want)
+		}
+		if tc.want != "" && !r.tty.closed {
+			t.Errorf("tt %s: the terminal was left open", strings.Join(tc.args, " "))
+		}
+	}
+}
+
 // An outcome which can't be saved ends the session with an error rather than
 // a crash, the results typed so far still being printed.
 func TestRunReportsSaveErrors(t *testing.T) {
@@ -195,7 +232,7 @@ func TestNewAppWithInvalidTheme(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "themes", "broken", "fgcol: nope")
 
-	_, err := newApp(newSimScreen(t), resolveFlags([]string{"-theme", "broken"}), appDeps{&memStore{}, res, time.Now})
+	_, err := newApp(newSimScreen(t), resolveFlags([]string{"-theme", "broken"}), appDeps{&memStore{}, res, time.Now, keptCursor{}})
 	if err == nil || !strings.HasPrefix(err.Error(), "broken theme is invalid: ") {
 		t.Errorf("newApp with an invalid theme: %v, want an error", err)
 	}
