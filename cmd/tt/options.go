@@ -3,7 +3,7 @@ package main
 import (
 	"errors"
 	"flag"
-	"os"
+	"io"
 	"strconv"
 	"time"
 )
@@ -142,12 +142,16 @@ type options struct {
 	version            bool
 }
 
-func parseFlags(args []string) options {
+// parseArgs parses the command line arguments. The usage is printed on
+// stdout when asked for, in which case the error is flag.ErrHelp, and invalid
+// arguments are reported on stderr.
+func parseArgs(args []string, stdout, stderr io.Writer) (options, error) {
 	var opts options
 	var timeout int
 	var pace string
 
-	fs := flag.NewFlagSet("tt", flag.ExitOnError)
+	fs := flag.NewFlagSet("tt", flag.ContinueOnError)
+	fs.SetOutput(stderr)
 
 	fs.IntVar(&opts.n, "n", 50, "")
 	fs.IntVar(&opts.g, "g", 1, "")
@@ -192,8 +196,10 @@ func parseFlags(args []string) options {
 	fs.StringVar(&opts.layout, "layout", "us", "")
 	fs.StringVar(&opts.export, "export", "", "")
 
-	fs.Usage = func() { os.Stdout.Write([]byte(usage)) }
-	fs.Parse(args)
+	fs.Usage = func() { io.WriteString(stdout, usage) }
+	if err := fs.Parse(args); err != nil {
+		return options{}, err
+	}
 
 	fs.Visit(func(f *flag.Flag) {
 		if f.Name == "theme" {
@@ -214,7 +220,7 @@ func parseFlags(args []string) options {
 		opts.paceTarget = pace
 	}
 
-	return opts
+	return opts, nil
 }
 
 // validate checks the numeric options.

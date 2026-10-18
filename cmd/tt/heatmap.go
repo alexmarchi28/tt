@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"sort"
 	"strings"
@@ -199,17 +200,18 @@ func formatKeys(ks keyStats, rows []string, color bool) string {
 }
 
 // printKeys prints how each key is typed on the given keyboard layout.
-func printKeys(layout string, color bool) {
+func printKeys(w io.Writer, layout string, color bool) error {
 	rows, ok := layouts[layout]
 	if !ok {
-		die("unknown layout %s, use one of: %s", layout, strings.Join(sortedKeys(layouts), ", "))
+		return fmt.Errorf("unknown layout %s, use one of: %s", layout, strings.Join(sortedKeys(layouts), ", "))
 	}
 
 	ks := loadKeyStats()
 	if len(ks.Chars) == 0 {
-		fmt.Println("No keystrokes recorded yet.")
-		return
+		_, err := fmt.Fprintln(w, "No keystrokes recorded yet.")
+		return err
 	}
 
-	fmt.Print(formatKeys(ks, rows, color))
+	_, err := fmt.Fprint(w, formatKeys(ks, rows, color))
+	return err
 }

@@ -1,10 +1,21 @@
 package main
 
 import (
+	"io"
 	"reflect"
 	"testing"
 	"time"
 )
+
+// parseFlags parses command line arguments known to be valid.
+func parseFlags(args []string) options {
+	opts, err := parseArgs(args, io.Discard, io.Discard)
+	if err != nil {
+		panic(err)
+	}
+
+	return opts
+}
 
 func TestParseFlagsDefaults(t *testing.T) {
 	got := parseFlags(nil)

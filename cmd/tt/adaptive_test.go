@@ -294,7 +294,10 @@ func TestAppShowsAdaptiveFocus(t *testing.T) {
 	}
 
 	sim := newSimScreen(t)
-	a := newApp(sim, parseFlags([]string{"-adaptive", "-words", "list", "-noreport"}), testKind{mode: "adaptive", source: "list"})
+	a, err := newApp(sim, parseFlags([]string{"-adaptive", "-words", "list", "-noreport"}), testKind{mode: "adaptive", source: "list"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	a.typer.tty = io.Discard
 
 	var calls int
