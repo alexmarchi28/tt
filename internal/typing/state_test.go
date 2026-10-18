@@ -1,4 +1,4 @@
-package main
+package typing
 
 import (
 	"reflect"
@@ -26,7 +26,7 @@ func TestHighlightWordPositionsAcrossWrappedLineBreak(t *testing.T) {
 	text := "alpha beta \ngamma delta"
 	idx := strings.Index(text, "beta")
 
-	positions := highlightWordPositions([]rune(text), idx)
+	positions := WordPositions([]rune(text), idx)
 
 	assertWordPosition(t, positions, text, "beta", 0)
 	assertWordPosition(t, positions, text, "gamma", 1)
@@ -37,7 +37,7 @@ func TestHighlightWordPositionsWhenCursorIsOnWrapWhitespace(t *testing.T) {
 	text := "alpha beta \ngamma delta"
 	idx := strings.Index(text, " \n")
 
-	positions := highlightWordPositions([]rune(text), idx)
+	positions := WordPositions([]rune(text), idx)
 
 	assertWordPosition(t, positions, text, "gamma", 1)
 	assertWordPosition(t, positions, text, "delta", 2)
@@ -46,13 +46,13 @@ func TestHighlightWordPositionsWhenCursorIsOnWrapWhitespace(t *testing.T) {
 func TestExtractMistypedWords(t *testing.T) {
 	tests := []struct {
 		text, typed string
-		want        []mistake
+		want        []Mistake
 	}{
 		{"alpha beta", "alpha beta", nil},
-		{"alpha beta", "alpha betx", []mistake{{"beta", "betx"}}},
-		{"alpha beta", "alxha bxta", []mistake{{"alpha", "alxha"}, {"beta", "bxta"}}},
-		{"ab cd", "a\x00 cd", []mistake{{"ab", "a_"}}},
-		{"ab cd", "ab cd"[:4] + "\x00", []mistake{{"cd", "c_"}}},
+		{"alpha beta", "alpha betx", []Mistake{{"beta", "betx"}}},
+		{"alpha beta", "alxha bxta", []Mistake{{"alpha", "alxha"}, {"beta", "bxta"}}},
+		{"ab cd", "a\x00 cd", []Mistake{{"ab", "a_"}}},
+		{"ab cd", "ab cd"[:4] + "\x00", []Mistake{{"cd", "c_"}}},
 	}
 
 	for _, tc := range tests {
@@ -66,11 +66,11 @@ func TestExtractMistypedWords(t *testing.T) {
 func TestExtractMistypedWordsAcrossLines(t *testing.T) {
 	tests := []struct {
 		text, typed string
-		want        []mistake
+		want        []Mistake
 	}{
-		{"ab \ncd", "ab \ncx", []mistake{{"cd", "cx"}}},
-		{"ab\ncd", "ab\ncx", []mistake{{"cd", "cx"}}},
-		{"ab\ncd", "xb\ncd", []mistake{{"ab", "xb"}}},
+		{"ab \ncd", "ab \ncx", []Mistake{{"cd", "cx"}}},
+		{"ab\ncd", "ab\ncx", []Mistake{{"cd", "cx"}}},
+		{"ab\ncd", "xb\ncd", []Mistake{{"ab", "xb"}}},
 	}
 
 	for _, tc := range tests {
@@ -81,19 +81,19 @@ func TestExtractMistypedWordsAcrossLines(t *testing.T) {
 	}
 }
 
-// typeKeys feeds keys to a new typingState for text, one every 100ms. '\b'
+// typeKeys feeds keys to a new State for text, one every 100ms. '\b'
 // stands for backspace and '\x17' (C-w) for deleting a word.
-func typeKeys(text, keys string, skipWord bool) *typingState {
-	s := newTypingState(text)
+func typeKeys(text, keys string, skipWord bool) *State {
+	s := NewState(text)
 
 	for i, r := range []rune(keys) {
 		switch r {
 		case '\b':
-			s.backspace()
+			s.Backspace()
 		case '\x17':
-			s.deleteWord()
+			s.DeleteWord()
 		default:
-			s.typeRune(r, skipWord, time.Duration(i)*100*time.Millisecond)
+			s.Type(r, skipWord, time.Duration(i)*100*time.Millisecond)
 		}
 	}
 
@@ -109,15 +109,15 @@ func TestTypingState(t *testing.T) {
 		correctChars int
 		correctKeys  int
 		wrongKeys    int
-		mistakes     []mistake
+		mistakes     []Mistake
 	}{
 		{"correct", "ab cd", "ab cd", false, 5, 5, 4, 0, nil},
-		{"typo", "ab cd", "ax", false, 2, 1, 1, 1, []mistake{{"ab", "ax"}}},
+		{"typo", "ab cd", "ax", false, 2, 1, 1, 1, []Mistake{{"ab", "ax"}}},
 		{"backspace", "ab cd", "x\bab", false, 2, 2, 2, 1, nil},
 		{"backspace at start", "ab", "\b\ba", false, 1, 1, 1, 0, nil},
-		{"space skips word", "ab cd", " ", false, 3, 1, 0, 0, []mistake{{"ab", "__"}}},
+		{"space skips word", "ab cd", " ", false, 3, 1, 0, 0, []Mistake{{"ab", "__"}}},
 		{"space at word start", "ab cd", "ab  ", false, 3, 3, 2, 0, nil},
-		{"space without skipping", "ab cd", "a ", true, 2, 1, 1, 1, []mistake{{"ab", "a "}}},
+		{"space without skipping", "ab cd", "a ", true, 2, 1, 1, 1, []Mistake{{"ab", "a "}}},
 		{"line breaks are skipped", "ab \ncd", "ab ", false, 4, 3, 2, 0, nil},
 		{"backspace over line break", "ab \ncd", "ab \b", false, 2, 2, 2, 0, nil},
 		{"delete current word", "ab cd", "ab c\x17", false, 3, 3, 3, 0, nil},
@@ -133,13 +133,13 @@ func TestTypingState(t *testing.T) {
 			if s.idx != tc.idx {
 				t.Errorf("idx = %d, want %d", s.idx, tc.idx)
 			}
-			if got := s.correctChars(); got != tc.correctChars {
+			if got := s.CorrectChars(); got != tc.correctChars {
 				t.Errorf("correctChars() = %d, want %d", got, tc.correctChars)
 			}
 			if s.correctKeys != tc.correctKeys || s.wrongKeys != tc.wrongKeys {
 				t.Errorf("keystrokes = %d correct, %d wrong, want %d, %d", s.correctKeys, s.wrongKeys, tc.correctKeys, tc.wrongKeys)
 			}
-			if got := s.mistakes(); !reflect.DeepEqual(got, tc.mistakes) {
+			if got := s.Mistakes(); !reflect.DeepEqual(got, tc.mistakes) {
 				t.Errorf("mistakes() = %q, want %q", got, tc.mistakes)
 			}
 		})
@@ -147,23 +147,23 @@ func TestTypingState(t *testing.T) {
 }
 
 func TestTypingStateDone(t *testing.T) {
-	if !newTypingState("").done() {
+	if !NewState("").Done() {
 		t.Error("an empty text should be done")
 	}
 
 	s := typeKeys("a?", "", true)
-	if s.done() || !s.expects('a') || s.expects('?') {
-		t.Errorf("at the start: done %t, expects a %t, expects ? %t", s.done(), s.expects('a'), s.expects('?'))
+	if s.Done() || !s.Expects('a') || s.Expects('?') {
+		t.Errorf("at the start: done %t, expects a %t, expects ? %t", s.Done(), s.Expects('a'), s.Expects('?'))
 	}
 
-	s.typeRune('a', true, 0)
-	if s.done() || !s.expects('?') {
-		t.Errorf("after a: done %t, expects ? %t", s.done(), s.expects('?'))
+	s.Type('a', true, 0)
+	if s.Done() || !s.Expects('?') {
+		t.Errorf("after a: done %t, expects ? %t", s.Done(), s.Expects('?'))
 	}
 
-	s.typeRune('?', true, 0)
-	if !s.done() || s.expects('?') {
-		t.Errorf("at the end: done %t, expects ? %t", s.done(), s.expects('?'))
+	s.Type('?', true, 0)
+	if !s.Done() || s.Expects('?') {
+		t.Errorf("at the end: done %t, expects ? %t", s.Done(), s.Expects('?'))
 	}
 }
 
@@ -174,13 +174,13 @@ func TestTypingStateTabs(t *testing.T) {
 		noSkip       bool
 		idx          int
 		correctChars int
-		mistakes     []mistake
+		mistakes     []Mistake
 	}{
 		{"tab typed", "a\n\tb", "a\tb", false, 4, 3, nil},
-		{"tabs separate mistyped words", "ab\tcd", "ab\tcx", false, 5, 4, []mistake{{"cd", "cx"}}},
+		{"tabs separate mistyped words", "ab\tcd", "ab\tcx", false, 5, 4, []Mistake{{"cd", "cx"}}},
 		{"space at indentation is ignored", "a\n\tb", "a ", false, 2, 1, nil},
 		{"space at indentation without skipping", "a\n\tb", "a ", true, 3, 1, nil},
-		{"space skips to a tab", "ab\tcd", "a ", false, 3, 2, []mistake{{"ab", "a_"}}},
+		{"space skips to a tab", "ab\tcd", "a ", false, 3, 2, []Mistake{{"ab", "a_"}}},
 		{"delete word stops at a tab", "ab\tcd", "ab\tc\x17", false, 3, 3, nil},
 	}
 
@@ -191,10 +191,10 @@ func TestTypingStateTabs(t *testing.T) {
 			if s.idx != tc.idx {
 				t.Errorf("idx = %d, want %d", s.idx, tc.idx)
 			}
-			if got := s.correctChars(); got != tc.correctChars {
+			if got := s.CorrectChars(); got != tc.correctChars {
 				t.Errorf("correctChars() = %d, want %d", got, tc.correctChars)
 			}
-			if got := s.mistakes(); !reflect.DeepEqual(got, tc.mistakes) {
+			if got := s.Mistakes(); !reflect.DeepEqual(got, tc.mistakes) {
 				t.Errorf("mistakes() = %q, want %q", got, tc.mistakes)
 			}
 		})
@@ -220,35 +220,35 @@ func TestPaceIndex(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		if got := paceIndex(text, tc.elapsed, 60); got != tc.want {
-			t.Errorf("paceIndex(%v) = %d, want %d", tc.elapsed, got, tc.want)
+		if got := PaceIndex(text, tc.elapsed, 60); got != tc.want {
+			t.Errorf("PaceIndex(%v) = %d, want %d", tc.elapsed, got, tc.want)
 		}
 	}
 
-	if got := paceIndex(text, time.Second, 120); got != 6 {
-		t.Errorf("at 120 wpm paceIndex(1s) = %d, want the end of the text", got)
+	if got := PaceIndex(text, time.Second, 120); got != 6 {
+		t.Errorf("at 120 wpm PaceIndex(1s) = %d, want the end of the text", got)
 	}
 }
 
 func TestTypingStateRecordsKeystrokes(t *testing.T) {
 	ms := time.Millisecond
-	brk := keystroke{}
+	brk := Keystroke{}
 
 	tests := []struct {
 		name       string
 		text, keys string
 		noSkip     bool
-		want       []keystroke
+		want       []Keystroke
 	}{
-		{"typed", "ab cd", "ax c", false, []keystroke{{'a', 'a', 0}, {'b', 'x', 100 * ms}, {' ', ' ', 200 * ms}, {'c', 'c', 300 * ms}}},
-		{"corrections break the sequence", "ab cd", "x\ba\x17ab", false, []keystroke{
+		{"typed", "ab cd", "ax c", false, []Keystroke{{'a', 'a', 0}, {'b', 'x', 100 * ms}, {' ', ' ', 200 * ms}, {'c', 'c', 300 * ms}}},
+		{"corrections break the sequence", "ab cd", "x\ba\x17ab", false, []Keystroke{
 			{'a', 'x', 0}, brk, {'a', 'a', 200 * ms}, brk, {'a', 'a', 400 * ms}, {'b', 'b', 500 * ms},
 		}},
-		{"skipped words break the sequence", "ab cd", "a c", false, []keystroke{{'a', 'a', 0}, brk, {'c', 'c', 200 * ms}}},
-		{"spaces typed without skipping", "ab cd", "a c", true, []keystroke{{'a', 'a', 0}, {'b', ' ', 100 * ms}, {' ', 'c', 200 * ms}}},
-		{"ignored space", "ab cd", "ab  c", false, []keystroke{{'a', 'a', 0}, {'b', 'b', 100 * ms}, {' ', ' ', 200 * ms}, {'c', 'c', 400 * ms}}},
-		{"line breaks are not keystrokes", "a\nb", "ab", false, []keystroke{{'a', 'a', 0}, {'b', 'b', 100 * ms}}},
-		{"space on a tab", "ab\tc", "ab c", false, []keystroke{{'a', 'a', 0}, {'b', 'b', 100 * ms}, brk, {'c', 'c', 300 * ms}}},
+		{"skipped words break the sequence", "ab cd", "a c", false, []Keystroke{{'a', 'a', 0}, brk, {'c', 'c', 200 * ms}}},
+		{"spaces typed without skipping", "ab cd", "a c", true, []Keystroke{{'a', 'a', 0}, {'b', ' ', 100 * ms}, {' ', 'c', 200 * ms}}},
+		{"ignored space", "ab cd", "ab  c", false, []Keystroke{{'a', 'a', 0}, {'b', 'b', 100 * ms}, {' ', ' ', 200 * ms}, {'c', 'c', 400 * ms}}},
+		{"line breaks are not keystrokes", "a\nb", "ab", false, []Keystroke{{'a', 'a', 0}, {'b', 'b', 100 * ms}}},
+		{"space on a tab", "ab\tc", "ab c", false, []Keystroke{{'a', 'a', 0}, {'b', 'b', 100 * ms}, brk, {'c', 'c', 300 * ms}}},
 	}
 
 	for _, tc := range tests {
@@ -268,12 +268,12 @@ func TestTypingStateRelayout(t *testing.T) {
 		keys         string
 		idx          int
 		correctChars int
-		mistakes     []mistake
+		mistakes     []Mistake
 	}{
-		{"line break added before the cursor", "ab cd ef", "ab \ncd ef", "ab cx", 6, 4, []mistake{{"cd", "cx"}}},
-		{"line break removed before the cursor", "ab \ncd ef", "ab cd ef", "ab cx", 5, 4, []mistake{{"cd", "cx"}}},
+		{"line break added before the cursor", "ab cd ef", "ab \ncd ef", "ab cx", 6, 4, []Mistake{{"cd", "cx"}}},
+		{"line break removed before the cursor", "ab \ncd ef", "ab cd ef", "ab cx", 5, 4, []Mistake{{"cd", "cx"}}},
 		{"line break moved after the cursor", "ab \ncd ef", "ab cd \nef", "a", 1, 1, nil},
-		{"skipped word", "ab cd ef", "ab \ncd \nef", "a c", 5, 3, []mistake{{"ab", "a_"}}},
+		{"skipped word", "ab cd ef", "ab \ncd \nef", "a c", 5, 3, []Mistake{{"ab", "a_"}}},
 		{"nothing typed", "ab cd", "ab \ncd", "", 0, 0, nil},
 		{"text complete", "ab cd", "ab \ncd", "ab cd", 6, 5, nil},
 	}
@@ -281,9 +281,9 @@ func TestTypingStateRelayout(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			s := typeKeys(tc.from, tc.keys, true)
-			keystrokes := append([]keystroke(nil), s.keystrokes...)
+			keystrokes := append([]Keystroke(nil), s.keystrokes...)
 
-			s.relayout(tc.to)
+			s.Relayout(tc.to)
 
 			if string(s.text) != tc.to {
 				t.Errorf("text = %q, want %q", string(s.text), tc.to)
@@ -291,10 +291,10 @@ func TestTypingStateRelayout(t *testing.T) {
 			if s.idx != tc.idx {
 				t.Errorf("idx = %d, want %d", s.idx, tc.idx)
 			}
-			if got := s.correctChars(); got != tc.correctChars {
+			if got := s.CorrectChars(); got != tc.correctChars {
 				t.Errorf("correctChars() = %d, want %d", got, tc.correctChars)
 			}
-			if got := s.mistakes(); !reflect.DeepEqual(got, tc.mistakes) {
+			if got := s.Mistakes(); !reflect.DeepEqual(got, tc.mistakes) {
 				t.Errorf("mistakes() = %q, want %q", got, tc.mistakes)
 			}
 			if !reflect.DeepEqual(s.keystrokes, keystrokes) {
@@ -306,13 +306,25 @@ func TestTypingStateRelayout(t *testing.T) {
 
 func TestTypingStateRelayoutKeepsTyping(t *testing.T) {
 	s := typeKeys("ab cd ef", "ab c", true)
-	s.relayout("ab \ncd \nef")
+	s.Relayout("ab \ncd \nef")
 
 	for _, r := range "d ef" {
-		s.typeRune(r, true, 0)
+		s.Type(r, true, 0)
 	}
 
-	if !s.done() || s.correctChars() != 8 || s.mistakes() != nil {
-		t.Errorf("done %t, %d correct characters, mistakes %q, want done, 8, none", s.done(), s.correctChars(), s.mistakes())
+	if !s.Done() || s.CorrectChars() != 8 || s.Mistakes() != nil {
+		t.Errorf("done %t, %d correct characters, mistakes %q, want done, 8, none", s.Done(), s.CorrectChars(), s.Mistakes())
+	}
+}
+
+func TestStateAccessors(t *testing.T) {
+	s := NewState("ab")
+	s.Type('x', false, 0)
+
+	if string(s.Text()) != "ab" || string(s.Typed()) != "x\x00" || s.Cursor() != 1 {
+		t.Errorf("text %q, typed %q, cursor %d, want ab, x and 1", string(s.Text()), string(s.Typed()), s.Cursor())
+	}
+	if s.CorrectKeys() != 0 || s.WrongKeys() != 1 || !reflect.DeepEqual(s.Keystrokes(), []Keystroke{{'a', 'x', 0}}) {
+		t.Errorf("correct keys %d, wrong keys %d, keystrokes %v", s.CorrectKeys(), s.WrongKeys(), s.Keystrokes())
 	}
 }

@@ -52,7 +52,7 @@ func TestParseConfig(t *testing.T) {
 func TestBuiltinThemesAreValid(t *testing.T) {
 	res, _ := newTestResources(t)
 
-	for _, name := range res.list("themes") {
+	for _, name := range res.List("themes") {
 		if _, err := loadTheme(res, name, true); err != nil {
 			t.Errorf("builtin theme %q is invalid: %v", name, err)
 		}
@@ -117,7 +117,7 @@ type listing struct {
 	names []string
 }
 
-func (l listing) list(string) []string { return l.names }
+func (l listing) List(string) []string { return l.names }
 
 func TestThemeCycler(t *testing.T) {
 	res, dir := newTestResources(t)

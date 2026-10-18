@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/alexmarchi28/tt/internal/resource"
 	"github.com/gdamore/tcell"
 	"github.com/mattn/go-isatty"
 )
@@ -80,7 +81,7 @@ func run(args []string, env environment) int {
 	}
 	deps := dependencies{
 		store:     newJSONStore(env.getenv, home),
-		resources: newResources(home, env.stdin),
+		resources: resource.New(home, env.stdin),
 		rng:       rand.New(rand.NewSource(env.now().UnixNano())),
 	}
 	if s.command != nil {
@@ -130,7 +131,7 @@ var commands = []command{
 }
 
 func listCommand(s settings, env environment, deps dependencies) error {
-	for _, name := range deps.resources.list(s.list) {
+	for _, name := range deps.resources.List(s.list) {
 		fmt.Fprintln(env.stdout, name)
 	}
 

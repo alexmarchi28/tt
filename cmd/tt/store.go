@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/alexmarchi28/tt/internal/keystats"
+	"github.com/alexmarchi28/tt/internal/typing"
 )
 
 type appConfig struct {
@@ -39,16 +42,16 @@ type resultStore interface {
 
 type mistakeStore interface {
 	// Mistakes returns the recorded mistakes, none if there are none yet.
-	Mistakes() ([]mistake, error)
-	AddMistakes(mistakes []mistake) error
+	Mistakes() ([]typing.Mistake, error)
+	AddMistakes(mistakes []typing.Mistake) error
 }
 
 type keyStatsStore interface {
 	// KeyStats returns the saved key statistics. They are only an aid which
 	// typing rebuilds, so they start over if they can't be read.
-	KeyStats() keyStats
+	KeyStats() keystats.Stats
 	// AddKeystrokes adds the keystrokes of a test to the key statistics.
-	AddKeystrokes(strokes []keystroke) error
+	AddKeystrokes(strokes []typing.Keystroke) error
 }
 
 type paragraphStore interface {
@@ -134,8 +137,8 @@ func (s *jsonStore) AddResult(r persistedResult) ([]persistedResult, error) {
 	return stored, nil
 }
 
-func (s *jsonStore) Mistakes() ([]mistake, error) {
-	var mistakes []mistake
+func (s *jsonStore) Mistakes() ([]typing.Mistake, error) {
+	var mistakes []typing.Mistake
 	if err := readValue(s.path(mistakesFile), &mistakes); err != nil && !os.IsNotExist(err) {
 		return nil, fmt.Errorf("could not read the recorded mistakes in %s: %v, fix or remove the file", s.path(mistakesFile), err)
 	}
@@ -145,7 +148,7 @@ func (s *jsonStore) Mistakes() ([]mistake, error) {
 
 // AddMistakes adds mistakes to the recorded ones. A file which can't be read
 // is left as is rather than replaced, which would lose its mistakes.
-func (s *jsonStore) AddMistakes(mistakes []mistake) error {
+func (s *jsonStore) AddMistakes(mistakes []typing.Mistake) error {
 	recorded, err := s.Mistakes()
 	if err != nil {
 		return err
@@ -158,18 +161,18 @@ func (s *jsonStore) AddMistakes(mistakes []mistake) error {
 	return nil
 }
 
-func (s *jsonStore) KeyStats() keyStats {
-	ks := newKeyStats()
+func (s *jsonStore) KeyStats() keystats.Stats {
+	ks := keystats.New()
 	if err := readValue(s.path(keyStatsFile), &ks); err != nil || ks.Chars == nil || ks.Bigrams == nil {
-		return newKeyStats()
+		return keystats.New()
 	}
 
 	return ks
 }
 
-func (s *jsonStore) AddKeystrokes(strokes []keystroke) error {
+func (s *jsonStore) AddKeystrokes(strokes []typing.Keystroke) error {
 	ks := s.KeyStats()
-	ks.add(strokes)
+	ks.Add(strokes)
 
 	if err := writeValue(s.path(keyStatsFile), ks); err != nil {
 		return fmt.Errorf("could not save the key statistics: %v", err)

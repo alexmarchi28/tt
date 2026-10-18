@@ -49,7 +49,7 @@ func TestSessionRules(t *testing.T) {
 	s.typeRune(' ')
 	s.correct(false)
 
-	if s.state.idx != 2 || s.state.wrongKeys != 1 {
-		t.Errorf("cursor at %d with %d wrong keys, want the space typed and kept", s.state.idx, s.state.wrongKeys)
+	if s.state.Cursor() != 2 || s.state.WrongKeys() != 1 {
+		t.Errorf("cursor at %d with %d wrong keys, want the space typed and kept", s.state.Cursor(), s.state.WrongKeys())
 	}
 }

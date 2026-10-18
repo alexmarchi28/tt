@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/alexmarchi28/tt/internal/typing"
 	"github.com/gdamore/tcell"
 )
 
@@ -22,11 +23,6 @@ const (
 type segment struct {
 	Text        string `json:"text"`
 	Attribution string `json:"attribution"`
-}
-
-type mistake struct {
-	Word  string `json:"word"`
-	Typed string `json:"typed"`
 }
 
 // paceTick is the longest interval between screen updates with a pacer.
@@ -140,8 +136,8 @@ type testResult struct {
 	correctChars int // Correctly typed characters, used for the speed.
 	correctKeys  int // Correct keystrokes, used for the accuracy.
 	wrongKeys    int // Wrong keystrokes, used for the accuracy.
-	mistakes     []mistake
-	keystrokes   []keystroke // Segments are separated by a break.
+	mistakes     []typing.Mistake
+	keystrokes   []typing.Keystroke // Segments are separated by a break.
 }
 
 func (r testResult) cpm() int {
@@ -176,7 +172,7 @@ func (t *typer) Start(text []segment, timeout time.Duration) (o outcome, res tes
 		res.wrongKeys += r.wrongKeys
 		res.mistakes = append(res.mistakes, r.mistakes...)
 		if i > 0 {
-			res.keystrokes = append(res.keystrokes, keystroke{})
+			res.keystrokes = append(res.keystrokes, typing.Keystroke{})
 		}
 		res.keystrokes = append(res.keystrokes, r.keystrokes...)
 
@@ -269,7 +265,7 @@ func (t *typer) handleKey(s *session, ev *tcell.EventKey) (outcome, bool) {
 	case actionDeleteWord:
 		s.correct(true)
 	case actionToggleHelp:
-		if !s.state.expects(ev.Rune()) {
+		if !s.state.Expects(ev.Rune()) {
 			t.showHelp = !t.showHelp
 		} else if s.typeRune(ev.Rune()) {
 			return outcomeComplete, true

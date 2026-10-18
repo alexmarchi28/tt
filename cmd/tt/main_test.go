@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -9,23 +8,26 @@ import (
 	"time"
 
 	"github.com/alexmarchi28/tt"
+	"github.com/alexmarchi28/tt/internal/resource"
 	"github.com/gdamore/tcell"
 )
 
 // newTestResources returns the resources of the calling test: user resources
 // in a directory of its own, whose path is returned (see writeUserResource),
 // then the builtin ones. Resources named "-" are read from an empty stdin.
-func newTestResources(t *testing.T) (*resources, string) {
+func newTestResources(t *testing.T) (*resource.Layers, string) {
+	t.Helper()
+
+	return newTestResourcesWithStdin(t, "")
+}
+
+// newTestResourcesWithStdin returns the resources of newTestResources, those
+// named "-" being read from stdin.
+func newTestResourcesWithStdin(t *testing.T, stdin string) (*resource.Layers, string) {
 	t.Helper()
 
 	dir := t.TempDir()
-	res := &resources{
-		dirs:     []fs.FS{os.DirFS(filepath.Join(dir, ".tt")), tt.Builtin},
-		stdin:    &onceReader{r: strings.NewReader("")},
-		readFile: os.ReadFile,
-	}
-
-	return res, dir
+	return resource.NewLayers(strings.NewReader(stdin), os.DirFS(filepath.Join(dir, ".tt")), tt.Builtin), dir
 }
 
 // writeUserResource creates a user resource (theme, word list, quote file)

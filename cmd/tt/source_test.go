@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/alexmarchi28/tt/internal/keystats"
 	"github.com/gdamore/tcell"
 )
 
@@ -69,7 +70,7 @@ type countingKeyStats struct {
 	reads int
 }
 
-func (c *countingKeyStats) KeyStats() keyStats {
+func (c *countingKeyStats) KeyStats() keystats.Stats {
 	c.reads++
 	return c.keyStatsOf.KeyStats()
 }

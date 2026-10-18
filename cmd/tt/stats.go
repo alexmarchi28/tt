@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/alexmarchi28/tt/internal/typing"
 )
 
 const week = 7 * 24 * time.Hour
@@ -126,7 +128,7 @@ type wordCount struct {
 
 // mostMistyped returns up to n of the most frequently mistyped words, the most
 // frequent first.
-func mostMistyped(mistakes []mistake, n int) []wordCount {
+func mostMistyped(mistakes []typing.Mistake, n int) []wordCount {
 	counts := map[string]int{}
 	for _, m := range mistakes {
 		counts[m.Word]++
@@ -161,7 +163,7 @@ func formatSummaryLine(label string, s summary) string {
 
 // formatStats describes the saved results and mistakes as of now. There must
 // be at least one result.
-func formatStats(stored []persistedResult, mistakes []mistake, now time.Time) string {
+func formatStats(stored []persistedResult, mistakes []typing.Mistake, now time.Time) string {
 	var b strings.Builder
 	all := summarize(stored)
 	bestDate := time.Unix(all.best.Timestamp, 0).In(now.Location())

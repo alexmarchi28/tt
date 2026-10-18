@@ -12,6 +12,9 @@ import (
 	"time"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/alexmarchi28/tt/internal/resource"
+	"github.com/alexmarchi28/tt/internal/typing"
 )
 
 func TestGenerateTestFromDataRaw(t *testing.T) {
@@ -148,16 +151,16 @@ func TestGenerateQuoteTest(t *testing.T) {
 func TestBuiltinQuotesAreValid(t *testing.T) {
 	res, _ := newTestResources(t)
 
-	names := res.list("quotes")
+	names := res.List("quotes")
 	for _, want := range []string{"en", "it"} {
-		if indexResourceName(names, want) == -1 {
+		if resource.Index(names, want) == -1 {
 			t.Errorf("no builtin %s quotes in %q", want, names)
 		}
 	}
 
 	for _, name := range names {
 		var quotes []segment
-		b, err := res.read("quotes", name)
+		b, err := res.Read("quotes", name)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -396,16 +399,16 @@ func exactly(texts ...string) func(t *testing.T, segments []segment) {
 
 // mistakesOf returns a store of mistakes in the given words.
 func mistakesOf(words ...string) *memStore {
-	var mistakes []mistake
+	var mistakes []typing.Mistake
 	for _, w := range words {
-		mistakes = append(mistakes, mistake{w, "x"})
+		mistakes = append(mistakes, typing.Mistake{Word: w, Typed: "x"})
 	}
 
 	return &memStore{mistakes: mistakes}
 }
 
 func TestWeightedMistakes(t *testing.T) {
-	mistakes := []mistake{{"a", "x"}, {"b", "x"}, {"a", "x"}, {"c", "x"}, {"a", "x"}}
+	mistakes := []typing.Mistake{{Word: "a", Typed: "x"}, {Word: "b", Typed: "x"}, {Word: "a", Typed: "x"}, {Word: "c", Typed: "x"}, {Word: "a", Typed: "x"}}
 
 	got := weightedMistakes(mistakes, 10)
 	want := []string{"a", "a", "a", "b", "c"}
@@ -702,7 +705,7 @@ func newRand() *rand.Rand {
 // The same source of randomness makes the same tests.
 func TestGeneratorsAreReproducible(t *testing.T) {
 	res, _ := newTestResources(t)
-	st := &memStore{mistakes: []mistake{{"alpha", "x"}, {"beta", "x"}, {"gamma", "x"}}, keys: weakTH()}
+	st := &memStore{mistakes: []typing.Mistake{{Word: "alpha", Typed: "x"}, {Word: "beta", Typed: "x"}, {Word: "gamma", Typed: "x"}}, keys: weakTH()}
 
 	for _, args := range [][]string{
 		{"-punct", "-numbers"},

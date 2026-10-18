@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexmarchi28/tt/internal/typing"
 	"github.com/gdamore/tcell"
 )
 
@@ -195,7 +196,7 @@ func typeText(t *testing.T, ty *typer, sim tcell.SimulationScreen, text string, 
 	return waitOutcome(t, done)
 }
 
-func assertOutcome(t *testing.T, got typed, o outcome, correctChars, correctKeys, wrongKeys int, mistakes []mistake) {
+func assertOutcome(t *testing.T, got typed, o outcome, correctChars, correctKeys, wrongKeys int, mistakes []typing.Mistake) {
 	t.Helper()
 
 	if got.outcome != o {
@@ -231,7 +232,7 @@ func TestTyperTypo(t *testing.T) {
 	ty, sim := newTestTyper(t)
 
 	got := typeText(t, ty, sim, "alpha beta", "alpxa beta")
-	assertOutcome(t, got, outcomeComplete, 9, 8, 1, []mistake{{"alpha", "alpxa"}})
+	assertOutcome(t, got, outcomeComplete, 9, 8, 1, []typing.Mistake{{Word: "alpha", Typed: "alpxa"}})
 }
 
 func TestTyperBackspace(t *testing.T) {
@@ -255,7 +256,7 @@ func TestTyperDisableBackspace(t *testing.T) {
 	ty, sim := newTestTyper(t, withRules(typingRules{noBackspace: true}))
 
 	got := typeText(t, ty, sim, "ab cd", "x", tcell.KeyBackspace2, "b c", tcell.KeyCtrlW, "d")
-	assertOutcome(t, got, outcomeComplete, 4, 3, 1, []mistake{{"ab", "xb"}})
+	assertOutcome(t, got, outcomeComplete, 4, 3, 1, []typing.Mistake{{Word: "ab", Typed: "xb"}})
 }
 
 func TestTyperDeleteWord(t *testing.T) {
@@ -289,7 +290,7 @@ func TestTyperSpaceSkipsWord(t *testing.T) {
 	ty, sim := newTestTyper(t)
 
 	got := typeText(t, ty, sim, "alpha beta gamma", "al beta gamma")
-	assertOutcome(t, got, outcomeComplete, 13, 11, 0, []mistake{{"alpha", "al___"}})
+	assertOutcome(t, got, outcomeComplete, 13, 11, 0, []typing.Mistake{{Word: "alpha", Typed: "al___"}})
 }
 
 func TestTyperSpaceAtWordStartIsIgnored(t *testing.T) {
@@ -303,7 +304,7 @@ func TestTyperNoSkip(t *testing.T) {
 	ty, sim := newTestTyper(t, withRules(typingRules{noSkip: true}))
 
 	got := typeText(t, ty, sim, "ab cd", "a  cd")
-	assertOutcome(t, got, outcomeComplete, 4, 4, 1, []mistake{{"ab", "a "}})
+	assertOutcome(t, got, outcomeComplete, 4, 4, 1, []typing.Mistake{{Word: "ab", Typed: "a "}})
 }
 
 func TestTyperSkipsLineBreaks(t *testing.T) {
@@ -379,7 +380,7 @@ func TestTyperResizeKeepsProgress(t *testing.T) {
 	sendKeys(t, sim, "ta gamma delta")
 
 	got := waitOutcome(t, done)
-	assertOutcome(t, got, outcomeComplete, 21, 18, 1, []mistake{{"beta", "bxta"}})
+	assertOutcome(t, got, outcomeComplete, 21, 18, 1, []typing.Mistake{{Word: "beta", Typed: "bxta"}})
 	if got.duration != time.Minute || len(got.keystrokes) != 22 {
 		t.Errorf("duration %v, %d keystrokes, want 1m and 22", got.duration, len(got.keystrokes))
 	}
@@ -418,7 +419,7 @@ func TestTyperMultipleSegments(t *testing.T) {
 	sendKeys(t, sim, "ab cx", "ef")
 	got := waitOutcome(t, done)
 
-	if got.outcome != outcomeComplete || got.correctChars != 6 || !reflect.DeepEqual(got.mistakes, []mistake{{"cd", "cx"}}) {
+	if got.outcome != outcomeComplete || got.correctChars != 6 || !reflect.DeepEqual(got.mistakes, []typing.Mistake{{Word: "cd", Typed: "cx"}}) {
 		t.Errorf("got %+v, want outcome %d, 6 correct characters and mistakes [{cd cx}]", got, outcomeComplete)
 	}
 
@@ -441,7 +442,7 @@ func TestTyperTimeout(t *testing.T) {
 	clock.advance(10 * time.Second)
 
 	got := waitOutcome(t, done)
-	assertOutcome(t, got, outcomeComplete, 2, 2, 1, []mistake{{"alp", "alx"}})
+	assertOutcome(t, got, outcomeComplete, 2, 2, 1, []typing.Mistake{{Word: "alp", Typed: "alx"}})
 	if got.duration != 10*time.Second {
 		t.Errorf("duration = %v, want the time limit", got.duration)
 	}
@@ -753,7 +754,7 @@ func TestTyperCountsKeystrokesOfAllSegments(t *testing.T) {
 	done := startTyper(ty, []segment{{"ab", ""}, {"cd", ""}}, -1)
 	sendKeys(t, sim, "xb", "cd")
 
-	assertOutcome(t, waitOutcome(t, done), outcomeComplete, 3, 3, 1, []mistake{{"ab", "xb"}})
+	assertOutcome(t, waitOutcome(t, done), outcomeComplete, 3, 3, 1, []typing.Mistake{{Word: "ab", Typed: "xb"}})
 }
 
 func TestCalcAccuracy(t *testing.T) {
@@ -898,7 +899,7 @@ func TestTyperBlind(t *testing.T) {
 	// But they still count.
 	sendKeys(t, sim, "cd ef")
 	got := waitOutcome(t, done)
-	assertOutcome(t, got, outcomeComplete, 6, 6, 2, []mistake{{"ab", "xb"}})
+	assertOutcome(t, got, outcomeComplete, 6, 6, 2, []typing.Mistake{{Word: "ab", Typed: "xb"}})
 }
 
 // fakeClock is a clock which only moves when told to.
@@ -1048,7 +1049,7 @@ func TestTyperRecordsKeystrokes(t *testing.T) {
 	sendKeys(t, sim, "b", "x")
 
 	// Segments are separated by a break, times are relative to each segment.
-	want := []keystroke{{'a', 'a', 0}, {'b', 'b', 250 * time.Millisecond}, {}, {'c', 'x', 0}}
+	want := []typing.Keystroke{{Expected: 'a', Typed: 'a', At: 0}, {Expected: 'b', Typed: 'b', At: 250 * time.Millisecond}, {}, {Expected: 'c', Typed: 'x', At: 0}}
 	if got := waitOutcome(t, done).keystrokes; !reflect.DeepEqual(got, want) {
 		t.Errorf("keystrokes = %v, want %v", got, want)
 	}

@@ -5,6 +5,8 @@ import (
 	"strings"
 	"testing"
 	"unicode"
+
+	"github.com/alexmarchi28/tt/internal/keystats"
 )
 
 func TestLayouts(t *testing.T) {
@@ -41,27 +43,8 @@ func TestLayoutNames(t *testing.T) {
 	}
 }
 
-func TestMergeKeyStats(t *testing.T) {
-	a := keyStat{Count: 30, ErrorRate: 0.25, Timed: 10, Latency: 100}
-	b := keyStat{Count: 10, ErrorRate: 0.75, Timed: 30, Latency: 200}
-
-	want := keyStat{Count: 40, ErrorRate: 0.375, Timed: 40, Latency: 175}
-	if got := mergeKeyStats(a, b); got != want {
-		t.Errorf("mergeKeyStats() = %+v, want %+v", got, want)
-	}
-
-	// Merging with nothing keeps the values exactly, 0.1*3/3 would not.
-	c := keyStat{Count: 3, ErrorRate: 0.1, Timed: 3, Latency: 0.1}
-	if got := mergeKeyStats(c, keyStat{}); got != c {
-		t.Errorf("merging with nothing = %+v, want %+v", got, c)
-	}
-	if got := mergeKeyStats(keyStat{}, c); got != c {
-		t.Errorf("merging nothing = %+v, want %+v", got, c)
-	}
-}
-
 func TestKeyStatsByKey(t *testing.T) {
-	ks := keyStats{Chars: map[string]keyStat{
+	ks := keystats.Stats{Chars: map[string]keystats.Stat{
 		"a": {Count: 10, ErrorRate: 0.25},
 		"A": {Count: 10, ErrorRate: 0.75},
 		"?": {Count: 5, ErrorRate: 1},
@@ -69,7 +52,7 @@ func TestKeyStatsByKey(t *testing.T) {
 
 	// Upper case letters are typed with the key of the lower case ones.
 	got := keyStatsByKey(ks)
-	want := map[rune]keyStat{
+	want := map[rune]keystats.Stat{
 		'a': {Count: 20, ErrorRate: 0.5},
 		'?': {Count: 5, ErrorRate: 1},
 	}
@@ -110,16 +93,16 @@ func TestDrawKeyboard(t *testing.T) {
 	}
 }
 
-func testKeyStats() keyStats {
-	ks := newKeyStats()
+func testKeyStats() keystats.Stats {
+	ks := keystats.New()
 	for _, c := range "abcdefghijklmnopqrstuvwxyz " {
-		ks.Chars[string(c)] = keyStat{Count: 50, ErrorRate: 0.02, Timed: 40, Latency: 150}
+		ks.Chars[string(c)] = keystats.Stat{Count: 50, ErrorRate: 0.02, Timed: 40, Latency: 150}
 	}
 
-	ks.Chars["q"] = keyStat{Count: 50, ErrorRate: 0.2, Timed: 40, Latency: 400}
-	ks.Chars["z"] = keyStat{Count: 50, ErrorRate: 0.1, Timed: 40, Latency: 150}
-	ks.Chars["x"] = keyStat{Count: 50, ErrorRate: 0.02, Timed: 40, Latency: 300}
-	ks.Chars["j"] = keyStat{Count: 5, ErrorRate: 1, Timed: 4, Latency: 900} // Not enough data.
+	ks.Chars["q"] = keystats.Stat{Count: 50, ErrorRate: 0.2, Timed: 40, Latency: 400}
+	ks.Chars["z"] = keystats.Stat{Count: 50, ErrorRate: 0.1, Timed: 40, Latency: 150}
+	ks.Chars["x"] = keystats.Stat{Count: 50, ErrorRate: 0.02, Timed: 40, Latency: 300}
+	ks.Chars["j"] = keystats.Stat{Count: 5, ErrorRate: 1, Timed: 4, Latency: 900} // Not enough data.
 	return ks
 }
 
@@ -150,9 +133,9 @@ func TestFormatKeys(t *testing.T) {
 }
 
 func TestFormatKeysListsOnlyMissedKeys(t *testing.T) {
-	ks := newKeyStats()
-	ks.Chars["a"] = keyStat{Count: 20, ErrorRate: 0, Timed: 10, Latency: 100}
-	ks.Chars["b"] = keyStat{Count: 20, ErrorRate: 0.1, Timed: 10, Latency: 100}
+	ks := keystats.New()
+	ks.Chars["a"] = keystats.Stat{Count: 20, ErrorRate: 0, Timed: 10, Latency: 100}
+	ks.Chars["b"] = keystats.Stat{Count: 20, ErrorRate: 0.1, Timed: 10, Latency: 100}
 
 	got := formatKeys(ks, layouts["us"], false)
 	if !strings.Contains(got, "Most missed keys  b 10.0%\n") {

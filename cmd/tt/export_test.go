@@ -6,6 +6,8 @@ import (
 	"errors"
 	"reflect"
 	"testing"
+
+	"github.com/alexmarchi28/tt/internal/typing"
 )
 
 // export returns what exportData prints of st, failing on errors.
@@ -56,7 +58,7 @@ func TestExportResultsAsJSON(t *testing.T) {
 }
 
 func TestExportMistakes(t *testing.T) {
-	st := &memStore{mistakes: []mistake{{"the", "teh"}, {"say,", "sya,"}}}
+	st := &memStore{mistakes: []typing.Mistake{{Word: "the", Typed: "teh"}, {Word: "say,", Typed: "sya,"}}}
 
 	want := "word,typed\nthe,teh\n\"say,\",\"sya,\"\n"
 	if got := export(t, st, "mistakes", false); got != want {

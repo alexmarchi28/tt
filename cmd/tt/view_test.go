@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexmarchi28/tt/internal/typing"
 	"github.com/gdamore/tcell"
 )
 
@@ -25,13 +26,13 @@ func newTestView(t *testing.T, opts viewOptions) (*view, tcell.SimulationScreen)
 // typedFrame returns the frame of text drawn at (x, y) after typing typed,
 // without skipping words.
 func typedFrame(text, typed string, x, y int) frame {
-	state := newTypingState(text)
+	state := typing.NewState(text)
 	for _, r := range typed {
-		state.typeRune(r, false, 0)
+		state.Type(r, false, 0)
 	}
 
 	nc, nr := calcStringDimensions(text)
-	return frame{text: state.text, typed: state.typed, idx: state.idx, x: x, y: y, nc: nc, nr: nr, pace: -1}
+	return frame{text: state.Text(), typed: state.Typed(), idx: state.Cursor(), x: x, y: y, nc: nc, nr: nr, pace: -1}
 }
 
 func TestViewDrawsTheText(t *testing.T) {

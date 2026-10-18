@@ -11,6 +11,9 @@ import (
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/alexmarchi28/tt/internal/resource"
+	"github.com/alexmarchi28/tt/internal/typing"
 )
 
 // The generators below return functions producing the successive tests of a
@@ -125,8 +128,8 @@ func generateWordTest(rng *rand.Rand, res resourceReader, name string, o wordOpt
 
 // loadWords returns the words of the named word list.
 func loadWords(res resourceReader, name string) ([]string, error) {
-	b, err := res.read("words", name)
-	if errors.Is(err, errNoResource) {
+	b, err := res.Read("words", name)
+	if errors.Is(err, resource.ErrNotFound) {
 		return nil, fmt.Errorf("%s does not appear to be a valid word list, see '-list words' for a list of builtin word lists", name)
 	} else if err != nil {
 		return nil, err
@@ -147,7 +150,7 @@ const recentMistakes = 500
 
 // weightedMistakes returns the words of the last n mistakes, each repeated as
 // many times as it was mistyped.
-func weightedMistakes(mistakes []mistake, n int) []string {
+func weightedMistakes(mistakes []typing.Mistake, n int) []string {
 	if len(mistakes) > n {
 		mistakes = mistakes[len(mistakes)-n:]
 	}
@@ -295,7 +298,7 @@ func addNumbers(rng *rand.Rand, words []string) []string {
 func generateQuoteTest(rng *rand.Rand, res resourceReader, name string) (func() []segment, error) {
 	var quotes []segment
 
-	if b, err := res.read("quotes", name); errors.Is(err, errNoResource) {
+	if b, err := res.Read("quotes", name); errors.Is(err, resource.ErrNotFound) {
 		return nil, fmt.Errorf("%s does not appear to be a valid quote file, see '-list quotes' for a list of builtin quotes", name)
 	} else if err != nil {
 		return nil, err

@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/alexmarchi28/tt/internal/resource"
 	"github.com/gdamore/tcell"
 )
 
@@ -34,8 +35,8 @@ var terminalTheme = theme{
 // loadTheme reads the named theme. Unless opaqueBg is set the background is
 // left transparent and bgcol is not required.
 func loadTheme(res resourceReader, name string, opaqueBg bool) (theme, error) {
-	b, err := res.read("themes", name)
-	if errors.Is(err, errNoResource) {
+	b, err := res.Read("themes", name)
+	if errors.Is(err, resource.ErrNotFound) {
 		return theme{}, fmt.Errorf("%s does not appear to be a valid theme", name)
 	} else if err != nil {
 		return theme{}, err
@@ -128,8 +129,8 @@ type themeCycler struct {
 }
 
 func newThemeCycler(res resourceLister, current string, opaqueBg bool) *themeCycler {
-	names := res.list("themes")
-	return &themeCycler{res, names, indexResourceName(names, current), opaqueBg}
+	names := res.List("themes")
+	return &themeCycler{res, names, resource.Index(names, current), opaqueBg}
 }
 
 // next loads the next (direction > 0) or previous valid theme. The name is
