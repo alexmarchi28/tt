@@ -131,31 +131,40 @@ history to show your progress.
 # Development
 
 The program lives in `cmd/tt`, while `embed.go` at the root embeds the builtin
-themes, word lists and quotes into the binary.
+themes, word lists and quotes into the binary. The parts independent of the
+command live in `internal/`, whose packages never import the screen or the
+command (checked by `internal/boundaries_test.go`):
+
+| Package | Contents |
+|---|---|
+| `internal/typing` | The typing logic: what was typed, keystrokes, mistakes |
+| `internal/keystats` | Statistics about each key and pair of keys, weak pairs |
+| `internal/resource` | Builtin or user themes, word lists and quotes |
+
+In `cmd/tt`:
 
 | File | Contents |
 |---|---|
-| `tt.go` | `main` |
-| `options.go` | Command line options and usage |
-| `app.go` | The sequence of tests: navigation, reports, saving the results |
-| `typer.go` | A test on the screen: styles, themes, drawing |
-| `session.go` | Typing a segment of a test: keys, timer, redrawing |
-| `typing.go` | The typing logic, independent of the screen |
-| `generators.go` | The texts of the tests: words, quotes, files, stdin, mistakes |
+| `tt.go` | `main`, `run` and the commands (`-list`, `-stats`, `-keys`, ...) |
+| `options.go`, `settings.go` | Command line options, usage, and the settings resolved from them |
+| `app.go`, `history.go` | The sequence of tests: navigation, reports, saving the results |
+| `typer.go`, `session.go` | A test on the screen: event loop, keys, timer |
+| `view.go` | Drawing a test: text, styles, live statistics, help |
+| `keymap.go` | The keys and the help generated from them |
+| `source.go`, `generators.go`, `adaptive.go` | The texts of the tests: words, quotes, files, stdin, mistakes, `-adaptive` |
 | `kind.go` | The kinds of tests whose results are compared |
-| `adaptive.go` | The choice of words of `-adaptive` |
-| `keystats.go` | Statistics about each key and pair of keys |
-| `db.go` | The saved data: results, mistakes, key statistics, settings |
+| `store.go` | The saved data: results, mistakes, key statistics, settings |
 | `stats.go`, `chart.go` | `-stats` |
 | `heatmap.go` | `-keys` |
+| `export.go` | `-export` |
 | `report.go` | The report and the `-json`/`-csv` output |
-| `theme.go`, `resources.go` | Themes and builtin or user resources |
+| `theme.go`, `resources.go` | Themes and resources |
 | `util.go` | Text wrapping and drawing helpers |
 
-Run the tests with `go test ./...`. They never touch your own data: saved data
-goes to temporary directories (see `main_test.go`), command line tests run tt in
-a separate process with a temporary home, and screen tests use the simulation
-screen of tcell with a clock they control.
+Run the tests with `go test ./...`. They never touch your own data: the app
+works with an injected store, in memory or in a temporary directory,
+command line tests call `run` with a temporary home, and screen tests use the
+simulation screen of tcell with a clock they control.
 
 Pushing a tag such as `v1.1.0` publishes the release of that version with the
 binaries of every platform, the man page and their checksums (see `make rel`).

@@ -26,19 +26,19 @@ type appDeps struct {
 
 // app runs the sequence of tests requested on the command line.
 type app struct {
-	rules   ruleSettings
-	output  outputSettings
-	kind    testKind
-	scr     tcell.Screen
-	store   sessionStore
-	now     func() time.Time
-	typer   *typer
-	results []result
-	theme   string // Theme to remember on exit, empty if none.
+	rules    ruleSettings
+	output   outputSettings
+	kind     testKind
+	store    sessionStore
+	now      func() time.Time
+	typer    *typer
+	reporter reporter
+	results  []result
+	theme    string // Theme to remember on exit, empty if none.
 }
 
 func newApp(scr tcell.Screen, s settings, deps appDeps) (*app, error) {
-	a := &app{rules: s.rules, output: s.output, kind: s.source.kind, scr: scr, store: deps.store, now: deps.now}
+	a := &app{rules: s.rules, output: s.output, kind: s.source.kind, store: deps.store, now: deps.now}
 	res, display := deps.resources, s.display
 
 	opts := []typerOption{
@@ -63,7 +63,7 @@ func newApp(scr tcell.Screen, s settings, deps appDeps) (*app, error) {
 	}
 
 	if display.noTheme {
-		a.typer = newTyper(scr, newView(scr, terminalTheme, viewOpts), opts...)
+		a.useTyper(newTyper(scr, newView(scr, terminalTheme, viewOpts), opts...))
 		return a, nil
 	}
 
@@ -87,67 +87,83 @@ func newApp(scr tcell.Screen, s settings, deps appDeps) (*app, error) {
 		return name, nil
 	}
 
-	a.typer = newTyper(scr, v, append(opts, withThemeCycler(cycle))...)
+	a.useTyper(newTyper(scr, v, append(opts, withThemeCycler(cycle))...))
 	return a, nil
+}
+
+// useTyper makes the app run its tests with ty, showing the reports on its
+// screen unless they were disabled.
+func (a *app) useTyper(ty *typer) {
+	a.typer = ty
+	a.reporter = screenReporter{ty.view}
+	if a.output.noReport {
+		a.reporter = noReporter{}
+	}
 }
 
 // run shows the tests of src until there are no more or the user quits, and
 // returns the exit code. It stops at the first test which can't be made or
 // whose outcome can't be saved.
 func (a *app) run(src testSource) (int, error) {
-	var tests [][]segment
-	var idx = 0
+	history := newTestHistory(src)
 
 	for {
-		if idx >= len(tests) {
-			test, err := src.next()
-			if err == io.EOF {
-				return 0, nil
-			} else if err != nil {
-				return 1, err
-			}
-
-			tests = append(tests, test)
+		test, err := history.current()
+		if err == io.EOF {
+			return 0, nil
+		} else if err != nil {
+			return 1, err
 		}
 
 		if d, ok := src.(describer); ok {
 			a.typer.showStatusMessage(d.describe(), 0)
 		}
 
-		o, res := a.typer.Start(tests[idx], a.rules.timeout)
-
-		switch o {
+		switch o, res := a.typer.Start(test, a.rules.timeout); o {
 		case outcomeNext:
-			idx++
+			history.next()
 		case outcomePrevious:
-			if idx > 0 {
-				idx--
-			}
+			history.previous()
 		case outcomeComplete:
-			best, err := a.record(res)
-			if err != nil {
-				return 1, err
+			if stop, rc, err := a.complete(test, res); stop {
+				return rc, err
 			}
 
-			if !a.output.noReport {
-				attribution := ""
-				if len(tests[idx]) == 1 {
-					attribution = tests[idx][0].Attribution
-				}
-				if quit := showReport(a.scr, formatReport(res, attribution, best), a.typer.view.defaultStyle); quit {
-					return 1, nil
-				}
-			}
-			if a.output.oneShot {
-				return 0, nil
-			}
-
-			idx++
+			history.next()
 		case outcomeRestart: //The same test is shown again.
 		case outcomeQuit:
 			return 1, nil
 		}
 	}
+}
+
+// complete records and reports a completed test. It tells whether the app
+// must stop, with its exit code: the outcome can't be saved, the user quit
+// from the report, or a single test was requested.
+func (a *app) complete(test []segment, res testResult) (stop bool, rc int, err error) {
+	best, err := a.record(res)
+	if err != nil {
+		return true, 1, err
+	}
+
+	if quit := a.reporter.show(formatReport(res, attributionOf(test), best)); quit {
+		return true, 1, nil
+	}
+	if a.output.oneShot {
+		return true, 0, nil
+	}
+
+	return false, 0, nil
+}
+
+// attributionOf returns the attribution of a test made of a single text, such
+// as a quote, and nothing for tests mixing several texts.
+func attributionOf(test []segment) string {
+	if len(test) == 1 {
+		return test[0].Attribution
+	}
+
+	return ""
 }
 
 // record stores the outcome of a completed test and tells whether it is a
