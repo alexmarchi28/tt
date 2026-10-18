@@ -37,6 +37,7 @@ func runCLI(t *testing.T, home string, env []string, args ...string) cliResult {
 		stdout: &stdout,
 		stderr: &stderr,
 		getenv: func(key string) string { return vars[key] },
+		now:    time.Now,
 		homeDir: func() (string, error) {
 			if home == "" {
 				return "", errors.New("$HOME is not defined")

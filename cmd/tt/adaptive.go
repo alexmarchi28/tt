@@ -194,9 +194,9 @@ func (a adaptiveWords) describe(ks keyStats) string {
 // share of them (from 0 to 1) among the words with the pairs of letters to
 // practice, see focus, the others among all words, favouring those with weak
 // pairs.
-func (a adaptiveWords) draw(n int, ks keyStats, share float64) []string {
+func (a adaptiveWords) draw(rng *rand.Rand, n int, ks keyStats, share float64) []string {
 	w := newWeaknesses(ks)
-	favoured := weightedPick(a.words, func(word string) float64 { return math.Pow(w.word(word), adaptivePower) })
+	favoured := weightedPick(rng, a.words, func(word string) float64 { return math.Pow(w.word(word), adaptivePower) })
 
 	focused := a.containing(w.focus(focusPairs, a.frequency))
 	if len(focused) == 0 {
@@ -209,8 +209,8 @@ func (a adaptiveWords) draw(n int, ks keyStats, share float64) []string {
 	}
 
 	return drawWords(n, candidates, func() string {
-		if rand.Float64() < share {
-			return focused[rand.Intn(len(focused))]
+		if rng.Float64() < share {
+			return focused[rng.Intn(len(focused))]
 		}
 		return favoured()
 	})
@@ -239,7 +239,7 @@ func (a adaptiveWords) containing(pairs []string) []string {
 
 // weightedPick returns a function drawing one of words at random, in
 // proportion to their weight.
-func weightedPick(words []string, weight func(word string) float64) func() string {
+func weightedPick(rng *rand.Rand, words []string, weight func(word string) float64) func() string {
 	cumulative := make([]float64, len(words))
 	total := 0.0
 	for i, word := range words {
@@ -248,20 +248,20 @@ func weightedPick(words []string, weight func(word string) float64) func() strin
 	}
 
 	return func() string {
-		return words[sort.SearchFloat64s(cumulative, rand.Float64()*total)]
+		return words[sort.SearchFloat64s(cumulative, rng.Float64()*total)]
 	}
 }
 
 // generateAdaptiveTest draws words from the given word list according to the
 // latest key statistics, focus percent of them with the pairs of letters to
 // practice, see adaptiveWords.draw.
-func generateAdaptiveTest(res resourceReader, name string, o wordOptions, focus int, st keyStatsStore) (func() []segment, error) {
+func generateAdaptiveTest(rng *rand.Rand, res resourceReader, name string, o wordOptions, focus int, st keyStatsStore) (func() []segment, error) {
 	a, err := loadAdaptiveWords(res, name)
 	if err != nil {
 		return nil, err
 	}
 
-	return wordTest(func(n int) []string {
-		return a.draw(n, st.KeyStats(), float64(focus)/100)
+	return wordTest(rng, func(n int) []string {
+		return a.draw(rng, n, st.KeyStats(), float64(focus)/100)
 	}, o), nil
 }

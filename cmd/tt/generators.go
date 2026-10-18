@@ -26,11 +26,20 @@ type generatorStore interface {
 	paragraphStore
 }
 
+// textSources are what the generators make the text of tests from.
+type textSources struct {
+	store           generatorStore
+	resources       resourceReader
+	rng             *rand.Rand
+	stdin           io.Reader // Its text is typed unless it is a terminal.
+	stdinIsTerminal bool
+}
+
 // newTestGenerator returns a function producing the successive tests
 // requested on the command line, or nil once there are no more, and what they
-// are made of. Text piped to stdin is used unless stdin is a terminal.
-func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool, st generatorStore, res resourceReader) (func() []segment, testKind, error) {
-	gen, kind, err := selectTestGenerator(opts, stdin, stdinIsTerminal, st, res)
+// are made of.
+func newTestGenerator(opts options, src textSources) (func() []segment, testKind, error) {
+	gen, kind, err := selectTestGenerator(opts, src)
 	if err != nil {
 		return nil, testKind{}, err
 	}
@@ -40,25 +49,26 @@ func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool, st ge
 
 // selectTestGenerator returns the generator of the tests requested on the
 // command line and where their text comes from, see newTestGenerator.
-func selectTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool, st generatorStore, res resourceReader) (func() []segment, testKind, error) {
+func selectTestGenerator(opts options, src textSources) (func() []segment, testKind, error) {
 	words := newWordOptions(opts)
+	res, rng := src.resources, src.rng
 
 	switch {
 	case opts.adaptive:
 		list := adaptiveWordList(opts)
-		gen, err := generateAdaptiveTest(res, list, words, opts.focus, st)
+		gen, err := generateAdaptiveTest(rng, res, list, words, opts.focus, src.store)
 		return gen, testKind{mode: modeAdaptive, source: filepath.Base(list)}, err
 	case opts.wordFile != "":
-		gen, err := generateWordTest(res, opts.wordFile, words)
+		gen, err := generateWordTest(rng, res, opts.wordFile, words)
 		return gen, testKind{mode: modeWords, source: filepath.Base(opts.wordFile)}, err
 	case opts.quoteFile != "":
-		gen, err := generateQuoteTest(res, opts.quoteFile)
+		gen, err := generateQuoteTest(rng, res, opts.quoteFile)
 		return gen, testKind{mode: modeQuotes, source: filepath.Base(opts.quoteFile)}, err
 	case opts.mistakes:
-		gen, err := generateMistakesTest(words, st)
+		gen, err := generateMistakesTest(rng, words, src.store)
 		return gen, testKind{mode: modeMistakes}, err
-	case !stdinIsTerminal:
-		b, err := io.ReadAll(stdin)
+	case !src.stdinIsTerminal:
+		b, err := io.ReadAll(src.stdin)
 		if err != nil {
 			return nil, testKind{}, err
 		}
@@ -66,10 +76,10 @@ func selectTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool, st
 		gen, err := generateTestFromData(b, opts.raw, opts.multi)
 		return gen, testKind{mode: modeText}, err
 	case len(opts.files) > 0:
-		gen, err := generateTestFromFile(opts.files[0], opts.startParagraph, st)
+		gen, err := generateTestFromFile(opts.files[0], opts.startParagraph, src.store)
 		return gen, testKind{mode: modeFile, source: filepath.Base(opts.files[0])}, err
 	default:
-		gen, err := generateWordTest(res, defaultWordList, words)
+		gen, err := generateWordTest(rng, res, defaultWordList, words)
 		return gen, testKind{mode: modeWords, source: defaultWordList}, err
 	}
 }
@@ -110,13 +120,13 @@ func newWordOptions(opts options) wordOptions {
 	return o
 }
 
-func generateWordTest(res resourceReader, name string, o wordOptions) (func() []segment, error) {
+func generateWordTest(rng *rand.Rand, res resourceReader, name string, o wordOptions) (func() []segment, error) {
 	words, err := loadWords(res, name)
 	if err != nil {
 		return nil, err
 	}
 
-	return wordTest(func(n int) []string { return randomWords(n, words) }, o), nil
+	return wordTest(rng, func(n int) []string { return randomWords(rng, n, words) }, o), nil
 }
 
 // loadWords returns the words of the named word list.
@@ -160,7 +170,7 @@ func weightedMistakes(mistakes []mistake, n int) []string {
 
 // generateMistakesTest practices the recently mistyped words, the most
 // frequently mistyped ones coming up more often.
-func generateMistakesTest(o wordOptions, st mistakeStore) (func() []segment, error) {
+func generateMistakesTest(rng *rand.Rand, o wordOptions, st mistakeStore) (func() []segment, error) {
 	mistakes, err := st.Mistakes()
 	if err != nil {
 		return nil, err
@@ -171,15 +181,15 @@ func generateMistakesTest(o wordOptions, st mistakeStore) (func() []segment, err
 		return nil, errors.New("there are no recorded mistakes to practice yet")
 	}
 
-	return wordTest(func(n int) []string { return randomWords(n, words) }, o), nil
+	return wordTest(rng, func(n int) []string { return randomWords(rng, n, words) }, o), nil
 }
 
 // wordTest makes tests of words drawn by draw, one segment per group.
-func wordTest(draw func(n int) []string, o wordOptions) func() []segment {
+func wordTest(rng *rand.Rand, draw func(n int) []string, o wordOptions) func() []segment {
 	return func() []segment {
 		var segments []segment
 		for chars := 0; len(segments) < o.g || chars < o.minChars; {
-			text := wordGroup(draw, o)
+			text := wordGroup(rng, draw, o)
 			segments = append(segments, segment{text, ""})
 			chars += utf8.RuneCountInString(text)
 		}
@@ -190,21 +200,21 @@ func wordTest(draw func(n int) []string, o wordOptions) func() []segment {
 
 // wordGroup draws a group of words and adds numbers and punctuation to them
 // if requested.
-func wordGroup(draw func(n int) []string, o wordOptions) string {
+func wordGroup(rng *rand.Rand, draw func(n int) []string, o wordOptions) string {
 	words := draw(o.n)
 	if o.numbers {
-		words = addNumbers(words)
+		words = addNumbers(rng, words)
 	}
 	if o.punctuation {
-		words = punctuate(words)
+		words = punctuate(rng, words)
 	}
 
 	return strings.Join(words, " ")
 }
 
 // randomWords draws n words, avoiding consecutive repetitions when possible.
-func randomWords(n int, words []string) []string {
-	return drawWords(n, words, func() string { return words[rand.Intn(len(words))] })
+func randomWords(rng *rand.Rand, n int, words []string) []string {
+	return drawWords(n, words, func() string { return words[rng.Intn(len(words))] })
 }
 
 // drawWords draws n words with pick, which randomly chooses one of words,
@@ -237,7 +247,7 @@ var sentenceEnds = []string{".", ".", ".", ".", "?", "!"}
 
 // punctuate turns words into sentences by capitalizing their first word and
 // adding punctuation marks. The last word always ends a sentence.
-func punctuate(words []string) []string {
+func punctuate(rng *rand.Rand, words []string) []string {
 	out := make([]string, len(words))
 	capitalize := true
 
@@ -250,9 +260,9 @@ func punctuate(words []string) []string {
 		//Roughly 8% of the words end a sentence, 10% are followed by a comma, 2% by a
 		//semicolon, 2% by a colon, 3% are quoted and 3% are in parentheses.
 		capitalize = false
-		switch p := rand.Float64(); {
+		switch p := rng.Float64(); {
 		case i == len(words)-1 || p < 0.08:
-			w += sentenceEnds[rand.Intn(len(sentenceEnds))]
+			w += sentenceEnds[rng.Intn(len(sentenceEnds))]
 			capitalize = true
 		case p < 0.18:
 			w += ","
@@ -273,13 +283,13 @@ func punctuate(words []string) []string {
 }
 
 // addNumbers replaces some of the words with numbers of up to 4 digits.
-func addNumbers(words []string) []string {
+func addNumbers(rng *rand.Rand, words []string) []string {
 	out := make([]string, len(words))
 
 	for i, w := range words {
-		if rand.Float64() < 0.15 {
-			digits := 1 + rand.Intn(4)
-			w = strconv.Itoa(rand.Intn(int(math.Pow10(digits))))
+		if rng.Float64() < 0.15 {
+			digits := 1 + rng.Intn(4)
+			w = strconv.Itoa(rng.Intn(int(math.Pow10(digits))))
 		}
 
 		out[i] = w
@@ -288,7 +298,7 @@ func addNumbers(words []string) []string {
 	return out
 }
 
-func generateQuoteTest(res resourceReader, name string) (func() []segment, error) {
+func generateQuoteTest(rng *rand.Rand, res resourceReader, name string) (func() []segment, error) {
 	var quotes []segment
 
 	if b, err := res.read("quotes", name); errors.Is(err, errNoResource) {
@@ -312,7 +322,7 @@ func generateQuoteTest(res resourceReader, name string) (func() []segment, error
 	}
 
 	return func() []segment {
-		return []segment{quotes[rand.Intn(len(quotes))]}
+		return []segment{quotes[rng.Intn(len(quotes))]}
 	}, nil
 }
 

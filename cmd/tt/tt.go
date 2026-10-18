@@ -5,8 +5,10 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math/rand"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/gdamore/tcell"
 	"github.com/mattn/go-isatty"
@@ -20,6 +22,7 @@ type environment struct {
 	stdinIsTerminal  bool
 	stdoutIsTerminal bool
 	getenv           func(key string) string
+	now              func() time.Time
 	homeDir          func() (string, error)
 
 	// newScreen returns the screen tests are typed on, with true colour
@@ -35,6 +38,7 @@ func processEnvironment() environment {
 		stdinIsTerminal:  isatty.IsTerminal(os.Stdin.Fd()),
 		stdoutIsTerminal: isatty.IsTerminal(os.Stdout.Fd()),
 		getenv:           os.Getenv,
+		now:              time.Now,
 		homeDir:          os.UserHomeDir, //$HOME on unix, %USERPROFILE% on windows.
 		newScreen: func(trueColor bool) (tcell.Screen, error) {
 			if !trueColor {
@@ -67,7 +71,11 @@ func run(args []string, env environment) int {
 	if err != nil {
 		return fail(env.stderr, errors.New("could not resolve the home directory"))
 	}
-	deps := dependencies{newJSONStore(env.getenv, home), newResources(home, env.stdin)}
+	deps := dependencies{
+		store:     newJSONStore(env.getenv, home),
+		resources: newResources(home, env.stdin),
+		rng:       rand.New(rand.NewSource(env.now().UnixNano())),
+	}
 	if err := opts.validate(); err != nil {
 		return fail(env.stderr, err)
 	}
@@ -100,6 +108,7 @@ func fail(stderr io.Writer, err error) int {
 type dependencies struct {
 	store     store
 	resources resourceLister
+	rng       *rand.Rand
 }
 
 // commands are the actions of tt other than typing tests, the first one
@@ -129,7 +138,7 @@ func versionCommand(_ options, env environment, _ dependencies) error {
 }
 
 func statsCommand(_ options, env environment, deps dependencies) error {
-	return printStats(env.stdout, deps.store)
+	return printStats(env.stdout, deps.store, env.now())
 }
 
 func keysCommand(opts options, env environment, deps dependencies) error {
@@ -160,7 +169,7 @@ func runTests(opts options, env environment, deps dependencies) (int, error) {
 		return 0, err
 	}
 
-	testFn, kind, err := newTestGenerator(opts, env.stdin, env.stdinIsTerminal, st, res)
+	testFn, kind, err := newTestGenerator(opts, textSources{st, res, deps.rng, env.stdin, env.stdinIsTerminal})
 	if err != nil {
 		return 0, err
 	}
@@ -184,7 +193,7 @@ func runTests(opts options, env environment, deps dependencies) (int, error) {
 	restore := func() { fini.Do(scr.Fini) }
 	defer restore()
 
-	a, err := newApp(scr, opts, kind, st, res)
+	a, err := newApp(scr, opts, kind, appDeps{st, res, env.now})
 	if err != nil {
 		return 0, err
 	}

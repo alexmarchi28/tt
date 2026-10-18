@@ -16,7 +16,7 @@ func newTestApp(t *testing.T, opts options) (*app, tcell.SimulationScreen) {
 	res, _ := newTestResources(t)
 	sim := newSimScreen(t)
 
-	a, err := newApp(sim, opts, testKind{mode: "words", source: "test"}, newTestStore(t), res)
+	a, err := newApp(sim, opts, testKind{mode: "words", source: "test"}, appDeps{newTestStore(t), res, time.Now})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,5 +321,24 @@ func TestAppReportsPersonalBest(t *testing.T) {
 			sendKeys(t, sim, tcell.KeyCtrlC)
 			waitExitCode(t, done)
 		})
+	}
+}
+
+func TestAppRecordsTheTimeOfTests(t *testing.T) {
+	opts := parseFlags(nil)
+	opts.noReport = true
+	a, sim := newTestApp(t, opts)
+	a.now = func() time.Time { return time.Unix(1700000000, 0) }
+
+	var calls int
+	done := startApp(a, testSequence(&calls, "ab"))
+	sendKeys(t, sim, "ab")
+	waitExitCode(t, done)
+
+	if stored, err := a.store.Results(); err != nil || len(stored) != 1 || stored[0].Timestamp != 1700000000 {
+		t.Errorf("saved results = %+v, %v, want the test typed at the time of the clock", stored, err)
+	}
+	if len(a.results) != 1 || a.results[0].Timestamp != 1700000000 {
+		t.Errorf("results = %+v, want the test typed at the time of the clock", a.results)
 	}
 }
