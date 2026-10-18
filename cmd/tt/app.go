@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/alexmarchi28/tt/internal/history"
+	"github.com/alexmarchi28/tt/internal/store"
 	"github.com/gdamore/tcell"
 )
 
@@ -203,5 +204,5 @@ func (a *app) saveTheme() error {
 		return nil
 	}
 
-	return a.store.SaveConfig(appConfig{Theme: a.theme})
+	return a.store.SaveConfig(store.Config{Theme: a.theme})
 }

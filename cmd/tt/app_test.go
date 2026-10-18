@@ -340,8 +340,10 @@ func TestAppReportsPersonalBest(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			a, sim := newTestApp(t, resolveFlags(nil))
-			if err := writeValue(a.store.(*jsonStore).path(resultsFile), tc.previous); err != nil {
-				t.Fatal(err)
+			for _, r := range tc.previous {
+				if _, err := a.store.AddResult(r); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			var calls int

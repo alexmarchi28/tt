@@ -22,6 +22,7 @@ var allowedImports = map[string][]string{
 	"history":  nil,
 	"keystats": {module + "/internal/typing"},
 	"resource": {module},
+	"store":    {module + "/internal/history", module + "/internal/keystats", module + "/internal/typing"},
 }
 
 // imports returns the non-standard packages imported by the non-test files
