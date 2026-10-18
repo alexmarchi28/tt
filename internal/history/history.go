@@ -81,7 +81,7 @@ type Result struct {
 
 	//The fields below are empty for results saved by older versions.
 	Duration float64 `json:"duration,omitempty"` //Seconds spent typing.
-	Kind         //Saved as fields of the result.
+	Kind             //Saved as fields of the result.
 }
 
 // String describes r, rather than only its kind as the String method of the

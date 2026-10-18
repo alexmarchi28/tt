@@ -19,7 +19,7 @@ type Config struct {
 	Theme string `json:"theme,omitempty"`
 }
 
-// The files of jsonStore in its data directory.
+// The files of JSON in its data directory.
 const (
 	paragraphsFile = ".db"
 	mistakesFile   = ".errors"

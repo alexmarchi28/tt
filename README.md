@@ -140,6 +140,10 @@ command (checked by `internal/boundaries_test.go`):
 | `internal/typing` | The typing logic: what was typed, keystrokes, mistakes |
 | `internal/keystats` | Statistics about each key and pair of keys, weak pairs |
 | `internal/resource` | Builtin or user themes, word lists and quotes |
+| `internal/textgen` | The texts of the tests: words, quotes, files, stdin, mistakes, `-adaptive` |
+| `internal/history` | The kinds of tests and their saved results |
+| `internal/store` | The data saved as JSON files: results, mistakes, key statistics, settings |
+| `internal/stats` | The statistics of `-stats`, `-keys` and `-pace` |
 
 In `cmd/tt`:
 
@@ -151,11 +155,9 @@ In `cmd/tt`:
 | `typer.go`, `session.go` | A test on the screen: event loop, keys, timer |
 | `view.go` | Drawing a test: text, styles, live statistics, help |
 | `keymap.go` | The keys and the help generated from them |
-| `source.go`, `generators.go`, `adaptive.go` | The texts of the tests: words, quotes, files, stdin, mistakes, `-adaptive` |
-| `kind.go` | The kinds of tests whose results are compared |
-| `store.go` | The saved data: results, mistakes, key statistics, settings |
-| `stats.go`, `chart.go` | `-stats` |
-| `heatmap.go` | `-keys` |
+| `source.go` | The source of the tests chosen by the settings |
+| `store.go` | What the app needs of the saved data |
+| `stats.go` | Printing `-stats` and `-keys` |
 | `export.go` | `-export` |
 | `report.go` | The report and the `-json`/`-csv` output |
 | `theme.go`, `resources.go` | Themes and resources |

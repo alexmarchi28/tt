@@ -73,3 +73,21 @@ func TestResultFormat(t *testing.T) {
 		t.Errorf("kind of an old result = %+v, want none", old.Kind)
 	}
 }
+
+func TestKindMadeOfWords(t *testing.T) {
+	t.Parallel()
+
+	for mode, want := range map[string]bool{
+		ModeWords:    true,
+		ModeMistakes: true,
+		ModeAdaptive: true,
+		ModeQuotes:   false,
+		ModeText:     false,
+		ModeFile:     false,
+		"":           false,
+	} {
+		if got := (Kind{Mode: mode}).MadeOfWords(); got != want {
+			t.Errorf("Kind{Mode: %q}.MadeOfWords() = %t, want %t", mode, got, want)
+		}
+	}
+}
