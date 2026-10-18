@@ -3,6 +3,8 @@
 New:
  - -focus sets the percentage of the words of -adaptive with the pairs of
    letters being practiced, 40 by default.
+ - The report shows the raw speed, wrong keystrokes included, the consistency
+   of the speed and a chart of the raw speed and errors second by second.
  - 1000 common Russian words (-words 1000ru): the most frequent pronouns,
    prepositions, verbs and adjectives besides the nouns of the ru list.
 

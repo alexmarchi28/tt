@@ -21,10 +21,12 @@ usage: tt \[OPTION\]... \[FILE\]
   test. Each paragraph of the input is treated as a segment unless '-multi' is
   supplied in which case each paragraph is treated as a separate test. 
 
-  At the end of each test a report shows the speed, accuracy and mistakes, and
-  whether a new personal best was set for that kind of test: the same word
-  list, quote file or file, with the same time limit, number of words,
-  punctuation and numbers.
+  At the end of each test a report shows the speed, the raw speed (wrong
+  keystrokes included), the accuracy, the consistency (how steady the raw speed
+  is, from 0 to 100%) and the mistakes, a chart of the raw speed and errors
+  second by second, and whether a new personal best was set for that kind of
+  test: the same word list, quote file or file, with the same time limit,
+  number of words, punctuation and numbers.
 
 # OPTIONS
 

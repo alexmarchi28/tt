@@ -238,6 +238,11 @@ func (r testResult) wpm() int {
 	return r.cpm() / 5
 }
 
+// rawWpm returns the speed of all the keystrokes, wrong ones included.
+func (r testResult) rawWpm() int {
+	return int(rawWpm(r.correctKeys+r.wrongKeys, r.duration))
+}
+
 func (r testResult) accuracy() float64 {
 	return calcAccuracy(r.correctKeys, r.wrongKeys)
 }
@@ -249,6 +254,11 @@ func (t *typer) Start(text []segment, timeout time.Duration) (res testResult) {
 
 	for i, s := range text {
 		r := t.start(s.Text, timeLeft, i > 0, s.Attribution)
+
+		//Keystrokes are timed from the start of their segment.
+		for j := range r.keystrokes {
+			r.keystrokes[j].at += res.duration
+		}
 
 		res.rc = r.rc
 		res.duration += r.duration

@@ -59,13 +59,30 @@ func daysWithTests(days []dayAverage) int {
 }
 
 // progressChart draws a column for each day with tests, from the first to the
-// last day. The scale goes from the ten below the lowest average to the ten
-// above the highest one so that small improvements remain visible.
+// last day.
 func progressChart(days []dayAverage) []string {
+	values := make([]float64, len(days))
+	shown := make([]bool, len(days))
+	for i, d := range days {
+		values[i], shown[i] = d.wpm, d.count > 0
+	}
+
+	lines, width := columnChart(values, shown, 0)
+	first, last := days[0].date.Format("01-02"), days[len(days)-1].date.Format("01-02")
+
+	return append(lines, axisLabels(width, len(days), first, last))
+}
+
+// columnChart draws a column for each value, the shown ones only, above a
+// horizontal axis. The scale goes from the ten below the lowest shown value to
+// the ten above the highest one so that small differences remain visible.
+// Labels take at least minWidth cells, the width of the labels is returned
+// with the lines.
+func columnChart(values []float64, shown []bool, minWidth int) (lines []string, width int) {
 	lo, hi := math.Inf(1), math.Inf(-1)
-	for _, d := range days {
-		if d.count > 0 {
-			lo, hi = math.Min(lo, d.wpm), math.Max(hi, d.wpm)
+	for i, v := range values {
+		if shown[i] {
+			lo, hi = math.Min(lo, v), math.Max(hi, v)
 		}
 	}
 
@@ -74,11 +91,11 @@ func progressChart(days []dayAverage) []string {
 		hi += 10
 	}
 
-	//Height of each column in eighths of a row, days with tests are always visible.
-	heights := make([]int, len(days))
-	for i, d := range days {
-		if d.count > 0 {
-			heights[i] = int(math.Round((d.wpm - lo) / (hi - lo) * chartRows * 8))
+	//Height of each column in eighths of a row, shown values are always visible.
+	heights := make([]int, len(values))
+	for i, v := range values {
+		if shown[i] {
+			heights[i] = int(math.Round((v - lo) / (hi - lo) * chartRows * 8))
 			if heights[i] < 1 {
 				heights[i] = 1
 			}
@@ -86,9 +103,11 @@ func progressChart(days []dayAverage) []string {
 	}
 
 	hiLabel, loLabel := fmt.Sprintf("%.0f", hi), fmt.Sprintf("%.0f", lo)
-	width := len(hiLabel)
+	width = len(hiLabel)
+	if width < minWidth {
+		width = minWidth
+	}
 
-	var lines []string
 	for row := chartRows - 1; row >= 0; row-- {
 		label := ""
 		switch row {
@@ -98,7 +117,7 @@ func progressChart(days []dayAverage) []string {
 			label = loLabel
 		}
 
-		cols := make([]rune, len(days))
+		cols := make([]rune, len(values))
 		for i, h := range heights {
 			cols[i] = chartBlocks[clamp(h-row*8, 0, 8)]
 		}
@@ -106,12 +125,21 @@ func progressChart(days []dayAverage) []string {
 		lines = append(lines, strings.TrimRight(fmt.Sprintf("%*s │%s", width, label, string(cols)), " "))
 	}
 
-	first, last := days[0].date.Format("01-02"), days[len(days)-1].date.Format("01-02")
-	lines = append(lines,
-		strings.Repeat(" ", width)+" └"+strings.Repeat("─", len(days)),
-		strings.Repeat(" ", width+2)+first+fmt.Sprintf("%*s", len(days)-len(first), last))
+	lines = append(lines, strings.Repeat(" ", width)+" └"+strings.Repeat("─", len(values)))
 
-	return lines
+	return lines, width
+}
+
+// axisLabels places first under the first of n columns of a chart whose labels
+// are width cells wide, and last under the last one. They are kept apart when
+// the chart is too narrow.
+func axisLabels(width, n int, first, last string) string {
+	gap := n - len(first) - len(last)
+	if gap < 1 {
+		gap = 1
+	}
+
+	return strings.Repeat(" ", width+2) + first + strings.Repeat(" ", gap) + last
 }
 
 // clamp returns v limited to [lo, hi].

@@ -34,7 +34,15 @@ func formatReport(res testResult, attribution string, best personalBest) string 
 		fmt.Fprintf(&b, "New personal best! (previous best: %d wpm)\n\n", best.previous)
 	}
 
-	fmt.Fprintf(&b, "WPM:         %d\nCPM:         %d\nAccuracy:    %.2f%%", res.wpm(), res.cpm(), res.accuracy())
+	seconds := timeline(res.keystrokes, res.duration)
+	overTime := typedSeconds(seconds) > 1 //A single second says nothing of how the speed changes.
+
+	fmt.Fprintf(&b, "WPM:         %d\nRaw WPM:     %d\nCPM:         %d\nAccuracy:    %.2f%%",
+		res.wpm(), res.rawWpm(), res.cpm(), res.accuracy())
+
+	if overTime {
+		fmt.Fprintf(&b, "\nConsistency: %.2f%%", consistency(seconds))
+	}
 
 	if len(res.mistakes) > 0 {
 		words := make([]string, len(res.mistakes))
@@ -43,6 +51,10 @@ func formatReport(res testResult, attribution string, best personalBest) string 
 		}
 
 		fmt.Fprintf(&b, "\nMistakes:    %s", strings.Join(words, ", "))
+	}
+
+	if overTime {
+		fmt.Fprintf(&b, "\n\nRaw wpm per second\n%s", strings.Join(speedChart(seconds), "\n"))
 	}
 
 	if attribution != "" {

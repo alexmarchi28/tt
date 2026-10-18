@@ -997,8 +997,8 @@ func TestTyperRecordsKeystrokes(t *testing.T) {
 	clock.advance(250 * time.Millisecond)
 	sendKeys(t, sim, "b", "x")
 
-	// Segments are separated by a break, times are relative to each segment.
-	want := []keystroke{{'a', 'a', 0}, {'b', 'b', 250 * time.Millisecond}, {}, {'c', 'x', 0}}
+	// Segments are separated by a break, times are relative to the start of the test.
+	want := []keystroke{{'a', 'a', 0}, {'b', 'b', 250 * time.Millisecond}, {}, {'c', 'x', 250 * time.Millisecond}}
 	if got := waitOutcome(t, done).keystrokes; !reflect.DeepEqual(got, want) {
 		t.Errorf("keystrokes = %v, want %v", got, want)
 	}

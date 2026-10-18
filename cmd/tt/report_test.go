@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 	"time"
 )
@@ -86,10 +87,12 @@ func TestFormatReport(t *testing.T) {
 	}{
 		{"plain", testResult{duration: time.Minute, correctChars: 250, correctKeys: 10}, "", personalBest{}, "" +
 			"WPM:         50\n" +
+			"Raw WPM:     2\n" +
 			"CPM:         250\n" +
 			"Accuracy:    100.00%"},
 		{"mistakes and attribution", res, "Someone", personalBest{}, "" +
 			"WPM:         60\n" +
+			"Raw WPM:     8\n" +
 			"CPM:         300\n" +
 			"Accuracy:    97.50%\n" +
 			"Mistakes:    alpha, beta\n" +
@@ -99,6 +102,7 @@ func TestFormatReport(t *testing.T) {
 			"New personal best! (previous best: 55 wpm)\n" +
 			"\n" +
 			"WPM:         60\n" +
+			"Raw WPM:     8\n" +
 			"CPM:         300\n" +
 			"Accuracy:    97.50%\n" +
 			"Mistakes:    alpha, beta"},
@@ -110,5 +114,36 @@ func TestFormatReport(t *testing.T) {
 				t.Errorf("got\n%s\nwant\n%s", got, tc.want)
 			}
 		})
+	}
+}
+
+func TestFormatReportShowsSpeedOverTime(t *testing.T) {
+	// 60 wpm, then 48 wpm with an error.
+	keys := append(keysAt(0, 200, 400, 600, 800), keysAt(1000, 1250, 1500, 1750)...)
+	keys[5].typed = 'x'
+	res := testResult{
+		duration:     2 * time.Second,
+		correctChars: 8,
+		correctKeys:  8,
+		wrongKeys:    1,
+		keystrokes:   keys,
+		mistakes:     []mistake{{"alpha", "xlpha"}},
+	}
+
+	want := "" +
+		"WPM:         48\n" +
+		"Raw WPM:     54\n" +
+		"CPM:         240\n" +
+		"Accuracy:    88.89%\n" +
+		"Consistency: 88.89%\n" +
+		"Mistakes:    alpha\n" +
+		"\n" +
+		"Raw wpm per second\n" +
+		strings.Join(speedChart(timeline(keys, res.duration)), "\n") + "\n" +
+		"\n" +
+		"Attribution: Someone"
+
+	if got := formatReport(res, "Someone", personalBest{}); got != want {
+		t.Errorf("got\n%s\nwant\n%s", got, want)
 	}
 }
