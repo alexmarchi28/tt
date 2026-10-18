@@ -60,12 +60,7 @@ func (r *testRun) environment(text string) environment {
 func (r *testRun) store(t *testing.T) *jsonStore {
 	t.Helper()
 
-	st, err := newJSONStore(func(string) string { return "" }, func() (string, error) { return r.home, nil })
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return st
+	return newJSONStore(func(string) string { return "" }, r.home)
 }
 
 // startRun runs tt in the background with the given stdin text and
@@ -91,7 +86,6 @@ func startRun(t *testing.T, text string, args ...string) (*testRun, <-chan int) 
 }
 
 func TestRunCommands(t *testing.T) {
-	useTempStorage(t)
 
 	tests := []struct {
 		args         []string
@@ -120,7 +114,6 @@ func TestRunCommands(t *testing.T) {
 }
 
 func TestRunTypesTests(t *testing.T) {
-	useTempStorage(t)
 	r, done := startRun(t, "hi there", "-oneshot", "-noreport", "-csv")
 
 	waitForScreenText(t, r.sim, "hi there", true)
@@ -143,7 +136,6 @@ func TestRunTypesTests(t *testing.T) {
 }
 
 func TestRunWithoutTheme(t *testing.T) {
-	useTempStorage(t)
 	r, done := startRun(t, "hi", "-oneshot", "-noreport", "-notheme")
 
 	sendKeys(t, r.sim, "hi")
@@ -157,7 +149,6 @@ func TestRunWithoutTheme(t *testing.T) {
 // An outcome which can't be saved ends the session with an error rather than
 // a crash, the results typed so far still being printed.
 func TestRunReportsSaveErrors(t *testing.T) {
-	useTempStorage(t)
 	r, done := startRun(t, "hi", "-noreport", "-csv")
 
 	// A directory can't be replaced by the file of the key statistics.
@@ -178,8 +169,17 @@ func TestRunReportsSaveErrors(t *testing.T) {
 	}
 }
 
+func TestRunWithoutHome(t *testing.T) {
+	r := newTestRun(t)
+	env := r.environment("")
+	env.homeDir = func() (string, error) { return "", errors.New("no home") }
+
+	if code := run([]string{"-v"}, env); code != 1 || r.stderr.String() != "ERROR: could not resolve the home directory\n" {
+		t.Errorf("run without a home directory = %d, %q, want the error", code, r.stderr.String())
+	}
+}
+
 func TestRunReportsScreenErrors(t *testing.T) {
-	useTempStorage(t)
 
 	r := newTestRun(t)
 	env := r.environment("hi")
@@ -191,10 +191,10 @@ func TestRunReportsScreenErrors(t *testing.T) {
 }
 
 func TestNewAppWithInvalidTheme(t *testing.T) {
-	dir := useTempStorage(t)
+	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "themes", "broken", "fgcol: nope")
 
-	_, err := newApp(newSimScreen(t), parseFlags([]string{"-theme", "broken"}), testKind{}, &memStore{})
+	_, err := newApp(newSimScreen(t), parseFlags([]string{"-theme", "broken"}), testKind{}, &memStore{}, res)
 	if err == nil || !strings.HasPrefix(err.Error(), "broken theme is invalid: ") {
 		t.Errorf("newApp with an invalid theme: %v, want an error", err)
 	}

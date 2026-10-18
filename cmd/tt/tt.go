@@ -63,17 +63,18 @@ func run(args []string, env environment) int {
 		return 2 //The flag package reports the error.
 	}
 
-	st, err := newJSONStore(env.getenv, env.homeDir)
+	home, err := env.homeDir()
 	if err != nil {
-		return fail(env.stderr, err)
+		return fail(env.stderr, errors.New("could not resolve the home directory"))
 	}
+	deps := dependencies{newJSONStore(env.getenv, home), newResources(home, env.stdin)}
 	if err := opts.validate(); err != nil {
 		return fail(env.stderr, err)
 	}
 
 	for _, c := range commands {
 		if c.requested(opts) {
-			if err := c.run(opts, env, st); err != nil {
+			if err := c.run(opts, env, deps); err != nil {
 				return fail(env.stderr, err)
 			}
 
@@ -81,7 +82,7 @@ func run(args []string, env environment) int {
 		}
 	}
 
-	rc, err := runTests(opts, env, st)
+	rc, err := runTests(opts, env, deps)
 	if err != nil {
 		return fail(env.stderr, err)
 	}
@@ -95,11 +96,17 @@ func fail(stderr io.Writer, err error) int {
 	return 1
 }
 
+// dependencies are what tt works with besides the environment.
+type dependencies struct {
+	store     store
+	resources resourceLister
+}
+
 // commands are the actions of tt other than typing tests, the first one
 // requested being run.
 var commands = []struct {
 	requested func(options) bool
-	run       func(options, environment, store) error
+	run       func(options, environment, dependencies) error
 }{
 	{func(o options) bool { return o.listType != "" }, listCommand},
 	{func(o options) bool { return o.version }, versionCommand},
@@ -108,36 +115,38 @@ var commands = []struct {
 	{func(o options) bool { return o.export != "" }, exportCommand},
 }
 
-func listCommand(opts options, env environment, _ store) error {
-	for _, name := range listResourceNames(opts.listType) {
+func listCommand(opts options, env environment, deps dependencies) error {
+	for _, name := range deps.resources.list(opts.listType) {
 		fmt.Fprintln(env.stdout, name)
 	}
 
 	return nil
 }
 
-func versionCommand(_ options, env environment, _ store) error {
+func versionCommand(_ options, env environment, _ dependencies) error {
 	_, err := fmt.Fprintln(env.stdout, "tt version "+versionString())
 	return err
 }
 
-func statsCommand(_ options, env environment, st store) error {
-	return printStats(env.stdout, st)
+func statsCommand(_ options, env environment, deps dependencies) error {
+	return printStats(env.stdout, deps.store)
 }
 
-func keysCommand(opts options, env environment, st store) error {
-	return printKeys(env.stdout, st, opts.layout, env.stdoutIsTerminal && env.getenv("NO_COLOR") == "")
+func keysCommand(opts options, env environment, deps dependencies) error {
+	return printKeys(env.stdout, deps.store, opts.layout, env.stdoutIsTerminal && env.getenv("NO_COLOR") == "")
 }
 
-func exportCommand(opts options, env environment, st store) error {
-	return exportData(env.stdout, st, opts.export, opts.json)
+func exportCommand(opts options, env environment, deps dependencies) error {
+	return exportData(env.stdout, deps.store, opts.export, opts.json)
 }
 
 // runTests types the tests requested on the command line and returns the
 // exit code.
-func runTests(opts options, env environment, st store) (int, error) {
+func runTests(opts options, env environment, deps dependencies) (int, error) {
+	st, res := deps.store, deps.resources
+
 	if !opts.noTheme && !opts.themeExplicit {
-		if rememberedTheme := loadRememberedTheme(st, opts.opaqueBg); rememberedTheme != "" {
+		if rememberedTheme := loadRememberedTheme(st, res, opts.opaqueBg); rememberedTheme != "" {
 			opts.themeName = rememberedTheme
 		}
 	}
@@ -151,7 +160,7 @@ func runTests(opts options, env environment, st store) (int, error) {
 		return 0, err
 	}
 
-	testFn, kind, err := newTestGenerator(opts, env.stdin, env.stdinIsTerminal, st)
+	testFn, kind, err := newTestGenerator(opts, env.stdin, env.stdinIsTerminal, st, res)
 	if err != nil {
 		return 0, err
 	}
@@ -175,7 +184,7 @@ func runTests(opts options, env environment, st store) (int, error) {
 	restore := func() { fini.Do(scr.Fini) }
 	defer restore()
 
-	a, err := newApp(scr, opts, kind, st)
+	a, err := newApp(scr, opts, kind, st, res)
 	if err != nil {
 		return 0, err
 	}

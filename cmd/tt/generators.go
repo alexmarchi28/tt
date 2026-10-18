@@ -29,8 +29,8 @@ type generatorStore interface {
 // newTestGenerator returns a function producing the successive tests
 // requested on the command line, or nil once there are no more, and what they
 // are made of. Text piped to stdin is used unless stdin is a terminal.
-func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool, st generatorStore) (func() []segment, testKind, error) {
-	gen, kind, err := selectTestGenerator(opts, stdin, stdinIsTerminal, st)
+func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool, st generatorStore, res resourceReader) (func() []segment, testKind, error) {
+	gen, kind, err := selectTestGenerator(opts, stdin, stdinIsTerminal, st, res)
 	if err != nil {
 		return nil, testKind{}, err
 	}
@@ -40,19 +40,19 @@ func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool, st ge
 
 // selectTestGenerator returns the generator of the tests requested on the
 // command line and where their text comes from, see newTestGenerator.
-func selectTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool, st generatorStore) (func() []segment, testKind, error) {
+func selectTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool, st generatorStore, res resourceReader) (func() []segment, testKind, error) {
 	words := newWordOptions(opts)
 
 	switch {
 	case opts.adaptive:
 		list := adaptiveWordList(opts)
-		gen, err := generateAdaptiveTest(list, words, opts.focus, st)
+		gen, err := generateAdaptiveTest(res, list, words, opts.focus, st)
 		return gen, testKind{mode: modeAdaptive, source: filepath.Base(list)}, err
 	case opts.wordFile != "":
-		gen, err := generateWordTest(opts.wordFile, words)
+		gen, err := generateWordTest(res, opts.wordFile, words)
 		return gen, testKind{mode: modeWords, source: filepath.Base(opts.wordFile)}, err
 	case opts.quoteFile != "":
-		gen, err := generateQuoteTest(opts.quoteFile)
+		gen, err := generateQuoteTest(res, opts.quoteFile)
 		return gen, testKind{mode: modeQuotes, source: filepath.Base(opts.quoteFile)}, err
 	case opts.mistakes:
 		gen, err := generateMistakesTest(words, st)
@@ -69,7 +69,7 @@ func selectTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool, st
 		gen, err := generateTestFromFile(opts.files[0], opts.startParagraph, st)
 		return gen, testKind{mode: modeFile, source: filepath.Base(opts.files[0])}, err
 	default:
-		gen, err := generateWordTest(defaultWordList, words)
+		gen, err := generateWordTest(res, defaultWordList, words)
 		return gen, testKind{mode: modeWords, source: defaultWordList}, err
 	}
 }
@@ -110,8 +110,8 @@ func newWordOptions(opts options) wordOptions {
 	return o
 }
 
-func generateWordTest(name string, o wordOptions) (func() []segment, error) {
-	words, err := loadWords(name)
+func generateWordTest(res resourceReader, name string, o wordOptions) (func() []segment, error) {
+	words, err := loadWords(res, name)
 	if err != nil {
 		return nil, err
 	}
@@ -120,10 +120,12 @@ func generateWordTest(name string, o wordOptions) (func() []segment, error) {
 }
 
 // loadWords returns the words of the named word list.
-func loadWords(name string) ([]string, error) {
-	b := readResource("words", name)
-	if b == nil {
+func loadWords(res resourceReader, name string) ([]string, error) {
+	b, err := res.read("words", name)
+	if errors.Is(err, errNoResource) {
 		return nil, fmt.Errorf("%s does not appear to be a valid word list, see '-list words' for a list of builtin word lists", name)
+	} else if err != nil {
+		return nil, err
 	}
 
 	words := strings.Fields(string(b))
@@ -286,11 +288,13 @@ func addNumbers(words []string) []string {
 	return out
 }
 
-func generateQuoteTest(name string) (func() []segment, error) {
+func generateQuoteTest(res resourceReader, name string) (func() []segment, error) {
 	var quotes []segment
 
-	if b := readResource("quotes", name); b == nil {
+	if b, err := res.read("quotes", name); errors.Is(err, errNoResource) {
 		return nil, fmt.Errorf("%s does not appear to be a valid quote file, see '-list quotes' for a list of builtin quotes", name)
+	} else if err != nil {
+		return nil, err
 	} else if err := json.Unmarshal(b, &quotes); err != nil {
 		return nil, fmt.Errorf("improperly formatted quote file: %v", err)
 	}

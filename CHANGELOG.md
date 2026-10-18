@@ -14,6 +14,8 @@ Changed:
 Fixed:
  - A test whose outcome can't be saved ends tt with an error, after printing
    the results of the tests typed (-csv, -json), rather than with a crash.
+ - A word list, quote file or theme read from stdin (-) which can't be read is
+   reported as an error rather than with a crash.
  - The Russian word list contained the English word TRUE.
  - Resizing the terminal no longer restarts the test: the text is wrapped again
    for the new width, keeping what was typed and the time.

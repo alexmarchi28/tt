@@ -5,11 +5,12 @@ import (
 	"errors"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/gdamore/tcell"
 )
 
 type cliResult struct {
@@ -17,37 +18,33 @@ type cliResult struct {
 	code           int
 }
 
-// runCLI runs tt with the given arguments in a separate process whose home
-// directory is home. TERM is set to an unknown terminal so that a test
-// reaching the interactive part fails instead of taking over the terminal.
+// runCLI runs tt with the given arguments, as a user whose home directory is
+// home and whose environment variables are given as key=value. Nothing is
+// piped to stdin, and the screen can't be used so that a test reaching the
+// interactive part fails.
 func runCLI(t *testing.T, home string, env []string, args ...string) cliResult {
 	t.Helper()
 
-	cmd := exec.Command(os.Args[0], args...)
-	for _, kv := range os.Environ() {
-		switch strings.SplitN(kv, "=", 2)[0] {
-		case "HOME", "XDG_DATA_HOME", "TERM":
-		default:
-			cmd.Env = append(cmd.Env, kv)
-		}
+	vars := map[string]string{}
+	for _, kv := range env {
+		k, v, _ := strings.Cut(kv, "=")
+		vars[k] = v
 	}
-	cmd.Env = append(cmd.Env, "TT_TEST_RUN_MAIN=1", "HOME="+home, "TERM=tt-test-unknown-terminal")
-	cmd.Env = append(cmd.Env, env...)
-	cmd.Stdin = strings.NewReader("")
 
 	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	code := 0
-
-	var exitErr *exec.ExitError
-	if errors.As(err, &exitErr) {
-		code = exitErr.ExitCode()
-	} else if err != nil {
-		t.Fatalf("running tt: %v", err)
-	}
+	code := run(args, environment{
+		stdin:  strings.NewReader(""),
+		stdout: &stdout,
+		stderr: &stderr,
+		getenv: func(key string) string { return vars[key] },
+		homeDir: func() (string, error) {
+			if home == "" {
+				return "", errors.New("$HOME is not defined")
+			}
+			return home, nil
+		},
+		newScreen: func(bool) (tcell.Screen, error) { return nil, errors.New("no screen in tests") },
+	})
 
 	return cliResult{stdout.String(), stderr.String(), code}
 }

@@ -27,11 +27,11 @@ type app struct {
 	words   *adaptiveWords // The word list of adaptive tests, nil for other tests.
 }
 
-func newApp(scr tcell.Screen, opts options, kind testKind, st sessionStore) (*app, error) {
+func newApp(scr tcell.Screen, opts options, kind testKind, st sessionStore, res resourceLister) (*app, error) {
 	a := &app{opts: opts, kind: kind, scr: scr, store: st}
 
 	if kind.mode == modeAdaptive {
-		words, err := loadAdaptiveWords(adaptiveWordList(opts))
+		words, err := loadAdaptiveWords(res, adaptiveWordList(opts))
 		if err != nil {
 			return nil, err
 		}
@@ -41,7 +41,7 @@ func newApp(scr tcell.Screen, opts options, kind testKind, st sessionStore) (*ap
 	if opts.noTheme {
 		a.typer = NewTyper(scr, true, terminalTheme)
 	} else {
-		th, err := loadTheme(opts.themeName, opts.opaqueBg)
+		th, err := loadTheme(res, opts.themeName, opts.opaqueBg)
 		if err != nil {
 			return nil, fmt.Errorf("%s theme is invalid: %v", opts.themeName, err)
 		}
@@ -49,7 +49,7 @@ func newApp(scr tcell.Screen, opts options, kind testKind, st sessionStore) (*ap
 		a.typer = NewTyper(scr, opts.bold, th)
 		a.theme = opts.themeName
 
-		themes := newThemeCycler(listResourceNames("themes"), opts.themeName, opts.opaqueBg)
+		themes := newThemeCycler(res, opts.themeName, opts.opaqueBg)
 		a.typer.CycleTheme = func(direction int) (string, error) {
 			name, th, err := themes.next(direction)
 			if err != nil || name == "" {

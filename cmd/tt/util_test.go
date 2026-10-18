@@ -2,12 +2,14 @@ package main
 
 import (
 	"bytes"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
 	"testing"
+	"testing/fstest"
 
 	"github.com/gdamore/tcell"
 )
@@ -92,18 +94,18 @@ func TestIndexResourceName(t *testing.T) {
 }
 
 func TestReadResource(t *testing.T) {
-	dir := useTempStorage(t)
+	res, dir := newTestResources(t)
 
-	if got := readResource("words", "200en"); !strings.HasPrefix(string(got), "the\n") {
-		t.Errorf("builtin word list not found, got %.20q", got)
+	if got, err := res.read("words", "200en"); err != nil || !strings.HasPrefix(string(got), "the\n") {
+		t.Errorf("builtin word list not found, got %.20q, %v", got, err)
 	}
 
-	if got := readResource("words", "does-not-exist"); got != nil {
-		t.Errorf("readResource of a missing resource = %q, want nil", got)
+	if got, err := res.read("words", "does-not-exist"); err != errNoResource {
+		t.Errorf("reading a missing resource = %q, %v, want %v", got, err, errNoResource)
 	}
 
 	writeUserResource(t, dir, "words", "200en", "overridden")
-	if got := readResource("words", "200en"); string(got) != "overridden" {
+	if got, _ := res.read("words", "200en"); string(got) != "overridden" {
 		t.Errorf("user resource should take precedence over the builtin one, got %.20q", got)
 	}
 
@@ -111,17 +113,38 @@ func TestReadResource(t *testing.T) {
 	if err := os.WriteFile(path, []byte("from path"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if got := readResource("words", path); string(got) != "from path" {
-		t.Errorf("readResource(path) = %q, want %q", got, "from path")
+	if got, _ := res.read("words", path); string(got) != "from path" {
+		t.Errorf("read(path) = %q, want %q", got, "from path")
+	}
+}
+
+// The directories of resources are searched in order.
+func TestResourceDirectories(t *testing.T) {
+	res := &resources{
+		dirs: []fs.FS{
+			fstest.MapFS{"words/mine": {Data: []byte("first")}, "words/sub/x": {Data: []byte("in a directory")}},
+			fstest.MapFS{"words/mine": {Data: []byte("second")}, "words/theirs": {Data: []byte("theirs")}, "themes/t": {}},
+		},
+		readFile: func(string) ([]byte, error) { return nil, os.ErrNotExist },
+	}
+
+	if got, _ := res.read("words", "mine"); string(got) != "first" {
+		t.Errorf("read(mine) = %q, want the first one", got)
+	}
+	if got, _ := res.read("words", "theirs"); string(got) != "theirs" {
+		t.Errorf("read(theirs) = %q", got)
+	}
+	if got := res.list("words"); !reflect.DeepEqual(got, []string{"mine", "theirs"}) {
+		t.Errorf("list(words) = %q, want the files of every directory", got)
 	}
 }
 
 func TestListResourceNames(t *testing.T) {
-	dir := useTempStorage(t)
+	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "themes", "zzz-mine", "")
 	writeUserResource(t, dir, "themes", "default", "")
 
-	names := listResourceNames("themes")
+	names := res.list("themes")
 	if !sort.StringsAreSorted(names) {
 		t.Errorf("theme names are not sorted: %v", names)
 	}
@@ -137,15 +160,15 @@ func TestListResourceNames(t *testing.T) {
 		}
 	}
 
-	words := listResourceNames("words")
+	words := res.list("words")
 	for _, want := range []string{"1000en", "200en", "1000it", "it", "1000ru", "ru"} {
 		if indexResourceName(words, want) == -1 {
 			t.Errorf("word list %q missing from %v", want, words)
 		}
 	}
 
-	if quotes := listResourceNames("quotes"); !reflect.DeepEqual(quotes, []string{"en", "it"}) {
-		t.Errorf("listResourceNames(quotes) = %v, want [en it]", quotes)
+	if quotes := res.list("quotes"); !reflect.DeepEqual(quotes, []string{"en", "it"}) {
+		t.Errorf("res.list(quotes) = %v, want [en it]", quotes)
 	}
 }
 
@@ -226,7 +249,7 @@ func TestLineWidth(t *testing.T) {
 }
 
 func TestBuiltinResourcesMatchFiles(t *testing.T) {
-	useTempStorage(t)
+	res, _ := newTestResources(t)
 
 	for _, typ := range []string{"themes", "words", "quotes"} {
 		dir := filepath.Join("..", "..", typ)
@@ -235,7 +258,7 @@ func TestBuiltinResourcesMatchFiles(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if names := listResourceNames(typ); len(names) != len(entries) {
+		if names := res.list(typ); len(names) != len(entries) {
 			t.Errorf("%d builtin %s, want %d", len(names), typ, len(entries))
 		}
 
@@ -245,28 +268,18 @@ func TestBuiltinResourcesMatchFiles(t *testing.T) {
 				t.Fatal(err)
 			}
 
-			if got := readResource(typ, e.Name()); !bytes.Equal(got, want) {
+			if got, _ := res.read(typ, e.Name()); !bytes.Equal(got, want) {
 				t.Errorf("builtin %s/%s differs from the file in the repository", typ, e.Name())
 			}
 		}
 	}
 }
 
-// useStdin makes resources named "-" read from the given text for the
-// duration of the calling test.
-func useStdin(t *testing.T, text string) {
-	t.Helper()
-
-	old := stdinResource
-	stdinResource = &onceReader{r: strings.NewReader(text)}
-	t.Cleanup(func() { stdinResource = old })
-}
-
 func TestReadResourceFromStdinMoreThanOnce(t *testing.T) {
-	useStdin(t, "alpha beta")
+	res := newResources(t.TempDir(), strings.NewReader("alpha beta"))
 
 	for i := 0; i < 2; i++ {
-		if got := readResource("words", "-"); string(got) != "alpha beta" {
+		if got, err := res.read("words", "-"); err != nil || string(got) != "alpha beta" {
 			t.Errorf("reading - a %d time = %q, want %q", i+1, got, "alpha beta")
 		}
 	}

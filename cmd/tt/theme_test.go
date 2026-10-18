@@ -50,19 +50,19 @@ func TestParseConfig(t *testing.T) {
 }
 
 func TestBuiltinThemesAreValid(t *testing.T) {
-	useTempStorage(t)
+	res, _ := newTestResources(t)
 
-	for _, name := range listResourceNames("themes") {
-		if _, err := loadTheme(name, true); err != nil {
+	for _, name := range res.list("themes") {
+		if _, err := loadTheme(res, name, true); err != nil {
 			t.Errorf("builtin theme %q is invalid: %v", name, err)
 		}
 	}
 }
 
 func TestLoadTheme(t *testing.T) {
-	dir := useTempStorage(t)
+	res, dir := newTestResources(t)
 
-	got, err := loadTheme("default", false)
+	got, err := loadTheme(res, "default", false)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,26 +79,26 @@ func TestLoadTheme(t *testing.T) {
 		t.Errorf("transparent default theme = %v, want %v", got, want)
 	}
 
-	if got, err = loadTheme("default", true); err != nil {
+	if got, err = loadTheme(res, "default", true); err != nil {
 		t.Fatal(err)
 	} else if got.bgcol != tcell.NewRGBColor(0x28, 0x28, 0x28) {
 		t.Errorf("opaque default theme bg = %v, want #282828", got.bgcol)
 	}
 
-	if _, err := loadTheme("does-not-exist", false); err == nil {
+	if _, err := loadTheme(res, "does-not-exist", false); err == nil {
 		t.Error("loading a missing theme should fail")
 	}
 
 	writeUserResource(t, dir, "themes", "partial", "fgcol: #ffffff\n")
-	if _, err := loadTheme("partial", false); err == nil || !strings.Contains(err.Error(), "hicol") {
+	if _, err := loadTheme(res, "partial", false); err == nil || !strings.Contains(err.Error(), "hicol") {
 		t.Errorf("loading a theme without hicol: err = %v, want an error mentioning hicol", err)
 	}
 
 	writeUserResource(t, dir, "themes", "nobg", "fgcol: #ffffff\nhicol: #ffffff\nhicol2: #ffffff\nhicol3: #ffffff\nerrcol: #ffffff\n")
-	if _, err := loadTheme("nobg", false); err != nil {
+	if _, err := loadTheme(res, "nobg", false); err != nil {
 		t.Errorf("bgcol should not be required for transparent themes: %v", err)
 	}
-	if _, err := loadTheme("nobg", true); err == nil || !strings.Contains(err.Error(), "bgcol") {
+	if _, err := loadTheme(res, "nobg", true); err == nil || !strings.Contains(err.Error(), "bgcol") {
 		t.Errorf("loading an opaque theme without bgcol: err = %v, want an error mentioning bgcol", err)
 	}
 }
@@ -111,13 +111,21 @@ func TestNewTcellColorRejectsInvalidDigits(t *testing.T) {
 	}
 }
 
+// listing lists the given resources of resourceReader, whatever their type.
+type listing struct {
+	resourceReader
+	names []string
+}
+
+func (l listing) list(string) []string { return l.names }
+
 func TestThemeCycler(t *testing.T) {
-	dir := useTempStorage(t)
+	res, dir := newTestResources(t)
 	valid := "fgcol: #ffffff\nhicol: #ffffff\nhicol2: #ffffff\nhicol3: #ffffff\nerrcol: #ffffff\n"
 	writeUserResource(t, dir, "themes", "a", valid)
 	writeUserResource(t, dir, "themes", "bad", "fgcol: #ffffff\n")
 	writeUserResource(t, dir, "themes", "c", valid)
-	names := []string{"a", "bad", "c"}
+	names := listing{res, []string{"a", "bad", "c"}}
 
 	assertNext := func(c *themeCycler, direction int, want string) {
 		t.Helper()
@@ -138,16 +146,16 @@ func TestThemeCycler(t *testing.T) {
 	assertNext(newThemeCycler(names, "unknown", false), 1, "a")
 	assertNext(newThemeCycler(names, "unknown", false), -1, "c")
 
-	if name, _, err := newThemeCycler(nil, "a", false).next(1); name != "" || err != nil {
+	if name, _, err := newThemeCycler(listing{res, nil}, "a", false).next(1); name != "" || err != nil {
 		t.Errorf("without themes next() = %q, %v, want no theme and no error", name, err)
 	}
 
-	if _, _, err := newThemeCycler([]string{"bad"}, "a", false).next(1); err == nil {
+	if _, _, err := newThemeCycler(listing{res, []string{"bad"}}, "a", false).next(1); err == nil {
 		t.Error("next() should fail when no theme is valid")
 	}
 
-	name, th, err := newThemeCycler([]string{"default"}, "", true).next(1)
-	if want, _ := loadTheme("default", true); name != "default" || th != want || err != nil {
+	name, th, err := newThemeCycler(listing{res, []string{"default"}}, "", true).next(1)
+	if want, _ := loadTheme(res, "default", true); name != "default" || th != want || err != nil {
 		t.Errorf("next() = %q, %v, %v, want the opaque default theme", name, th, err)
 	}
 }

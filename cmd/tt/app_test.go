@@ -13,10 +13,10 @@ import (
 func newTestApp(t *testing.T, opts options) (*app, tcell.SimulationScreen) {
 	t.Helper()
 
-	useTempStorage(t)
+	res, _ := newTestResources(t)
 	sim := newSimScreen(t)
 
-	a, err := newApp(sim, opts, testKind{mode: "words", source: "test"}, newTestStore(t))
+	a, err := newApp(sim, opts, testKind{mode: "words", source: "test"}, newTestStore(t), res)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -245,7 +245,8 @@ func TestAppRawMode(t *testing.T) {
 func TestAppCyclesThemes(t *testing.T) {
 	a, sim := newTestApp(t, parseFlags(nil))
 
-	names := listResourceNames("themes")
+	res, _ := newTestResources(t)
+	names := res.list("themes")
 	next := names[indexResourceName(names, "default")+1]
 
 	var calls int
