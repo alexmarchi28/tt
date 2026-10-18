@@ -139,7 +139,9 @@ func (a *app) record(res testResult) personalBest {
 		Timestamp: timestamp,
 		Duration:  res.duration.Seconds(),
 	}.withKind(a.kind))
-	saveMistakes(res.mistakes)
+	if err := saveMistakes(res.mistakes); err != nil {
+		die("could not save the mistakes: %v", err)
+	}
 	saveKeyStats(res.keystrokes)
 
 	if best, ok := bestWpm(previous, a.kind); ok && res.wpm() > best {

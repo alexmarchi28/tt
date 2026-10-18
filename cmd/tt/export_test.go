@@ -69,7 +69,9 @@ func TestExportResultsAsJSON(t *testing.T) {
 
 func TestExportMistakes(t *testing.T) {
 	useTempStorage(t)
-	saveMistakes([]mistake{{"the", "teh"}, {"say,", "sya,"}})
+	if err := saveMistakes([]mistake{{"the", "teh"}, {"say,", "sya,"}}); err != nil {
+		t.Fatal(err)
+	}
 
 	want := "word,typed\nthe,teh\n\"say,\",\"sya,\"\n"
 	if got := export(t, "mistakes", false); got != want {
