@@ -4,17 +4,21 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"runtime"
 	"time"
 
 	"github.com/gdamore/tcell"
 )
 
+// outcome is how a test ended.
+type outcome int
+
 const (
-	TyperComplete = iota
-	TyperSigInt
-	TyperEscape
-	TyperPrevious
-	TyperNext
+	outcomeComplete outcome = iota // The text was typed, or the time is up.
+	outcomeQuit
+	outcomeRestart
+	outcomePrevious
+	outcomeNext
 )
 
 type segment struct {
@@ -41,6 +45,7 @@ type typer struct {
 	Pace             int  // Speed in WPM of a pacer shown through the text, 0 for none.
 	CycleTheme       func(direction int) (string, error)
 	Wrap             func(text string, screenWidth int) string // Lays out the text on the screen, nil to show it as is.
+	keys             keymap
 	tty              io.Writer
 	now              func() time.Time // The clock, replaced in tests.
 	tick             time.Duration    // Interval between screen updates.
@@ -60,21 +65,6 @@ type typer struct {
 	showKeyboardHelp    bool
 }
 
-var keyboardHelpLines = []string{
-	"Help",
-	"? - show/hide this help",
-	"Esc - restart the current test",
-	"C-c - quit",
-	"C-l - redraw the terminal",
-	"Right - next test",
-	"Left - previous test",
-	"C-n - next theme",
-	"C-p - previous theme",
-	"Backspace - delete previous character if enabled",
-	"C-w / C-backspace / Alt-backspace - delete previous word if enabled",
-	"Space - skip current word if enabled",
-}
-
 func NewTyper(scr tcell.Screen, emboldenTypedText bool, th theme) *typer {
 	var tty io.Writer
 
@@ -87,6 +77,7 @@ func NewTyper(scr tcell.Screen, emboldenTypedText bool, th theme) *typer {
 	t := &typer{
 		Scr:      scr,
 		SkipWord: true,
+		keys:     newKeymap(runtime.GOOS),
 		tty:      tty,
 		now:      time.Now,
 		tick:     500 * time.Millisecond,
@@ -168,9 +159,10 @@ func (t *typer) statusMessageActive() string {
 	return t.statusMessage
 }
 
-func keyboardHelpDimensions() (width, height int) {
-	height = len(keyboardHelpLines)
-	for _, line := range keyboardHelpLines {
+func (t *typer) keyboardHelpDimensions() (width, height int) {
+	lines := t.keys.help()
+	height = len(lines)
+	for _, line := range lines {
 		if len([]rune(line)) > width {
 			width = len([]rune(line))
 		}
@@ -180,7 +172,7 @@ func keyboardHelpDimensions() (width, height int) {
 }
 
 func (t *typer) clearKeyboardHelpArea(sw, sh int) {
-	width, height := keyboardHelpDimensions()
+	width, height := t.keyboardHelpDimensions()
 	if width > sw {
 		width = sw
 	}
@@ -196,7 +188,7 @@ func (t *typer) clearKeyboardHelpArea(sw, sh int) {
 }
 
 func (t *typer) drawKeyboardHelp(sw, sh int) {
-	for y, line := range keyboardHelpLines {
+	for y, line := range t.keys.help() {
 		if y >= sh {
 			return
 		}
@@ -215,9 +207,8 @@ func (t *typer) drawKeyboardHelp(sw, sh int) {
 	}
 }
 
-// testResult is the outcome of a test.
+// testResult measures the typing of a test.
 type testResult struct {
-	rc           int
 	duration     time.Duration
 	correctChars int // Correctly typed characters, used for the speed.
 	correctKeys  int // Correct keystrokes, used for the accuracy.
@@ -242,15 +233,16 @@ func (r testResult) accuracy() float64 {
 	return calcAccuracy(r.correctKeys, r.wrongKeys)
 }
 
-// Start runs a test made of the given segments. A timeout of -1 disables the
+// Start runs a test made of the given segments and returns how it ended
+// along with the typing of the segments typed. A timeout of -1 disables the
 // time limit.
-func (t *typer) Start(text []segment, timeout time.Duration) (res testResult) {
+func (t *typer) Start(text []segment, timeout time.Duration) (o outcome, res testResult) {
 	timeLeft := timeout
 
 	for i, s := range text {
-		r := t.start(s.Text, timeLeft, i > 0, s.Attribution)
+		var r testResult
+		o, r = t.start(s.Text, timeLeft, i > 0, s.Attribution)
 
-		res.rc = r.rc
 		res.duration += r.duration
 		res.correctChars += r.correctChars
 		res.correctKeys += r.correctKeys
@@ -268,7 +260,7 @@ func (t *typer) Start(text []segment, timeout time.Duration) (res testResult) {
 			}
 		}
 
-		if r.rc != TyperComplete {
+		if o != outcomeComplete {
 			return
 		}
 	}
@@ -278,7 +270,7 @@ func (t *typer) Start(text []segment, timeout time.Duration) (res testResult) {
 
 // start runs the typing of a single segment. The timer starts with the first
 // key press, unless startImmediately is set.
-func (t *typer) start(text string, timeLimit time.Duration, startImmediately bool, attribution string) testResult {
+func (t *typer) start(text string, timeLimit time.Duration, startImmediately bool, attribution string) (outcome, testResult) {
 	s := t.newSession(text, timeLimit, attribution)
 	if startImmediately {
 		s.startTimer()
@@ -303,15 +295,19 @@ func (t *typer) start(text string, timeLimit time.Duration, startImmediately boo
 
 		ev := t.Scr.PollEvent()
 		if s.timeUp() { //Whatever happened after the time limit comes too late.
-			return s.result()
+			return outcomeComplete, s.result()
 		}
 
 		switch ev := ev.(type) {
 		case *tcell.EventResize:
 			s.resize()
 		case *tcell.EventKey:
-			if res, ended := s.handleKey(ev); ended {
-				return res
+			if o, ended := s.handleKey(ev); ended {
+				if o != outcomeComplete {
+					return o, testResult{}
+				}
+
+				return o, s.result()
 			}
 		default: //The ticks of startTicker only update the screen.
 		}

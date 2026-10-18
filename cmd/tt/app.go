@@ -107,16 +107,16 @@ func (a *app) run(src testSource) (int, error) {
 			a.typer.ShowStatusMessage(d.describe(), 0)
 		}
 
-		res := a.typer.Start(tests[idx], a.rules.timeout)
+		o, res := a.typer.Start(tests[idx], a.rules.timeout)
 
-		switch res.rc {
-		case TyperNext:
+		switch o {
+		case outcomeNext:
 			idx++
-		case TyperPrevious:
+		case outcomePrevious:
 			if idx > 0 {
 				idx--
 			}
-		case TyperComplete:
+		case outcomeComplete:
 			best, err := a.record(res)
 			if err != nil {
 				return 1, err
@@ -136,7 +136,8 @@ func (a *app) run(src testSource) (int, error) {
 			}
 
 			idx++
-		case TyperSigInt:
+		case outcomeRestart: //The same test is shown again.
+		case outcomeQuit:
 			return 1, nil
 		}
 	}
