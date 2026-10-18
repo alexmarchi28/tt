@@ -80,11 +80,7 @@ func (s *typingState) typeRune(r rune, skipWord bool, at time.Duration) {
 		s.idx++
 	}
 
-	//Line breaks are never typed.
-	for s.idx < len(s.text) && s.text[s.idx] == '\n' {
-		s.typed[s.idx] = s.text[s.idx]
-		s.idx++
-	}
+	s.skipLineBreaks()
 }
 
 // backspace moves the cursor back by one character, skipping line breaks.
@@ -122,6 +118,41 @@ func (s *typingState) deleteWord() {
 	}
 
 	if isWordSeparator(s.text[s.idx]) {
+		s.typed[s.idx] = s.text[s.idx]
+		s.idx++
+	}
+}
+
+// relayout replaces the text with the same characters arranged on different
+// lines, as when it is wrapped at another width, keeping what was typed. The
+// texts may differ only in their line breaks.
+func (s *typingState) relayout(text string) {
+	var typed []rune // What was typed at each position before the cursor, line breaks excluded.
+	for i := 0; i < s.idx; i++ {
+		if s.text[i] != '\n' {
+			typed = append(typed, s.typed[i])
+		}
+	}
+
+	s.text = []rune(text)
+	s.typed = make([]rune, len(s.text))
+	s.idx = 0
+
+	for _, r := range typed {
+		s.skipLineBreaks()
+		s.typed[s.idx] = r
+		s.idx++
+	}
+
+	if s.idx > 0 {
+		s.skipLineBreaks()
+	}
+}
+
+// skipLineBreaks moves the cursor past the line breaks at its position, which
+// are never typed.
+func (s *typingState) skipLineBreaks() {
+	for s.idx < len(s.text) && s.text[s.idx] == '\n' {
 		s.typed[s.idx] = s.text[s.idx]
 		s.idx++
 	}

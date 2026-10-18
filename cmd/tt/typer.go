@@ -15,7 +15,6 @@ const (
 	TyperEscape
 	TyperPrevious
 	TyperNext
-	TyperResize
 )
 
 type segment struct {
@@ -41,6 +40,7 @@ type typer struct {
 	Blind            bool // Show mistakes like correctly typed characters.
 	Pace             int  // Speed in WPM of a pacer shown through the text, 0 for none.
 	CycleTheme       func(direction int) (string, error)
+	Wrap             func(text string, screenWidth int) string // Lays out the text on the screen, nil to show it as is.
 	tty              io.Writer
 	now              func() time.Time // The clock, replaced in tests.
 	tick             time.Duration    // Interval between screen updates.
@@ -308,7 +308,7 @@ func (t *typer) start(text string, timeLimit time.Duration, startImmediately boo
 
 		switch ev := ev.(type) {
 		case *tcell.EventResize:
-			return testResult{rc: TyperResize}
+			s.resize()
 		case *tcell.EventKey:
 			if res, ended := s.handleKey(ev); ended {
 				return res

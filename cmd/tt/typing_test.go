@@ -260,3 +260,59 @@ func TestTypingStateRecordsKeystrokes(t *testing.T) {
 		})
 	}
 }
+
+func TestTypingStateRelayout(t *testing.T) {
+	tests := []struct {
+		name         string
+		from, to     string
+		keys         string
+		idx          int
+		correctChars int
+		mistakes     []mistake
+	}{
+		{"line break added before the cursor", "ab cd ef", "ab \ncd ef", "ab cx", 6, 4, []mistake{{"cd", "cx"}}},
+		{"line break removed before the cursor", "ab \ncd ef", "ab cd ef", "ab cx", 5, 4, []mistake{{"cd", "cx"}}},
+		{"line break moved after the cursor", "ab \ncd ef", "ab cd \nef", "a", 1, 1, nil},
+		{"skipped word", "ab cd ef", "ab \ncd \nef", "a c", 5, 3, []mistake{{"ab", "a_"}}},
+		{"nothing typed", "ab cd", "ab \ncd", "", 0, 0, nil},
+		{"text complete", "ab cd", "ab \ncd", "ab cd", 6, 5, nil},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			s := typeKeys(tc.from, tc.keys, true)
+			keystrokes := append([]keystroke(nil), s.keystrokes...)
+
+			s.relayout(tc.to)
+
+			if string(s.text) != tc.to {
+				t.Errorf("text = %q, want %q", string(s.text), tc.to)
+			}
+			if s.idx != tc.idx {
+				t.Errorf("idx = %d, want %d", s.idx, tc.idx)
+			}
+			if got := s.correctChars(); got != tc.correctChars {
+				t.Errorf("correctChars() = %d, want %d", got, tc.correctChars)
+			}
+			if got := s.mistakes(); !reflect.DeepEqual(got, tc.mistakes) {
+				t.Errorf("mistakes() = %q, want %q", got, tc.mistakes)
+			}
+			if !reflect.DeepEqual(s.keystrokes, keystrokes) {
+				t.Errorf("keystrokes = %v, want %v", s.keystrokes, keystrokes)
+			}
+		})
+	}
+}
+
+func TestTypingStateRelayoutKeepsTyping(t *testing.T) {
+	s := typeKeys("ab cd ef", "ab c", true)
+	s.relayout("ab \ncd \nef")
+
+	for _, r := range "d ef" {
+		s.typeRune(r, true, 0)
+	}
+
+	if !s.done() || s.correctChars() != 8 || s.mistakes() != nil {
+		t.Errorf("done %t, %d correct characters, mistakes %q, want done, 8, none", s.done(), s.correctChars(), s.mistakes())
+	}
+}
