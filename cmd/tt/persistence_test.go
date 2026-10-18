@@ -16,12 +16,12 @@ func TestSavePersistedResult(t *testing.T) {
 	}
 
 	first := persistedResult{Wpm: 60, Accuracy: 95.5, Timestamp: 1000}
-	if previous := savePersistedResult(first); previous != nil {
+	if previous, err := savePersistedResult(first); previous != nil || err != nil {
 		t.Errorf("results saved before the first one: %+v", previous)
 	}
 
 	second := persistedResult{Wpm: 72, Accuracy: 100, Timestamp: 2000, Mode: "quotes", Source: "en", Duration: 12.5, Seconds: 30}
-	if previous := savePersistedResult(second); !reflect.DeepEqual(previous, []persistedResult{first}) {
+	if previous, err := savePersistedResult(second); err != nil || !reflect.DeepEqual(previous, []persistedResult{first}) {
 		t.Errorf("results saved before the second one: %+v, want the first one", previous)
 	}
 
@@ -161,7 +161,9 @@ func TestRememberedTheme(t *testing.T) {
 func TestSavePersistedResultWithoutKeystrokes(t *testing.T) {
 	useTempStorage(t)
 
-	savePersistedResult(persistedResult{Wpm: 0, Accuracy: calcAccuracy(0, 0), Timestamp: 1000})
+	if _, err := savePersistedResult(persistedResult{Wpm: 0, Accuracy: calcAccuracy(0, 0), Timestamp: 1000}); err != nil {
+		t.Fatal(err)
+	}
 
 	got, err := readPersistedResults()
 	if err != nil {

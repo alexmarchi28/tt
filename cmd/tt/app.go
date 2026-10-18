@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"time"
 
 	"github.com/gdamore/tcell"
@@ -19,13 +18,13 @@ type app struct {
 	words   *adaptiveWords // The word list of adaptive tests, nil for other tests.
 }
 
-func newApp(scr tcell.Screen, opts options, kind testKind) *app {
+func newApp(scr tcell.Screen, opts options, kind testKind) (*app, error) {
 	a := &app{opts: opts, kind: kind, scr: scr}
 
 	if kind.mode == modeAdaptive {
 		words, err := loadAdaptiveWords(adaptiveWordList(opts))
 		if err != nil {
-			die("%v", err)
+			return nil, err
 		}
 		a.words = &words
 	}
@@ -35,7 +34,7 @@ func newApp(scr tcell.Screen, opts options, kind testKind) *app {
 	} else {
 		th, err := loadTheme(opts.themeName, opts.opaqueBg)
 		if err != nil {
-			die("%s theme is invalid: %v", opts.themeName, err)
+			return nil, fmt.Errorf("%s theme is invalid: %v", opts.themeName, err)
 		}
 
 		a.typer = NewTyper(scr, opts.bold, th)
@@ -73,12 +72,13 @@ func newApp(scr tcell.Screen, opts options, kind testKind) *app {
 		}
 	}
 
-	return a
+	return a, nil
 }
 
 // run shows the tests produced by testFn until there are no more or the user
-// quits, and returns the exit code.
-func (a *app) run(testFn func() []segment) int {
+// quits, and returns the exit code. It stops at the first test whose outcome
+// can't be saved.
+func (a *app) run(testFn func() []segment) (int, error) {
 	var tests [][]segment
 	var idx = 0
 
@@ -88,7 +88,7 @@ func (a *app) run(testFn func() []segment) int {
 		}
 
 		if tests[idx] == nil {
-			return 0
+			return 0, nil
 		}
 
 		if a.words != nil {
@@ -105,7 +105,10 @@ func (a *app) run(testFn func() []segment) int {
 				idx--
 			}
 		case TyperComplete:
-			best := a.record(res)
+			best, err := a.record(res)
+			if err != nil {
+				return 1, err
+			}
 
 			if !a.opts.noReport {
 				attribution := ""
@@ -113,59 +116,54 @@ func (a *app) run(testFn func() []segment) int {
 					attribution = tests[idx][0].Attribution
 				}
 				if quit := showReport(a.scr, formatReport(res, attribution, best)); quit {
-					return 1
+					return 1, nil
 				}
 			}
 			if a.opts.oneShot {
-				return 0
+				return 0, nil
 			}
 
 			idx++
 		case TyperSigInt:
-			return 1
+			return 1, nil
 		}
 	}
 }
 
 // record stores the outcome of a completed test and tells whether it is a
 // new personal best.
-func (a *app) record(res testResult) personalBest {
+func (a *app) record(res testResult) (personalBest, error) {
 	timestamp := time.Now().Unix()
 
 	a.results = append(a.results, result{res.wpm(), res.cpm(), res.accuracy(), timestamp, res.mistakes})
-	previous := savePersistedResult(persistedResult{
+	previous, err := savePersistedResult(persistedResult{
 		Wpm:       res.wpm(),
 		Accuracy:  res.accuracy(),
 		Timestamp: timestamp,
 		Duration:  res.duration.Seconds(),
 	}.withKind(a.kind))
-	if err := saveMistakes(res.mistakes); err != nil {
-		die("could not save the mistakes: %v", err)
+	if err != nil {
+		return personalBest{}, err
 	}
-	saveKeyStats(res.keystrokes)
+	if err := saveMistakes(res.mistakes); err != nil {
+		return personalBest{}, fmt.Errorf("could not save the mistakes: %v", err)
+	}
+	if err := saveKeyStats(res.keystrokes); err != nil {
+		return personalBest{}, fmt.Errorf("could not save the key statistics: %v", err)
+	}
 
 	if best, ok := bestWpm(previous, a.kind); ok && res.wpm() > best {
-		return personalBest{beaten: true, previous: best}
+		return personalBest{beaten: true, previous: best}, nil
 	}
 
-	return personalBest{}
+	return personalBest{}, nil
 }
 
-// exit restores the terminal, remembers the selected theme, prints the
-// results if requested and exits.
-func (a *app) exit(rc int) {
-	a.scr.Fini()
-	scr = nil
-
-	if a.theme != "" {
-		if err := writeAppConfig(appConfig{Theme: a.theme}); err != nil {
-			fmt.Fprintf(os.Stderr, "WARNING: could not save theme selection: %v\n", err)
-		}
+// saveTheme remembers the theme selected last, if any.
+func (a *app) saveTheme() error {
+	if a.theme == "" {
+		return nil
 	}
 
-	if err := writeResults(os.Stdout, a.results, a.opts.json, a.opts.csv); err != nil {
-		panic(err)
-	}
-
-	os.Exit(rc)
+	return writeAppConfig(appConfig{Theme: a.theme})
 }

@@ -16,7 +16,10 @@ func newTestApp(t *testing.T, opts options) (*app, tcell.SimulationScreen) {
 	useTempStorage(t)
 	sim := newSimScreen(t)
 
-	a := newApp(sim, opts, testKind{mode: "words", source: "test"})
+	a, err := newApp(sim, opts, testKind{mode: "words", source: "test"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	a.typer.tty = io.Discard
 
 	return a, sim
@@ -37,7 +40,13 @@ func testSequence(calls *int, texts ...string) func() []segment {
 
 func startApp(a *app, testFn func() []segment) <-chan int {
 	done := make(chan int, 1)
-	go func() { done <- a.run(testFn) }()
+	go func() {
+		rc, err := a.run(testFn)
+		if err != nil {
+			rc = -1
+		}
+		done <- rc
+	}()
 	return done
 }
 

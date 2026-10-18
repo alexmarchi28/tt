@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"sort"
 	"strings"
@@ -222,21 +223,22 @@ func formatStats(stored []persistedResult, mistakes []mistake, now time.Time) st
 	return b.String()
 }
 
-func printStats() {
+func printStats(w io.Writer) error {
 	stored, err := readPersistedResults()
 	if err != nil {
-		die("%v", err)
+		return err
 	}
 
 	if len(stored) == 0 {
-		fmt.Println("No saved results yet.")
-		return
+		_, err := fmt.Fprintln(w, "No saved results yet.")
+		return err
 	}
 
 	//Mistakes are only an addition to the results, ignore them if they can't be read.
 	mistakes, _ := readMistakes()
 
-	fmt.Print(formatStats(stored, mistakes, time.Now()))
+	_, err = fmt.Fprint(w, formatStats(stored, mistakes, time.Now()))
+	return err
 }
 
 // Speeds of the pacer taken from the saved results, see -pace.

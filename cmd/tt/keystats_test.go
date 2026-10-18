@@ -77,8 +77,11 @@ func TestSaveKeyStats(t *testing.T) {
 		t.Errorf("loadKeyStats() without a file = %+v, want empty statistics", got)
 	}
 
-	saveKeyStats([]keystroke{{'a', 'a', 0}, {'b', 'x', 100 * time.Millisecond}})
-	saveKeyStats([]keystroke{{'a', 'a', 0}})
+	for _, strokes := range [][]keystroke{{{'a', 'a', 0}, {'b', 'x', 100 * time.Millisecond}}, {{'a', 'a', 0}}} {
+		if err := saveKeyStats(strokes); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	got := loadKeyStats()
 	if got.Chars["a"].Count != 2 || got.Chars["b"].ErrorRate != 1 || got.Bigrams["ab"].Count != 1 {
@@ -94,7 +97,9 @@ func TestSaveKeyStatsOverCorruptFile(t *testing.T) {
 	}
 
 	// The statistics are only an aid, they start over rather than stopping tt.
-	saveKeyStats([]keystroke{{'a', 'a', 0}})
+	if err := saveKeyStats([]keystroke{{'a', 'a', 0}}); err != nil {
+		t.Fatal(err)
+	}
 	if got := loadKeyStats(); got.Chars["a"].Count != 1 {
 		t.Errorf("statistics = %+v, want them to start over", got)
 	}

@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -53,11 +54,16 @@ func (r persistedResult) withKind(k testKind) persistedResult {
 	return r
 }
 
+// storageErr tells why the locations of the saved data couldn't be
+// resolved, if they couldn't.
+var storageErr error
+
 func init() {
 	//$HOME on unix, %USERPROFILE% on windows.
 	home, err := os.UserHomeDir()
 	if err != nil {
-		die("could not resolve the home directory")
+		storageErr = errors.New("could not resolve the home directory")
+		return
 	}
 
 	data, ok := os.LookupEnv("XDG_DATA_HOME")
@@ -167,17 +173,17 @@ func saveMistakes(mistakes []mistake) error {
 
 // savePersistedResult adds r to the saved results and returns the ones saved
 // before it.
-func savePersistedResult(r persistedResult) []persistedResult {
+func savePersistedResult(r persistedResult) ([]persistedResult, error) {
 	stored, err := readPersistedResults()
 	if err != nil {
-		die("%v", err)
+		return nil, err
 	}
 
 	if err := writePersistedResults(append(stored, r)); err != nil {
-		die("could not save the result: %v", err)
+		return nil, fmt.Errorf("could not save the result: %v", err)
 	}
 
-	return stored
+	return stored, nil
 }
 
 // loadKeyStats returns the saved key statistics. They are only an aid which
@@ -192,11 +198,9 @@ func loadKeyStats() keyStats {
 }
 
 // saveKeyStats adds the keystrokes of a test to the saved key statistics.
-func saveKeyStats(strokes []keystroke) {
+func saveKeyStats(strokes []keystroke) error {
 	ks := loadKeyStats()
 	ks.add(strokes)
 
-	if err := writeValue(keyStatsDB, ks); err != nil {
-		panic(err)
-	}
+	return writeValue(keyStatsDB, ks)
 }
