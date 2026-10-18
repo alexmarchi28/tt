@@ -304,3 +304,17 @@ func TestAppShowsAdaptiveFocus(t *testing.T) {
 	sendKeys(t, sim, tcell.KeyCtrlC)
 	waitExitCode(t, done)
 }
+
+// The word list of adaptive tests is read by both the generator and the app.
+func TestAdaptiveWordListFromStdin(t *testing.T) {
+	useTempStorage(t)
+	useStdin(t, "alpha beta gamma delta")
+	opts := parseFlags([]string{"-adaptive", "-words", "-"})
+
+	if _, _, err := newTestGenerator(opts, strings.NewReader(""), true); err != nil {
+		t.Fatalf("generator: %v", err)
+	}
+	if _, err := loadAdaptiveWords(adaptiveWordList(opts)); err != nil {
+		t.Errorf("loading the word list a second time: %v", err)
+	}
+}

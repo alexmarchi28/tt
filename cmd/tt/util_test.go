@@ -251,3 +251,23 @@ func TestBuiltinResourcesMatchFiles(t *testing.T) {
 		}
 	}
 }
+
+// useStdin makes resources named "-" read from the given text for the
+// duration of the calling test.
+func useStdin(t *testing.T, text string) {
+	t.Helper()
+
+	old := stdinResource
+	stdinResource = &onceReader{r: strings.NewReader(text)}
+	t.Cleanup(func() { stdinResource = old })
+}
+
+func TestReadResourceFromStdinMoreThanOnce(t *testing.T) {
+	useStdin(t, "alpha beta")
+
+	for i := 0; i < 2; i++ {
+		if got := readResource("words", "-"); string(got) != "alpha beta" {
+			t.Errorf("reading - a %d time = %q, want %q", i+1, got, "alpha beta")
+		}
+	}
+}

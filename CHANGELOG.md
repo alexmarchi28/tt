@@ -15,6 +15,8 @@ Fixed:
  - The Russian word list contained the English word TRUE.
  - Resizing the terminal no longer restarts the test: the text is wrapped again
    for the new width, keeping what was typed and the time.
+ - -adaptive -words - (the word list read from stdin) no longer fails with an
+   empty word list.
 
 # 1.1.0:
 
