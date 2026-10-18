@@ -15,20 +15,29 @@ type sessionStore interface {
 	configStore
 }
 
+// appDeps are what the app works with.
+type appDeps struct {
+	store     sessionStore
+	resources resourceLister
+	now       func() time.Time
+}
+
 // app runs the sequence of tests requested on the command line.
 type app struct {
 	opts    options
 	kind    testKind
 	scr     tcell.Screen
 	store   sessionStore
+	now     func() time.Time
 	typer   *typer
 	results []result
 	theme   string         // Theme to remember on exit, empty if none.
 	words   *adaptiveWords // The word list of adaptive tests, nil for other tests.
 }
 
-func newApp(scr tcell.Screen, opts options, kind testKind, st sessionStore, res resourceLister) (*app, error) {
-	a := &app{opts: opts, kind: kind, scr: scr, store: st}
+func newApp(scr tcell.Screen, opts options, kind testKind, deps appDeps) (*app, error) {
+	a := &app{opts: opts, kind: kind, scr: scr, store: deps.store, now: deps.now}
+	res := deps.resources
 
 	if kind.mode == modeAdaptive {
 		words, err := loadAdaptiveWords(res, adaptiveWordList(opts))
@@ -68,6 +77,7 @@ func newApp(scr tcell.Screen, opts options, kind testKind, st sessionStore, res 
 		!(opts.noHighlightNext || opts.noHighlight),
 	)
 
+	a.typer.now = deps.now
 	a.typer.SkipWord = !opts.noSkip
 	a.typer.DisableBackspace = opts.noBackspace
 	a.typer.BlockCursor = opts.blockCursor
@@ -142,7 +152,7 @@ func (a *app) run(testFn func() []segment) (int, error) {
 // record stores the outcome of a completed test and tells whether it is a
 // new personal best.
 func (a *app) record(res testResult) (personalBest, error) {
-	timestamp := time.Now().Unix()
+	timestamp := a.now().Unix()
 
 	a.results = append(a.results, result{res.wpm(), res.cpm(), res.accuracy(), timestamp, res.mistakes})
 	previous, err := a.store.AddResult(persistedResult{

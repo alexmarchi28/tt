@@ -186,7 +186,7 @@ func TestGenerateAdaptiveTestFavoursWeakWords(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "list", "the her err rare")
 
-	got := drawShares(t, mustGen(generateAdaptiveTest(res, "list", wordOptions{n: 100, g: 4}, 0, keyStatsOf(weakTH()))))
+	got := drawShares(t, mustGen(generateAdaptiveTest(newRand(), res, "list", wordOptions{n: 100, g: 4}, 0, keyStatsOf(weakTH()))))
 
 	// Uniformly drawn every word would make a quarter of the test.
 	for _, w := range []string{"her", "err", "rare"} {
@@ -200,7 +200,7 @@ func TestGenerateAdaptiveTestWithoutStatistics(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "list", "the her err rare")
 
-	got := drawShares(t, mustGen(generateAdaptiveTest(res, "list", wordOptions{n: 100, g: 4}, 40, keyStatsOf(newKeyStats()))))
+	got := drawShares(t, mustGen(generateAdaptiveTest(newRand(), res, "list", wordOptions{n: 100, g: 4}, 40, keyStatsOf(newKeyStats()))))
 
 	for _, w := range []string{"the", "her", "err", "rare"} {
 		if got[w] < 0.18 || got[w] > 0.32 {
@@ -218,7 +218,7 @@ func thShare(t *testing.T, focus int) float64 {
 	writeUserResource(t, dir, "words", "list", "the this that them then ab cd fg ij kl mn op qu vw xz ac bd ce df eg")
 
 	share := 0.0
-	for w, s := range drawShares(t, mustGen(generateAdaptiveTest(res, "list", wordOptions{n: 100, g: 4}, focus, keyStatsOf(weakTH())))) {
+	for w, s := range drawShares(t, mustGen(generateAdaptiveTest(newRand(), res, "list", wordOptions{n: 100, g: 4}, focus, keyStatsOf(weakTH())))) {
 		if strings.Contains(w, "th") {
 			share += s
 		}
@@ -252,7 +252,7 @@ func TestGenerateAdaptiveTestFocusOnASingleWord(t *testing.T) {
 
 	done := make(chan []segment, 1)
 	go func() {
-		done <- mustGen(generateAdaptiveTest(res, "list", wordOptions{n: 4, g: 1}, 100, keyStatsOf(weakTH())))()
+		done <- mustGen(generateAdaptiveTest(newRand(), res, "list", wordOptions{n: 4, g: 1}, 100, keyStatsOf(weakTH())))()
 	}()
 
 	select {
@@ -295,7 +295,7 @@ func TestAppShowsAdaptiveFocus(t *testing.T) {
 	}
 
 	sim := newSimScreen(t)
-	a, err := newApp(sim, parseFlags([]string{"-adaptive", "-words", "list", "-noreport"}), testKind{mode: "adaptive", source: "list"}, st, res)
+	a, err := newApp(sim, parseFlags([]string{"-adaptive", "-words", "list", "-noreport"}), testKind{mode: "adaptive", source: "list"}, appDeps{st, res, time.Now})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -315,7 +315,7 @@ func TestAdaptiveWordListFromStdin(t *testing.T) {
 	res.stdin = &onceReader{r: strings.NewReader("alpha beta gamma delta")}
 	opts := parseFlags([]string{"-adaptive", "-words", "-"})
 
-	if _, _, err := newTestGenerator(opts, strings.NewReader(""), true, newTestStore(t), res); err != nil {
+	if _, _, err := newTestGenerator(opts, textSources{newTestStore(t), res, newRand(), strings.NewReader(""), true}); err != nil {
 		t.Fatalf("generator: %v", err)
 	}
 	if _, err := loadAdaptiveWords(res, adaptiveWordList(opts)); err != nil {

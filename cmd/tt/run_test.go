@@ -48,6 +48,7 @@ func (r *testRun) environment(text string) environment {
 		stderr:          &r.stderr,
 		stdinIsTerminal: text == "",
 		getenv:          func(string) string { return "" },
+		now:             time.Now,
 		homeDir:         func() (string, error) { return r.home, nil },
 		newScreen: func(trueColor bool) (tcell.Screen, error) {
 			r.trueColor = trueColor
@@ -194,7 +195,7 @@ func TestNewAppWithInvalidTheme(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "themes", "broken", "fgcol: nope")
 
-	_, err := newApp(newSimScreen(t), parseFlags([]string{"-theme", "broken"}), testKind{}, &memStore{}, res)
+	_, err := newApp(newSimScreen(t), parseFlags([]string{"-theme", "broken"}), testKind{}, appDeps{&memStore{}, res, time.Now})
 	if err == nil || !strings.HasPrefix(err.Error(), "broken theme is invalid: ") {
 		t.Errorf("newApp with an invalid theme: %v, want an error", err)
 	}
@@ -203,7 +204,7 @@ func TestNewAppWithInvalidTheme(t *testing.T) {
 func TestProcessEnvironment(t *testing.T) {
 	env := processEnvironment()
 
-	if env.stdin != os.Stdin || env.stdout != os.Stdout || env.stderr != os.Stderr || env.getenv == nil || env.homeDir == nil || env.newScreen == nil {
+	if env.stdin != os.Stdin || env.stdout != os.Stdout || env.stderr != os.Stderr || env.getenv == nil || env.homeDir == nil || env.now == nil || env.newScreen == nil {
 		t.Errorf("processEnvironment() = %+v", env)
 	}
 }

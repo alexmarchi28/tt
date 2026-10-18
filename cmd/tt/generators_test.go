@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"math/rand"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -49,7 +50,7 @@ func TestGenerateWordTest(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "greek", "alpha beta\tgamma\ndelta")
 
-	gen := mustGen(generateWordTest(res, "greek", wordOptions{n: 3, g: 2}))
+	gen := mustGen(generateWordTest(newRand(), res, "greek", wordOptions{n: 3, g: 2}))
 	allowed := map[string]bool{"alpha": true, "beta": true, "gamma": true, "delta": true}
 
 	for i := 0; i < 20; i++ {
@@ -79,7 +80,7 @@ func TestGenerateWordTest(t *testing.T) {
 func TestGenerateWordTestUsesBuiltinLists(t *testing.T) {
 	res, _ := newTestResources(t)
 
-	gen := mustGen(generateWordTest(res, "1000en", wordOptions{n: 50, g: 1}))
+	gen := mustGen(generateWordTest(newRand(), res, "1000en", wordOptions{n: 50, g: 1}))
 	for i := 0; i < 100; i++ {
 		segments := gen()
 		if len(segments) != 1 {
@@ -93,7 +94,7 @@ func TestGenerateWordTestIgnoresBlankEntries(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "blanks", "\n  alpha beta\n\ngamma\t\n")
 
-	gen := mustGen(generateWordTest(res, "blanks", wordOptions{n: 10, g: 1}))
+	gen := mustGen(generateWordTest(newRand(), res, "blanks", wordOptions{n: 10, g: 1}))
 	for i := 0; i < 100; i++ {
 		assertWords(t, gen()[0].Text, 10)
 	}
@@ -122,7 +123,7 @@ func TestGenerateQuoteTest(t *testing.T) {
 		{"text": "second quote", "attribution": "someone else"}
 	]`)
 
-	gen := mustGen(generateQuoteTest(res, "mine"))
+	gen := mustGen(generateQuoteTest(newRand(), res, "mine"))
 	seen := map[string]bool{}
 
 	for i := 0; i < 50; i++ {
@@ -331,7 +332,7 @@ func TestNewTestGenerator(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			gen, kind, err := newTestGenerator(parseFlags(tc.args), strings.NewReader(tc.stdin), tc.stdinIsTerminal, st, res)
+			gen, kind, err := newTestGenerator(parseFlags(tc.args), textSources{st, res, newRand(), strings.NewReader(tc.stdin), tc.stdinIsTerminal})
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -423,7 +424,7 @@ func TestGenerateMistakesTest(t *testing.T) {
 	for i := 0; i < recentMistakes/10; i++ {
 		words = append(words, "often", "often", "often", "often", "often", "often", "often", "often", "rarely", "seldom")
 	}
-	gen := mustGen(generateMistakesTest(wordOptions{n: 50, g: 2}, mistakesOf(words...)))
+	gen := mustGen(generateMistakesTest(newRand(), wordOptions{n: 50, g: 2}, mistakesOf(words...)))
 	counts := map[string]int{}
 	for i := 0; i < 50; i++ {
 		segments := gen()
@@ -451,9 +452,10 @@ func TestGenerateMistakesTest(t *testing.T) {
 
 func TestRandomWords(t *testing.T) {
 	words := []string{"alpha", "beta", "gamma"}
+	rng := newRand()
 
 	for i := 0; i < 50; i++ {
-		got := randomWords(20, words)
+		got := randomWords(rng, 20, words)
 		if len(got) != 20 {
 			t.Fatalf("randomWords produced %d words, want 20: %q", len(got), got)
 		}
@@ -478,7 +480,7 @@ func TestRandomWordsWithoutAlternatives(t *testing.T) {
 	for name, words := range tests {
 		t.Run(name, func(t *testing.T) {
 			done := make(chan []string, 1)
-			go func() { done <- randomWords(4, words) }()
+			go func() { done <- randomWords(newRand(), 4, words) }()
 
 			select {
 			case got := <-done:
@@ -506,9 +508,10 @@ func endsSentence(w string) bool {
 func TestPunctuate(t *testing.T) {
 	words := []string{"alpha", "beta", "gamma", "delta", "épsilon", "zeta", "eta", "theta"}
 	marks := map[string]int{}
+	rng := newRand()
 
 	for i := 0; i < 500; i++ {
-		got := punctuate(words)
+		got := punctuate(rng, words)
 		if len(got) != len(words) {
 			t.Fatalf("punctuate() returned %d words, want %d", len(got), len(words))
 		}
@@ -547,9 +550,10 @@ func TestPunctuate(t *testing.T) {
 func TestAddNumbers(t *testing.T) {
 	words := strings.Fields(strings.Repeat("word ", 20))
 	numbers := 0
+	rng := newRand()
 
 	for i := 0; i < 200; i++ {
-		got := addNumbers(words)
+		got := addNumbers(rng, words)
 		if len(got) != len(words) {
 			t.Fatalf("addNumbers() returned %d words, want %d", len(got), len(words))
 		}
@@ -575,7 +579,7 @@ func TestGenerateWordTestDecorations(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "greek", "alpha beta gamma delta")
 
-	gen := mustGen(generateWordTest(res, "greek", wordOptions{n: 30, g: 2, punctuation: true, numbers: true}))
+	gen := mustGen(generateWordTest(newRand(), res, "greek", wordOptions{n: 30, g: 2, punctuation: true, numbers: true}))
 	digits := false
 
 	for i := 0; i < 20; i++ {
@@ -600,7 +604,7 @@ func TestGenerateWordTestMinChars(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "greek", "alpha beta gamma delta")
 
-	gen := mustGen(generateWordTest(res, "greek", wordOptions{n: 3, g: 1, minChars: 100}))
+	gen := mustGen(generateWordTest(newRand(), res, "greek", wordOptions{n: 3, g: 1, minChars: 100}))
 	for i := 0; i < 20; i++ {
 		segments := gen()
 
@@ -618,7 +622,7 @@ func TestGenerateWordTestMinChars(t *testing.T) {
 	}
 
 	// -g still sets the least number of groups.
-	gen = mustGen(generateWordTest(res, "greek", wordOptions{n: 3, g: 50, minChars: 100}))
+	gen = mustGen(generateWordTest(newRand(), res, "greek", wordOptions{n: 3, g: 50, minChars: 100}))
 	if segments := gen(); len(segments) != 50 {
 		t.Errorf("got %d segments, want 50", len(segments))
 	}
@@ -648,7 +652,7 @@ func TestGeneratorsRejectEmptyText(t *testing.T) {
 		{"paragraphs", func() (func() []segment, error) { return generateTestFromData([]byte(" \n\n "), false, false) }, "there is no text to type"},
 		{"multi", func() (func() []segment, error) { return generateTestFromData(nil, false, true) }, "there is no text to type"},
 		{"file", func() (func() []segment, error) { return generateTestFromFile(blankFile, -1, &memStore{}) }, blankFile + " does not contain any text"},
-		{"quotes", func() (func() []segment, error) { return generateQuoteTest(res, "blank") }, "blank does not contain any quotes"},
+		{"quotes", func() (func() []segment, error) { return generateQuoteTest(newRand(), res, "blank") }, "blank does not contain any quotes"},
 	}
 
 	for _, tc := range tests {
@@ -664,7 +668,7 @@ func TestGenerateQuoteTestIgnoresBlankQuotes(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "quotes", "some-blank", `[{"text": "  "}, {"text": "real quote"}]`)
 
-	gen := mustGen(generateQuoteTest(res, "some-blank"))
+	gen := mustGen(generateQuoteTest(newRand(), res, "some-blank"))
 	for i := 0; i < 20; i++ {
 		if got := gen(); got[0].Text != "real quote" {
 			t.Fatalf("got %q, want the only quote with text", got)
@@ -677,10 +681,42 @@ func TestGenerateQuoteTestReturnsCopies(t *testing.T) {
 	writeUserResource(t, dir, "quotes", "one", `[{"text": "the only quote"}]`)
 
 	// The app reflows the text of the tests it is given.
-	gen := mustGen(generateQuoteTest(res, "one"))
+	gen := mustGen(generateQuoteTest(newRand(), res, "one"))
 	gen()[0].Text = "reflowed"
 
 	if got := gen()[0].Text; got != "the only quote" {
 		t.Errorf("second draw = %q, want the quote unchanged", got)
+	}
+}
+
+// newRand returns a source of randomness of its own to the calling test,
+// making the same draws on every run so that tests relying on chance can't
+// fail randomly.
+func newRand() *rand.Rand {
+	return rand.New(rand.NewSource(1))
+}
+
+// The same source of randomness makes the same tests.
+func TestGeneratorsAreReproducible(t *testing.T) {
+	res, _ := newTestResources(t)
+	st := &memStore{mistakes: []mistake{{"alpha", "x"}, {"beta", "x"}, {"gamma", "x"}}, keys: weakTH()}
+
+	for _, args := range [][]string{
+		{"-punct", "-numbers"},
+		{"-quotes", "en"},
+		{"-mistakes", "-punct"},
+		{"-adaptive", "-numbers"},
+	} {
+		tests := func() [][]segment {
+			gen, _, err := newTestGenerator(parseFlags(args), textSources{st, res, newRand(), strings.NewReader(""), true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			return [][]segment{gen(), gen(), gen()}
+		}
+
+		if first, second := tests(), tests(); !reflect.DeepEqual(first, second) {
+			t.Errorf("tt %s made\n%q\nthen\n%q", strings.Join(args, " "), first, second)
+		}
 	}
 }
