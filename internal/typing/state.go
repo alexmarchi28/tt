@@ -1,68 +1,99 @@
-package main
+// Package typing follows the typing of a text: what was typed at each
+// position, the keystrokes and the mistakes, independently of how the text is
+// displayed.
+package typing
 
 import "time"
 
-// typingState tracks the progress through the text of a single segment,
+// State tracks the progress through the text of a single segment,
 // independently of how it is displayed.
-type typingState struct {
+type State struct {
 	text  []rune
 	typed []rune // What was typed at each position, 0 for skipped characters.
 	idx   int    // Position of the cursor.
 
 	correctKeys int // Keystrokes matching the expected character.
 	wrongKeys   int // Keystrokes not matching the expected character.
-	keystrokes  []keystroke
+	keystrokes  []Keystroke
 }
 
-// keystroke is a key pressed to type a character of the text.
-type keystroke struct {
-	expected rune          // The character of the text, 0 for a break in the sequence (a correction or a skipped word).
-	typed    rune          // The character typed.
-	at       time.Duration // Time since the start of the test.
+// Keystroke is a key pressed to type a character of the text.
+type Keystroke struct {
+	Expected rune          // The character of the text, 0 for a break in the sequence (a correction or a skipped word).
+	Typed    rune          // The character typed.
+	At       time.Duration // Time since the start of the test.
 }
 
-func newTypingState(s string) *typingState {
+// Mistake is a word mistyped.
+type Mistake struct {
+	Word  string `json:"word"`
+	Typed string `json:"typed"`
+}
+
+// NewState starts the typing of s.
+func NewState(s string) *State {
 	text := []rune(s)
 
-	return &typingState{
+	return &State{
 		text:  text,
 		typed: make([]rune, len(text)),
 	}
 }
 
-func (s *typingState) done() bool {
+// Text returns the text typed, which must not be modified.
+func (s *State) Text() []rune { return s.text }
+
+// Typed returns what was typed at each position of the text, 0 for skipped
+// characters. It must not be modified.
+func (s *State) Typed() []rune { return s.typed }
+
+// Cursor returns the position of the cursor in the text.
+func (s *State) Cursor() int { return s.idx }
+
+// CorrectKeys returns the number of keystrokes matching the expected character.
+func (s *State) CorrectKeys() int { return s.correctKeys }
+
+// WrongKeys returns the number of keystrokes not matching the expected
+// character.
+func (s *State) WrongKeys() int { return s.wrongKeys }
+
+// Keystrokes returns the keystrokes typed, see Keystroke.
+func (s *State) Keystrokes() []Keystroke { return s.keystrokes }
+
+// Done reports whether the whole text was typed.
+func (s *State) Done() bool {
 	return s.idx == len(s.text)
 }
 
-// expects reports whether r is the next character to be typed.
-func (s *typingState) expects(r rune) bool {
+// Expects reports whether r is the next character to be typed.
+func (s *State) Expects(r rune) bool {
 	return s.idx < len(s.text) && s.text[s.idx] == r
 }
 
-// typeRune handles a character typed at the given time since the start of the
+// Type handles a character typed at the given time since the start of the
 // test. If skipWord is set a space moves the cursor to the next word, leaving
 // the rest of the current one untyped.
-func (s *typingState) typeRune(r rune, skipWord bool, at time.Duration) {
-	if s.done() {
+func (s *State) Type(r rune, skipWord bool, at time.Duration) {
+	if s.Done() {
 		return
 	}
 
 	if skipWord && r == ' ' {
-		if s.idx > 0 && isWordSeparator(s.text[s.idx-1]) && s.text[s.idx] != ' ' { //Do nothing on word boundaries.
+		if s.idx > 0 && IsWordSeparator(s.text[s.idx-1]) && s.text[s.idx] != ' ' { //Do nothing on word boundaries.
 			return
 		}
 
 		start := s.idx
-		for s.idx < len(s.text) && !isWordSeparator(s.text[s.idx]) {
+		for s.idx < len(s.text) && !IsWordSeparator(s.text[s.idx]) {
 			s.typed[s.idx] = 0
 			s.idx++
 		}
 
 		//A space typed on a space is a regular keystroke, skipping anything breaks the sequence.
 		if s.idx == start && s.text[s.idx] == ' ' {
-			s.keystrokes = append(s.keystrokes, keystroke{' ', ' ', at})
+			s.keystrokes = append(s.keystrokes, Keystroke{' ', ' ', at})
 		} else {
-			s.keystrokes = append(s.keystrokes, keystroke{})
+			s.keystrokes = append(s.keystrokes, Keystroke{})
 		}
 
 		if s.idx < len(s.text) {
@@ -70,7 +101,7 @@ func (s *typingState) typeRune(r rune, skipWord bool, at time.Duration) {
 			s.idx++
 		}
 	} else {
-		s.keystrokes = append(s.keystrokes, keystroke{s.text[s.idx], r, at})
+		s.keystrokes = append(s.keystrokes, Keystroke{s.text[s.idx], r, at})
 		s.typed[s.idx] = r
 		if r == s.text[s.idx] {
 			s.correctKeys++
@@ -83,13 +114,13 @@ func (s *typingState) typeRune(r rune, skipWord bool, at time.Duration) {
 	s.skipLineBreaks()
 }
 
-// backspace moves the cursor back by one character, skipping line breaks.
-func (s *typingState) backspace() {
+// Backspace moves the cursor back by one character, skipping line breaks.
+func (s *State) Backspace() {
 	if s.idx == 0 {
 		return
 	}
 
-	s.keystrokes = append(s.keystrokes, keystroke{})
+	s.keystrokes = append(s.keystrokes, Keystroke{})
 
 	s.idx--
 
@@ -98,35 +129,35 @@ func (s *typingState) backspace() {
 	}
 }
 
-// deleteWord moves the cursor back to the start of the current word, or of
+// DeleteWord moves the cursor back to the start of the current word, or of
 // the previous one if the cursor is already at the start of a word.
-func (s *typingState) deleteWord() {
+func (s *State) DeleteWord() {
 	if s.idx == 0 {
 		return
 	}
 
-	s.keystrokes = append(s.keystrokes, keystroke{})
+	s.keystrokes = append(s.keystrokes, Keystroke{})
 
 	s.idx--
 
-	for s.idx > 0 && isWordSeparator(s.text[s.idx]) {
+	for s.idx > 0 && IsWordSeparator(s.text[s.idx]) {
 		s.idx--
 	}
 
-	for s.idx > 0 && !isWordSeparator(s.text[s.idx]) {
+	for s.idx > 0 && !IsWordSeparator(s.text[s.idx]) {
 		s.idx--
 	}
 
-	if isWordSeparator(s.text[s.idx]) {
+	if IsWordSeparator(s.text[s.idx]) {
 		s.typed[s.idx] = s.text[s.idx]
 		s.idx++
 	}
 }
 
-// relayout replaces the text with the same characters arranged on different
+// Relayout replaces the text with the same characters arranged on different
 // lines, as when it is wrapped at another width, keeping what was typed. The
 // texts may differ only in their line breaks.
-func (s *typingState) relayout(text string) {
+func (s *State) Relayout(text string) {
 	var typed []rune // What was typed at each position before the cursor, line breaks excluded.
 	for i := 0; i < s.idx; i++ {
 		if s.text[i] != '\n' {
@@ -151,16 +182,16 @@ func (s *typingState) relayout(text string) {
 
 // skipLineBreaks moves the cursor past the line breaks at its position, which
 // are never typed.
-func (s *typingState) skipLineBreaks() {
+func (s *State) skipLineBreaks() {
 	for s.idx < len(s.text) && s.text[s.idx] == '\n' {
 		s.typed[s.idx] = s.text[s.idx]
 		s.idx++
 	}
 }
 
-// correctChars returns the number of correctly typed characters before the
+// CorrectChars returns the number of correctly typed characters before the
 // cursor, line breaks excluded.
-func (s *typingState) correctChars() int {
+func (s *State) CorrectChars() int {
 	n := 0
 
 	for i := 0; i < s.idx; i++ {
@@ -172,20 +203,20 @@ func (s *typingState) correctChars() int {
 	return n
 }
 
-// mistakes returns the mistyped words before the cursor.
-func (s *typingState) mistakes() []mistake {
+// Mistakes returns the mistyped words before the cursor.
+func (s *State) Mistakes() []Mistake {
 	return extractMistypedWords(s.text[:s.idx], s.typed[:s.idx])
 }
 
-func extractMistypedWords(text []rune, typed []rune) (mistakes []mistake) {
+func extractMistypedWords(text []rune, typed []rune) (mistakes []Mistake) {
 	var w []rune
 	var t []rune
 	f := false
 
 	for i := range text {
-		if isWordSeparator(text[i]) {
+		if IsWordSeparator(text[i]) {
 			if f {
-				mistakes = append(mistakes, mistake{string(w), string(t)})
+				mistakes = append(mistakes, Mistake{string(w), string(t)})
 			}
 
 			w = w[:0]
@@ -212,21 +243,22 @@ func extractMistypedWords(text []rune, typed []rune) (mistakes []mistake) {
 	}
 
 	if f {
-		mistakes = append(mistakes, mistake{string(w), string(t)})
+		mistakes = append(mistakes, Mistake{string(w), string(t)})
 	}
 
 	return
 }
 
-func isWordSeparator(r rune) bool {
+// IsWordSeparator reports whether r separates words.
+func IsWordSeparator(r rune) bool {
 	return r == ' ' || r == '\n' || r == '\t'
 }
 
-// highlightWordPositions returns, for each character of text, the position
+// WordPositions returns, for each character of text, the position
 // relative to the cursor of the word it belongs to (0 for the current word, 1
 // for the next one and so on), or -1 for characters before the cursor and
 // separators.
-func highlightWordPositions(text []rune, idx int) []int {
+func WordPositions(text []rune, idx int) []int {
 	positions := make([]int, len(text))
 	for i := range positions {
 		positions[i] = -1
@@ -241,7 +273,7 @@ func highlightWordPositions(text []rune, idx int) []int {
 
 	for i, r := range text {
 		if i == idx {
-			if isWordSeparator(r) {
+			if IsWordSeparator(r) {
 				wordPos = 1
 				insideWord = false
 			} else {
@@ -254,7 +286,7 @@ func highlightWordPositions(text []rune, idx int) []int {
 			continue
 		}
 
-		if isWordSeparator(r) {
+		if IsWordSeparator(r) {
 			if insideWord {
 				wordPos++
 				insideWord = false
@@ -269,10 +301,10 @@ func highlightWordPositions(text []rune, idx int) []int {
 	return positions
 }
 
-// paceIndex returns the position in text of a typist starting at its
+// PaceIndex returns the position in text of a typist starting at its
 // beginning and typing at wpm (5 characters per word) for the elapsed time.
 // Line breaks, which are never typed, are skipped.
-func paceIndex(text []rune, elapsed time.Duration, wpm int) int {
+func PaceIndex(text []rune, elapsed time.Duration, wpm int) int {
 	chars := int(int64(elapsed) * int64(wpm) * 5 / int64(time.Minute))
 
 	for i, r := range text {

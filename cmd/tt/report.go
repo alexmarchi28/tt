@@ -8,15 +8,16 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/alexmarchi28/tt/internal/typing"
 	"github.com/gdamore/tcell"
 )
 
 type result struct {
-	Wpm       int       `json:"wpm"`
-	Cpm       int       `json:"cpm"`
-	Accuracy  float64   `json:"accuracy"`
-	Timestamp int64     `json:"timestamp"`
-	Mistakes  []mistake `json:"mistakes"`
+	Wpm       int              `json:"wpm"`
+	Cpm       int              `json:"cpm"`
+	Accuracy  float64          `json:"accuracy"`
+	Timestamp int64            `json:"timestamp"`
+	Mistakes  []typing.Mistake `json:"mistakes"`
 }
 
 // personalBest tells whether a test beat the best WPM previously achieved on

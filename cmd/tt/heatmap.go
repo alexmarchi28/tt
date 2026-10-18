@@ -7,6 +7,8 @@ import (
 	"sort"
 	"strings"
 	"unicode"
+
+	"github.com/alexmarchi28/tt/internal/keystats"
 )
 
 // layouts holds the characters of the unshifted keys of keyboard layouts, from
@@ -26,7 +28,6 @@ var layouts = map[string][]string{
 
 const (
 	minKeyCount = 10 // Keystrokes needed to judge the accuracy of a key.
-	minKeyTimed = 5  // Timed keystrokes needed to judge the speed of a key.
 	spaceIndent = 9  // Offset of the space bar.
 )
 
@@ -36,35 +37,15 @@ var (
 	levelColors     = []int{46, 154, 226, 208, 196} // Colours of the levels in the 256 colour palette.
 )
 
-// mergeKeyStats combines the statistics of two sets of keystrokes.
-func mergeKeyStats(a, b keyStat) keyStat {
-	if a.Count == 0 && a.Timed == 0 {
-		return b
-	}
-	if b.Count == 0 && b.Timed == 0 {
-		return a
-	}
-
-	m := keyStat{Count: a.Count + b.Count, Timed: a.Timed + b.Timed}
-	if m.Count > 0 {
-		m.ErrorRate = (a.ErrorRate*float64(a.Count) + b.ErrorRate*float64(b.Count)) / float64(m.Count)
-	}
-	if m.Timed > 0 {
-		m.Latency = (a.Latency*float64(a.Timed) + b.Latency*float64(b.Timed)) / float64(m.Timed)
-	}
-
-	return m
-}
-
 // keyStatsByKey returns the statistics of each key, upper case letters being
 // typed with the key of the lower case ones.
-func keyStatsByKey(ks keyStats) map[rune]keyStat {
-	byKey := map[rune]keyStat{}
+func keyStatsByKey(ks keystats.Stats) map[rune]keystats.Stat {
+	byKey := map[rune]keystats.Stat{}
 
 	for s, stat := range ks.Chars {
 		for _, r := range s {
 			key := unicode.ToLower(r)
-			byKey[key] = mergeKeyStats(byKey[key], stat)
+			byKey[key] = keystats.Merge(byKey[key], stat)
 			break
 		}
 	}
@@ -154,13 +135,13 @@ func keyLabel(r rune) string {
 
 // formatKeys describes how accurately and quickly each key is typed on a
 // keyboard with the given rows.
-func formatKeys(ks keyStats, rows []string, color bool) string {
+func formatKeys(ks keystats.Stats, rows []string, color bool) string {
 	accuracy, speed := map[rune]float64{}, map[rune]float64{}
 	for r, s := range keyStatsByKey(ks) {
 		if s.Count >= minKeyCount {
 			accuracy[r] = s.ErrorRate
 		}
-		if s.Timed >= minKeyTimed {
+		if s.Timed >= keystats.MinTimed {
 			speed[r] = s.Latency
 		}
 	}

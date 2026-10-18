@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/alexmarchi28/tt/internal/typing"
 )
 
 // statsNow is just after midnight in a time zone where the date differs from
@@ -66,9 +68,9 @@ func TestSinceAndBefore(t *testing.T) {
 }
 
 func TestMostMistyped(t *testing.T) {
-	mistakes := []mistake{
-		{"the", "teh"}, {"zebra", "zerba"}, {"because", "becuase"}, {"the", "th_"},
-		{"a", "s"}, {"because", "bec"}, {"the", "hte"}, {"a", "q"},
+	mistakes := []typing.Mistake{
+		{Word: "the", Typed: "teh"}, {Word: "zebra", Typed: "zerba"}, {Word: "because", Typed: "becuase"}, {Word: "the", Typed: "th_"},
+		{Word: "a", Typed: "s"}, {Word: "because", Typed: "bec"}, {Word: "the", Typed: "hte"}, {Word: "a", Typed: "q"},
 	}
 
 	want := []wordCount{{"the", 3}, {"a", 2}, {"because", 2}, {"zebra", 1}}
@@ -94,7 +96,7 @@ func TestFormatStats(t *testing.T) {
 		resultAt(41, 99, 2*time.Hour),
 		resultAt(60, 90, 30*time.Minute),
 	}
-	mistakes := []mistake{{"the", "teh"}, {"because", "becuase"}, {"the", "th_"}, {"the", "hte"}}
+	mistakes := []typing.Mistake{{Word: "the", Typed: "teh"}, {Word: "because", Typed: "becuase"}, {Word: "the", Typed: "th_"}, {Word: "the", Typed: "hte"}}
 
 	want := "" +
 		"Typing stats\n" +

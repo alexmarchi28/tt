@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexmarchi28/tt/internal/resource"
+	"github.com/alexmarchi28/tt/internal/typing"
 	"github.com/gdamore/tcell"
 )
 
@@ -82,7 +84,7 @@ func TestAppRecordsCompletedTests(t *testing.T) {
 		t.Errorf("exit code = %d, want 0", rc)
 	}
 
-	if len(a.results) != 2 || a.results[0].Mistakes != nil || !reflect.DeepEqual(a.results[1].Mistakes, []mistake{{"cd", "cx"}}) {
+	if len(a.results) != 2 || a.results[0].Mistakes != nil || !reflect.DeepEqual(a.results[1].Mistakes, []typing.Mistake{{Word: "cd", Typed: "cx"}}) {
 		t.Errorf("results = %+v, want two tests with a single mistake in the second", a.results)
 	}
 
@@ -101,7 +103,7 @@ func TestAppRecordsCompletedTests(t *testing.T) {
 	}
 
 	// The mistake of the restarted attempt is not recorded.
-	if mistakes, err := a.store.Mistakes(); err != nil || !reflect.DeepEqual(mistakes, []mistake{{"cd", "cx"}}) {
+	if mistakes, err := a.store.Mistakes(); err != nil || !reflect.DeepEqual(mistakes, []typing.Mistake{{Word: "cd", Typed: "cx"}}) {
 		t.Errorf("stored mistakes = %v (%v), want [{cd cx}]", mistakes, err)
 	}
 }
@@ -251,8 +253,8 @@ func TestAppCyclesThemes(t *testing.T) {
 	a, sim := newTestApp(t, resolveFlags(nil))
 
 	res, _ := newTestResources(t)
-	names := res.list("themes")
-	next := names[indexResourceName(names, "default")+1]
+	names := res.List("themes")
+	next := names[resource.Index(names, "default")+1]
 
 	var calls int
 	done := startApp(a, testSequence(&calls, "ab"))

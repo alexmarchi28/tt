@@ -7,140 +7,28 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexmarchi28/tt/internal/keystats"
+	"github.com/alexmarchi28/tt/internal/typing"
 	"github.com/gdamore/tcell"
 )
 
 // keyStatsOf is a store of the given key statistics, which ignores new
 // keystrokes.
-type keyStatsOf keyStats
+type keyStatsOf keystats.Stats
 
-func (k keyStatsOf) KeyStats() keyStats              { return keyStats(k) }
-func (keyStatsOf) AddKeystrokes(_ []keystroke) error { return nil }
+func (k keyStatsOf) KeyStats() keystats.Stats               { return keystats.Stats(k) }
+func (keyStatsOf) AddKeystrokes(_ []typing.Keystroke) error { return nil }
 
 // weakTH returns statistics where "th" is typed badly and "he" and "er" well.
-func weakTH() keyStats {
-	ks := newKeyStats()
-	ks.Bigrams["th"] = keyStat{Count: 10, ErrorRate: 0.3, Timed: 10, Latency: 300}
-	ks.Bigrams["TH"] = keyStat{Count: 10, ErrorRate: 0.3, Timed: 10, Latency: 300}
-	ks.Bigrams["he"] = keyStat{Count: 10, ErrorRate: 0, Timed: 10, Latency: 100}
-	ks.Bigrams["er"] = keyStat{Count: 10, ErrorRate: 0, Timed: 10, Latency: 100}
-	ks.Bigrams["e "] = keyStat{Count: 10, ErrorRate: 1, Timed: 10, Latency: 900} // Not a pair of letters.
-	ks.Bigrams["zz"] = keyStat{Count: 2, ErrorRate: 1, Timed: 2, Latency: 900}   // Not enough keystrokes.
+func weakTH() keystats.Stats {
+	ks := keystats.New()
+	ks.Bigrams["th"] = keystats.Stat{Count: 10, ErrorRate: 0.3, Timed: 10, Latency: 300}
+	ks.Bigrams["TH"] = keystats.Stat{Count: 10, ErrorRate: 0.3, Timed: 10, Latency: 300}
+	ks.Bigrams["he"] = keystats.Stat{Count: 10, ErrorRate: 0, Timed: 10, Latency: 100}
+	ks.Bigrams["er"] = keystats.Stat{Count: 10, ErrorRate: 0, Timed: 10, Latency: 100}
+	ks.Bigrams["e "] = keystats.Stat{Count: 10, ErrorRate: 1, Timed: 10, Latency: 900} // Not a pair of letters.
+	ks.Bigrams["zz"] = keystats.Stat{Count: 2, ErrorRate: 1, Timed: 2, Latency: 900}   // Not enough keystrokes.
 	return ks
-}
-
-func near(a, b float64) bool {
-	return math.Abs(a-b) < 0.001
-}
-
-func TestNewWeaknesses(t *testing.T) {
-	w := newWeaknesses(weakTH())
-
-	// The average error rate is 0.1 and the average latency 166.67ms. The
-	// keystrokes of each pair (20 for th and TH) are completed by 20 at the
-	// averages.
-	errTH, latencyTH := (0.3*20+0.1*20)/40, (300*20+500.0/3*20)/40
-	errHE, latencyHE := (0*10+0.1*20)/30, (100*10+500.0/3*20)/30
-	want := map[string]float64{
-		"th": (errTH+errorFloor)/(0.1+errorFloor) + latencyTH/(500.0/3),
-		"he": (errHE+errorFloor)/(0.1+errorFloor) + latencyHE/(500.0/3),
-		"er": (errHE+errorFloor)/(0.1+errorFloor) + latencyHE/(500.0/3),
-	}
-
-	if len(w) != len(want) {
-		t.Errorf("rated pairs = %v, want %v", w, want)
-	}
-	for pair, v := range want {
-		if !near(w[pair], v) {
-			t.Errorf("weakness of %q = %v, want %v", pair, w[pair], v)
-		}
-	}
-
-	if got := w.of("zz"); got != averageWeakness {
-		t.Errorf("weakness of an unrated pair = %v, want the average %v", got, averageWeakness)
-	}
-}
-
-func TestNewWeaknessesTrustsPairsWithMoreKeystrokes(t *testing.T) {
-	ks := newKeyStats()
-	ks.Bigrams["ab"] = keyStat{Count: 6, ErrorRate: 1.0 / 6, Timed: 6, Latency: 200}
-	ks.Bigrams["cd"] = keyStat{Count: 100, ErrorRate: 1.0 / 6, Timed: 100, Latency: 200}
-	ks.Bigrams["ef"] = keyStat{Count: 100, ErrorRate: 0, Timed: 100, Latency: 100}
-
-	// A single mistake in a few keystrokes may be bad luck.
-	w := newWeaknesses(ks)
-	if w["ab"] >= w["cd"] {
-		t.Errorf("weaknesses = %v, want ab, typed as badly as cd but less often, to be judged less weak", w)
-	}
-}
-
-func TestNewWeaknessesOfRecentKeystrokes(t *testing.T) {
-	ks := newKeyStats()
-	ks.Bigrams["ab"] = keyStat{Count: recentKeystrokes, ErrorRate: 0.2, Timed: recentKeystrokes, Latency: 200}
-	ks.Bigrams["cd"] = keyStat{Count: 1000, ErrorRate: 0.2, Timed: 1000, Latency: 200}
-	ks.Bigrams["ef"] = keyStat{Count: 100, ErrorRate: 0, Timed: 100, Latency: 100}
-
-	// The rates are recent averages: older keystrokes don't make them surer.
-	w := newWeaknesses(ks)
-	if !near(w["ab"], w["cd"]) {
-		t.Errorf("weaknesses = %v, want ab and cd to be as weak", w)
-	}
-}
-
-func TestNewWeaknessesWithoutTimings(t *testing.T) {
-	ks := newKeyStats()
-	ks.Bigrams["ab"] = keyStat{Count: 10, ErrorRate: 0}
-	ks.Bigrams["cd"] = keyStat{Count: 10, ErrorRate: 0}
-
-	w := newWeaknesses(ks)
-	if !near(w["ab"], averageWeakness) || !near(w["cd"], averageWeakness) {
-		t.Errorf("weaknesses = %v, want average ones", w)
-	}
-}
-
-func TestWordWeakness(t *testing.T) {
-	w := newWeaknesses(weakTH())
-
-	if got, want := w.word("the"), w["th"]; !near(got, want) {
-		t.Errorf("weakness of the = %v, want that of its weakest pair %v", got, want)
-	}
-	if got := w.word("hex"); got != averageWeakness {
-		t.Errorf("weakness of hex = %v, want %v as its pair ex is not rated", got, averageWeakness)
-	}
-	if got, want := w.word("The"), w.word("the"); got != want {
-		t.Errorf("weakness of The = %v, want that of the %v", got, want)
-	}
-	for _, word := range []string{"a", "", "xyz"} {
-		if got := w.word(word); got != averageWeakness {
-			t.Errorf("weakness of %q = %v, want the average", word, got)
-		}
-	}
-}
-
-func TestPairFrequencies(t *testing.T) {
-	got := pairFrequencies([]string{"the", "There", "a", "can't"})
-
-	// th, he, th, he, er, re, ca, an: the apostrophe isn't a letter.
-	want := map[string]float64{"th": 0.25, "he": 0.25, "er": 0.125, "re": 0.125, "ca": 0.125, "an": 0.125}
-	if !reflect.DeepEqual(got, want) {
-		t.Errorf("pairFrequencies() = %v, want %v", got, want)
-	}
-}
-
-func TestWeaknessFocus(t *testing.T) {
-	w := newWeaknesses(weakTH())
-	w["er"] = 3
-	w["xy"] = 5
-	frequency := map[string]float64{"th": 0.01, "he": 0.1, "er": 0.05}
-
-	// er is less weak than th but much more frequent, he is typed well and xy
-	// is never typed.
-	if got := w.focus(3, frequency); !reflect.DeepEqual(got, []string{"er", "th"}) {
-		t.Errorf("focus(3) = %q, want the weak pairs costing the most time first", got)
-	}
-	if got := w.focus(1, frequency); !reflect.DeepEqual(got, []string{"er"}) {
-		t.Errorf("focus(1) = %q, want [er]", got)
-	}
 }
 
 func TestAdaptiveWordsFocusOnFrequentWeakPairs(t *testing.T) {
@@ -149,11 +37,11 @@ func TestAdaptiveWordsFocusOnFrequentWeakPairs(t *testing.T) {
 
 	// cc, rare in the list, was typed a few times with a mistake and slowly,
 	// in, frequent, was typed often with mistakes and a bit slowly.
-	ks := newKeyStats()
-	ks.Bigrams["cc"] = keyStat{Count: 7, ErrorRate: 1.0 / 7, Timed: 6, Latency: 165}
-	ks.Bigrams["in"] = keyStat{Count: 190, ErrorRate: 0.1, Timed: 185, Latency: 120}
-	ks.Bigrams["er"] = keyStat{Count: 230, ErrorRate: 0, Timed: 230, Latency: 100}
-	ks.Bigrams["he"] = keyStat{Count: 96, ErrorRate: 0, Timed: 95, Latency: 71}
+	ks := keystats.New()
+	ks.Bigrams["cc"] = keystats.Stat{Count: 7, ErrorRate: 1.0 / 7, Timed: 6, Latency: 165}
+	ks.Bigrams["in"] = keystats.Stat{Count: 190, ErrorRate: 0.1, Timed: 185, Latency: 120}
+	ks.Bigrams["er"] = keystats.Stat{Count: 230, ErrorRate: 0, Timed: 230, Latency: 100}
+	ks.Bigrams["he"] = keystats.Stat{Count: 96, ErrorRate: 0, Timed: 95, Latency: 71}
 
 	a, err := loadAdaptiveWords(res, "list")
 	if err != nil {
@@ -176,7 +64,7 @@ func TestAdaptiveWordsDescribe(t *testing.T) {
 	if got := a.describe(weakTH()); got != "Practicing th" {
 		t.Errorf("describe() = %q", got)
 	}
-	if got := a.describe(newKeyStats()); got != "Practicing all keys until enough keystrokes are recorded" {
+	if got := a.describe(keystats.New()); got != "Practicing all keys until enough keystrokes are recorded" {
 		t.Errorf("describe() without statistics = %q", got)
 	}
 }
@@ -199,7 +87,7 @@ func TestGenerateAdaptiveTestWithoutStatistics(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "list", "the her err rare")
 
-	got := drawShares(t, nextFunc(t, mustSource(newAdaptiveSource(newRand(), res, "list", wordOptions{n: 100, g: 4}, 40, keyStatsOf(newKeyStats())))))
+	got := drawShares(t, nextFunc(t, mustSource(newAdaptiveSource(newRand(), res, "list", wordOptions{n: 100, g: 4}, 40, keyStatsOf(keystats.New())))))
 
 	for _, w := range []string{"the", "her", "err", "rare"} {
 		if got[w] < 0.18 || got[w] > 0.32 {
@@ -240,7 +128,7 @@ func TestGenerateAdaptiveTestFocus(t *testing.T) {
 		t.Errorf("share of the words with th with focus 40 = %.2f, want %.2f", got, want)
 	}
 
-	if got := thShare(t, 100); !near(got, 1) {
+	if got := thShare(t, 100); math.Abs(got-1) > 0.001 {
 		t.Errorf("share of the words with th with focus 100 = %.2f, want all of them", got)
 	}
 }
@@ -301,8 +189,7 @@ func TestAppShowsAdaptiveFocus(t *testing.T) {
 }
 
 func TestAdaptiveWordListFromStdin(t *testing.T) {
-	res, _ := newTestResources(t)
-	res.stdin = &onceReader{r: strings.NewReader("alpha")}
+	res, _ := newTestResourcesWithStdin(t, "alpha")
 	s := resolveFlags([]string{"-adaptive", "-words", "-", "-n", "3"})
 
 	src, err := newTestSource(s.source, textSources{&memStore{}, res, newRand(), strings.NewReader("")})

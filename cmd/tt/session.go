@@ -2,6 +2,8 @@ package main
 
 import (
 	"time"
+
+	"github.com/alexmarchi28/tt/internal/typing"
 )
 
 // typingRules say how the keys typed are handled.
@@ -22,7 +24,7 @@ type sessionDeps struct {
 // of a given size.
 type session struct {
 	sessionDeps
-	state       *typingState
+	state       *typing.State
 	attribution string
 	timeLimit   time.Duration // -1 for no time limit.
 	startTime   time.Time     // Zero until the timer starts.
@@ -41,7 +43,7 @@ func newSession(text, attribution string, timeLimit time.Duration, sw, sh int, d
 		sh:          sh,
 	}
 
-	s.state = newTypingState(s.layout(text))
+	s.state = typing.NewState(s.layout(text))
 	s.center()
 
 	return s
@@ -58,7 +60,7 @@ func (s *session) layout(text string) string {
 
 // center places the text at the center of the screen.
 func (s *session) center() {
-	s.nc, s.nr = calcStringDimensions(string(s.state.text))
+	s.nc, s.nr = calcStringDimensions(string(s.state.Text()))
 	s.x = (s.sw - s.nc) / 2
 	s.y = (s.sh - s.nr) / 2
 }
@@ -67,7 +69,7 @@ func (s *session) center() {
 // what was typed.
 func (s *session) resize(sw, sh int) {
 	s.sw, s.sh = sw, sh
-	s.state.relayout(s.layout(string(s.state.text)))
+	s.state.Relayout(s.layout(string(s.state.Text())))
 	s.center()
 }
 
@@ -107,22 +109,22 @@ func (s *session) duration() time.Duration {
 func (s *session) result() testResult {
 	return testResult{
 		duration:     s.duration(),
-		correctChars: s.state.correctChars(),
-		correctKeys:  s.state.correctKeys,
-		wrongKeys:    s.state.wrongKeys,
-		mistakes:     s.state.mistakes(),
-		keystrokes:   s.state.keystrokes,
+		correctChars: s.state.CorrectChars(),
+		correctKeys:  s.state.CorrectKeys(),
+		wrongKeys:    s.state.WrongKeys(),
+		mistakes:     s.state.Mistakes(),
+		keystrokes:   s.state.Keystrokes(),
 	}
 }
 
 // typeRune types a character and reports whether the text is complete.
 func (s *session) typeRune(r rune) bool {
-	if !s.state.done() {
+	if !s.state.Done() {
 		s.startTimer()
-		s.state.typeRune(r, !s.rules.noSkip, s.elapsed())
+		s.state.Type(r, !s.rules.noSkip, s.elapsed())
 	}
 
-	return s.state.done()
+	return s.state.Done()
 }
 
 // correct deletes the previous character, or word, unless backspace is
@@ -134,18 +136,18 @@ func (s *session) correct(word bool) {
 
 	s.startTimer()
 	if word {
-		s.state.deleteWord()
+		s.state.DeleteWord()
 	} else {
-		s.state.backspace()
+		s.state.Backspace()
 	}
 }
 
 // frame returns what the screen shows of the session.
 func (s *session) frame() frame {
 	f := frame{
-		text:        s.state.text,
-		typed:       s.state.typed,
-		idx:         s.state.idx,
+		text:        s.state.Text(),
+		typed:       s.state.Typed(),
+		idx:         s.state.Cursor(),
 		x:           s.x,
 		y:           s.y,
 		nc:          s.nc,
@@ -156,7 +158,7 @@ func (s *session) frame() frame {
 
 	if s.started() {
 		if s.pace > 0 {
-			f.pace = paceIndex(s.state.text, s.elapsed(), s.pace)
+			f.pace = typing.PaceIndex(s.state.Text(), s.elapsed(), s.pace)
 		}
 		if s.timeLimit != -1 {
 			f.timed, f.timeLeft = true, s.timeLimit-s.elapsed()
@@ -165,9 +167,9 @@ func (s *session) frame() frame {
 		//Only what the live statistics need, see view.drawLiveStats.
 		f.stats = &testResult{
 			duration:     s.duration(),
-			correctChars: s.state.correctChars(),
-			correctKeys:  s.state.correctKeys,
-			wrongKeys:    s.state.wrongKeys,
+			correctChars: s.state.CorrectChars(),
+			correctKeys:  s.state.CorrectKeys(),
+			wrongKeys:    s.state.WrongKeys(),
 		}
 	}
 

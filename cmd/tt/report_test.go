@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"testing"
 	"time"
+
+	"github.com/alexmarchi28/tt/internal/typing"
 )
 
 var testResults = []result{
 	{Wpm: 60, Cpm: 300, Accuracy: 97.5, Timestamp: 1000},
-	{Wpm: 50, Cpm: 250, Accuracy: 100, Timestamp: 2000, Mistakes: []mistake{{"alpha", "alpah"}, {"beta", "bet_"}}},
+	{Wpm: 50, Cpm: 250, Accuracy: 100, Timestamp: 2000, Mistakes: []typing.Mistake{{Word: "alpha", Typed: "alpah"}, {Word: "beta", Typed: "bet_"}}},
 }
 
 func TestWriteResults(t *testing.T) {
@@ -50,9 +52,9 @@ func TestWriteResults(t *testing.T) {
 }
 
 func TestWriteResultsEscapesCSV(t *testing.T) {
-	results := []result{{Wpm: 40, Cpm: 200, Accuracy: 90, Timestamp: 3000, Mistakes: []mistake{
-		{"world,", "worl,"},
-		{`"quoted"`, `"quoted_`},
+	results := []result{{Wpm: 40, Cpm: 200, Accuracy: 90, Timestamp: 3000, Mistakes: []typing.Mistake{
+		{Word: "world,", Typed: "worl,"},
+		{Word: `"quoted"`, Typed: `"quoted_`},
 	}}}
 
 	var b bytes.Buffer
@@ -74,7 +76,7 @@ func TestFormatReport(t *testing.T) {
 		correctChars: 300,
 		correctKeys:  39,
 		wrongKeys:    1,
-		mistakes:     []mistake{{"alpha", "alpah"}, {"beta", "bet_"}},
+		mistakes:     []typing.Mistake{{Word: "alpha", Typed: "alpah"}, {Word: "beta", Typed: "bet_"}},
 	}
 
 	tests := []struct {

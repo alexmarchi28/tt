@@ -6,13 +6,14 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/alexmarchi28/tt/internal/typing"
 	"github.com/gdamore/tcell"
 )
 
 // frame is what the screen shows at a moment of a test, see view.draw.
 type frame struct {
 	text  []rune
-	typed []rune // What was typed at each position of text, see typingState.
+	typed []rune // What was typed at each position of text, see typing.State.
 	idx   int    // Position of the cursor in text.
 
 	x, y   int // Position of the text on the screen.
@@ -129,7 +130,7 @@ func (v *view) draw(f frame) {
 // what was typed. The character at the pacer is reversed.
 func (v *view) drawText(f frame) {
 	cx, cy := f.x, f.y
-	wordPositions := highlightWordPositions(f.text, f.idx)
+	wordPositions := typing.WordPositions(f.text, f.idx)
 
 	for i, r := range f.text {
 		if r == '\n' {

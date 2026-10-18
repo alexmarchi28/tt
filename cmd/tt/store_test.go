@@ -8,14 +8,17 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/alexmarchi28/tt/internal/keystats"
+	"github.com/alexmarchi28/tt/internal/typing"
 )
 
 // memStore keeps the saved data in memory. Every access fails with err if it
 // is set.
 type memStore struct {
 	results    []persistedResult
-	mistakes   []mistake
-	keys       keyStats
+	mistakes   []typing.Mistake
+	keys       keystats.Stats
 	paragraphs map[string]int
 	config     appConfig
 	err        error
@@ -33,26 +36,26 @@ func (s *memStore) AddResult(r persistedResult) ([]persistedResult, error) {
 	return previous, nil
 }
 
-func (s *memStore) Mistakes() ([]mistake, error) { return s.mistakes, s.err }
+func (s *memStore) Mistakes() ([]typing.Mistake, error) { return s.mistakes, s.err }
 
-func (s *memStore) AddMistakes(mistakes []mistake) error {
+func (s *memStore) AddMistakes(mistakes []typing.Mistake) error {
 	if s.err == nil {
 		s.mistakes = append(s.mistakes, mistakes...)
 	}
 	return s.err
 }
 
-func (s *memStore) KeyStats() keyStats {
+func (s *memStore) KeyStats() keystats.Stats {
 	if s.keys.Chars == nil {
-		return newKeyStats()
+		return keystats.New()
 	}
 	return s.keys
 }
 
-func (s *memStore) AddKeystrokes(strokes []keystroke) error {
+func (s *memStore) AddKeystrokes(strokes []typing.Keystroke) error {
 	if s.err == nil {
 		s.keys = s.KeyStats()
-		s.keys.add(strokes)
+		s.keys.Add(strokes)
 	}
 	return s.err
 }
@@ -165,14 +168,14 @@ func TestStoreMistakes(t *testing.T) {
 		t.Fatalf("reading missing mistakes: %+v, %v, want none", got, err)
 	}
 
-	for _, m := range [][]mistake{{{"alpha", "alpah"}}, nil, {{"beta", "bteta"}, {"gamma", "gama_"}}} {
+	for _, m := range [][]typing.Mistake{{{Word: "alpha", Typed: "alpah"}}, nil, {{Word: "beta", Typed: "bteta"}, {Word: "gamma", Typed: "gama_"}}} {
 		if err := s.AddMistakes(m); err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	got, err := s.Mistakes()
-	if want := []mistake{{"alpha", "alpah"}, {"beta", "bteta"}, {"gamma", "gama_"}}; err != nil || !reflect.DeepEqual(got, want) {
+	if want := []typing.Mistake{{Word: "alpha", Typed: "alpah"}, {Word: "beta", Typed: "bteta"}, {Word: "gamma", Typed: "gama_"}}; err != nil || !reflect.DeepEqual(got, want) {
 		t.Errorf("stored mistakes = %v, %v, want %v", got, err, want)
 	}
 }
@@ -185,7 +188,7 @@ func TestStoreCorruptMistakes(t *testing.T) {
 	writeFile(t, path, `[{"word":"old","typed":"odl"},`)
 
 	want := "could not read the recorded mistakes in " + path + ": unexpected end of JSON input, fix or remove the file"
-	if err := s.AddMistakes([]mistake{{"new", "nwe"}}); err == nil || err.Error() != want {
+	if err := s.AddMistakes([]typing.Mistake{{Word: "new", Typed: "nwe"}}); err == nil || err.Error() != want {
 		t.Errorf("AddMistakes over a corrupt file: %v, want the error %q", err, want)
 	}
 	if b, _ := os.ReadFile(path); string(b) != `[{"word":"old","typed":"odl"},` {
@@ -200,7 +203,7 @@ func TestStoreKeyStats(t *testing.T) {
 		t.Errorf("KeyStats() without a file = %+v, want empty statistics", got)
 	}
 
-	for _, strokes := range [][]keystroke{{{'a', 'a', 0}, {'b', 'x', 100 * time.Millisecond}}, {{'a', 'a', 0}}} {
+	for _, strokes := range [][]typing.Keystroke{{{Expected: 'a', Typed: 'a', At: 0}, {Expected: 'b', Typed: 'x', At: 100 * time.Millisecond}}, {{Expected: 'a', Typed: 'a', At: 0}}} {
 		if err := s.AddKeystrokes(strokes); err != nil {
 			t.Fatal(err)
 		}
@@ -217,7 +220,7 @@ func TestStoreKeyStatsOverCorruptFile(t *testing.T) {
 	writeFile(t, s.path(keyStatsFile), "not json")
 
 	// The statistics are only an aid, they start over rather than stopping tt.
-	if err := s.AddKeystrokes([]keystroke{{'a', 'a', 0}}); err != nil {
+	if err := s.AddKeystrokes([]typing.Keystroke{{Expected: 'a', Typed: 'a', At: 0}}); err != nil {
 		t.Fatal(err)
 	}
 	if got := s.KeyStats(); got.Chars["a"].Count != 1 {
