@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexmarchi28/tt/internal/history"
 	"github.com/gdamore/tcell"
 )
 
@@ -148,7 +149,7 @@ func TestRunTypesTests(t *testing.T) {
 	}
 
 	stored, err := r.store(t).Results()
-	if err != nil || len(stored) != 1 || stored[0].Mode != modeText {
+	if err != nil || len(stored) != 1 || stored[0].Mode != history.ModeText {
 		t.Errorf("saved results = %+v, %v, want the text test", stored, err)
 	}
 }

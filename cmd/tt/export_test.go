@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/alexmarchi28/tt/internal/history"
 	"github.com/alexmarchi28/tt/internal/typing"
 )
 
@@ -22,12 +23,12 @@ func export(t *testing.T, st historyStore, data string, asJSON bool) string {
 	return b.String()
 }
 
-func exportedResults() []persistedResult {
-	return []persistedResult{
+func exportedResults() []history.Result {
+	return []history.Result{
 		{Wpm: 40, Accuracy: 80, Timestamp: 1000},
-		persistedResult{Wpm: 72, Accuracy: 96.5, Timestamp: 2000, Duration: 12.5, testKind: testKind{Mode: "words", Source: "1000en", Seconds: 15, Punct: true, Numbers: true}},
-		persistedResult{Wpm: 65, Accuracy: 100, Timestamp: 3000, Duration: 30, testKind: testKind{Mode: "quotes", Source: "my, quotes"}},
-		persistedResult{Wpm: 55, Accuracy: 98, Timestamp: 4000, Duration: 20, testKind: testKind{Mode: "adaptive", Source: "1000en", Words: 50, Focus: 40}},
+		history.Result{Wpm: 72, Accuracy: 96.5, Timestamp: 2000, Duration: 12.5, Kind: history.Kind{Mode: "words", Source: "1000en", Seconds: 15, Punct: true, Numbers: true}},
+		history.Result{Wpm: 65, Accuracy: 100, Timestamp: 3000, Duration: 30, Kind: history.Kind{Mode: "quotes", Source: "my, quotes"}},
+		history.Result{Wpm: 55, Accuracy: 98, Timestamp: 4000, Duration: 20, Kind: history.Kind{Mode: "adaptive", Source: "1000en", Words: 50, Focus: 40}},
 	}
 }
 
@@ -52,7 +53,7 @@ func TestExportResultsAsJSON(t *testing.T) {
 
 	saved := exportedResults()
 
-	var got []persistedResult
+	var got []history.Result
 	if err := json.Unmarshal([]byte(export(t, &memStore{results: saved}, "results", true)), &got); err != nil {
 		t.Fatal(err)
 	}

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/alexmarchi28/tt/internal/history"
 	"github.com/alexmarchi28/tt/internal/typing"
 )
 
@@ -22,10 +23,10 @@ type summary struct {
 	wpm      float64       // Average WPM.
 	accuracy float64       // Average accuracy.
 	duration time.Duration // Total time spent typing, as far as it is known.
-	best     persistedResult
+	best     history.Result
 }
 
-func summarize(results []persistedResult) summary {
+func summarize(results []history.Result) summary {
 	var s summary
 
 	for _, r := range results {
@@ -48,8 +49,8 @@ func summarize(results []persistedResult) summary {
 }
 
 // filterResults returns the results for which keep returns true.
-func filterResults(results []persistedResult, keep func(persistedResult) bool) []persistedResult {
-	var out []persistedResult
+func filterResults(results []history.Result, keep func(history.Result) bool) []history.Result {
+	var out []history.Result
 	for _, r := range results {
 		if keep(r) {
 			out = append(out, r)
@@ -60,38 +61,38 @@ func filterResults(results []persistedResult, keep func(persistedResult) bool) [
 }
 
 // since returns the results saved at or after t.
-func since(results []persistedResult, t time.Time) []persistedResult {
-	return filterResults(results, func(r persistedResult) bool { return r.Timestamp >= t.Unix() })
+func since(results []history.Result, t time.Time) []history.Result {
+	return filterResults(results, func(r history.Result) bool { return r.Timestamp >= t.Unix() })
 }
 
 // before returns the results saved before t.
-func before(results []persistedResult, t time.Time) []persistedResult {
-	return filterResults(results, func(r persistedResult) bool { return r.Timestamp < t.Unix() })
+func before(results []history.Result, t time.Time) []history.Result {
+	return filterResults(results, func(r history.Result) bool { return r.Timestamp < t.Unix() })
 }
 
 // ofKind returns the results of the given kind of test.
-func ofKind(results []persistedResult, kind testKind) []persistedResult {
-	return filterResults(results, func(r persistedResult) bool { return r.testKind == kind })
+func ofKind(results []history.Result, kind history.Kind) []history.Result {
+	return filterResults(results, func(r history.Result) bool { return r.Kind == kind })
 }
 
 // bestWpm returns the best WPM achieved on the given kind of test, and false
 // if no such test was completed.
-func bestWpm(results []persistedResult, kind testKind) (int, bool) {
+func bestWpm(results []history.Result, kind history.Kind) (int, bool) {
 	s := summarize(ofKind(results, kind))
 	return s.best.Wpm, s.count > 0
 }
 
 type kindSummary struct {
-	kind testKind
+	kind history.Kind
 	summary
 }
 
 // summarizeByKind summarizes the results of each kind of test, the most
 // frequent first.
-func summarizeByKind(results []persistedResult) []kindSummary {
-	groups := map[testKind][]persistedResult{}
+func summarizeByKind(results []history.Result) []kindSummary {
+	groups := map[history.Kind][]history.Result{}
 	for _, r := range results {
-		groups[r.testKind] = append(groups[r.testKind], r)
+		groups[r.Kind] = append(groups[r.Kind], r)
 	}
 
 	summaries := make([]kindSummary, 0, len(groups))
@@ -163,7 +164,7 @@ func formatSummaryLine(label string, s summary) string {
 
 // formatStats describes the saved results and mistakes as of now. There must
 // be at least one result.
-func formatStats(stored []persistedResult, mistakes []typing.Mistake, now time.Time) string {
+func formatStats(stored []history.Result, mistakes []typing.Mistake, now time.Time) string {
 	var b strings.Builder
 	all := summarize(stored)
 	bestDate := time.Unix(all.best.Timestamp, 0).In(now.Location())
@@ -175,7 +176,7 @@ func formatStats(stored []persistedResult, mistakes []typing.Mistake, now time.T
 
 	best := bestDate.Format("2006-01-02")
 	if all.best.Mode != "" {
-		best += ", " + all.best.testKind.String()
+		best += ", " + all.best.Kind.String()
 	}
 
 	fmt.Fprintln(&b, "Typing stats")
@@ -254,7 +255,7 @@ const recentPaceResults = 10
 
 // paceFromResults returns the speed of the pacer set by target (paceBest or
 // paceAverage) from the saved results of the given kind of test.
-func paceFromResults(target string, results []persistedResult, kind testKind) (int, error) {
+func paceFromResults(target string, results []history.Result, kind history.Kind) (int, error) {
 	results = ofKind(results, kind)
 	if len(results) == 0 {
 		return 0, fmt.Errorf("-pace %s needs a saved result of %s", target, kind)

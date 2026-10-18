@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/alexmarchi28/tt/internal/history"
 	"github.com/alexmarchi28/tt/internal/keystats"
 	"github.com/alexmarchi28/tt/internal/typing"
 )
@@ -14,30 +15,14 @@ type appConfig struct {
 	Theme string `json:"theme,omitempty"`
 }
 
-type persistedResult struct {
-	Wpm       int     `json:"wpm"`
-	Accuracy  float64 `json:"accuracy"`
-	Timestamp int64   `json:"timestamp"`
-
-	//The fields below are empty for results saved by older versions.
-	Duration float64 `json:"duration,omitempty"` //Seconds spent typing.
-	testKind         //Saved as fields of the result.
-}
-
-// String describes r, rather than only its kind as the String method of the
-// embedded testKind would.
-func (r persistedResult) String() string {
-	return fmt.Sprintf("%d wpm, %.2f%% accuracy, %.1fs at %d (%s)", r.Wpm, r.Accuracy, r.Duration, r.Timestamp, r.testKind)
-}
-
 // The interfaces below give access to the data saved between runs of tt,
 // each user of the data depending only on what it needs.
 
 type resultStore interface {
 	// Results returns the saved results, none if there are none yet.
-	Results() ([]persistedResult, error)
+	Results() ([]history.Result, error)
 	// AddResult saves r and returns the results saved before it.
-	AddResult(r persistedResult) ([]persistedResult, error)
+	AddResult(r history.Result) ([]history.Result, error)
 }
 
 type mistakeStore interface {
@@ -115,8 +100,8 @@ func (s *jsonStore) configPath() string {
 	return filepath.Join(s.configDir, "config.json")
 }
 
-func (s *jsonStore) Results() ([]persistedResult, error) {
-	var stored []persistedResult
+func (s *jsonStore) Results() ([]history.Result, error) {
+	var stored []history.Result
 	if err := readValue(s.path(resultsFile), &stored); err != nil && !os.IsNotExist(err) {
 		return nil, fmt.Errorf("could not read the saved results in %s: %v, fix or remove the file", s.path(resultsFile), err)
 	}
@@ -124,7 +109,7 @@ func (s *jsonStore) Results() ([]persistedResult, error) {
 	return stored, nil
 }
 
-func (s *jsonStore) AddResult(r persistedResult) ([]persistedResult, error) {
+func (s *jsonStore) AddResult(r history.Result) ([]history.Result, error) {
 	stored, err := s.Results()
 	if err != nil {
 		return nil, err

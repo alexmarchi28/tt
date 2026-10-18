@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexmarchi28/tt/internal/history"
 	"github.com/alexmarchi28/tt/internal/resource"
 	"github.com/alexmarchi28/tt/internal/typing"
 	"github.com/gdamore/tcell"
@@ -17,7 +18,7 @@ func newTestApp(t *testing.T, s settings) (*app, tcell.SimulationScreen) {
 	res, _ := newTestResources(t)
 	sim := newSimScreen(t)
 
-	s.source.kind = testKind{Mode: "words", Source: "test"}
+	s.source.kind = history.Kind{Mode: "words", Source: "test"}
 	a, err := newApp(sim, s, appDeps{newTestStore(t), res, time.Now, keptCursor{}})
 	if err != nil {
 		t.Fatal(err)
@@ -76,7 +77,7 @@ func TestAppRecordsCompletedTests(t *testing.T) {
 	opts := resolveFlags(nil)
 	opts.output.noReport = true
 	a, sim := newTestApp(t, opts)
-	a.kind = testKind{Mode: "words", Source: "test", Seconds: 30, Punct: true}
+	a.kind = history.Kind{Mode: "words", Source: "test", Seconds: 30, Punct: true}
 
 	var calls int
 	done := startApp(a, testSequence(&calls, "ab", "cd"))
@@ -95,7 +96,7 @@ func TestAppRecordsCompletedTests(t *testing.T) {
 		t.Fatalf("persisted results = %+v (%v), want 2", stored, err)
 	}
 	for _, r := range stored {
-		if r.testKind != a.kind || r.Duration <= 0 || r.Duration > 5 {
+		if r.Kind != a.kind || r.Duration <= 0 || r.Duration > 5 {
 			t.Errorf("persisted result %+v, want the kind of test and its duration", r)
 		}
 	}
@@ -326,14 +327,14 @@ func TestAppReportsPersonalBest(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		previous []persistedResult
+		previous []history.Result
 		want     bool
 	}{
 		{"first test", nil, false},
-		{"beaten", []persistedResult{{Wpm: 1, testKind: testKind{Mode: "words", Source: "test"}}}, true},
-		{"not beaten", []persistedResult{{Wpm: 1_000_000_000, testKind: testKind{Mode: "words", Source: "test"}}}, false},
-		{"other kind of test", []persistedResult{{Wpm: 1, testKind: testKind{Mode: "quotes", Source: "en"}}}, false},
-		{"other variant of the test", []persistedResult{{Wpm: 1, testKind: testKind{Mode: "words", Source: "test", Punct: true}}}, false},
+		{"beaten", []history.Result{{Wpm: 1, Kind: history.Kind{Mode: "words", Source: "test"}}}, true},
+		{"not beaten", []history.Result{{Wpm: 1_000_000_000, Kind: history.Kind{Mode: "words", Source: "test"}}}, false},
+		{"other kind of test", []history.Result{{Wpm: 1, Kind: history.Kind{Mode: "quotes", Source: "en"}}}, false},
+		{"other variant of the test", []history.Result{{Wpm: 1, Kind: history.Kind{Mode: "words", Source: "test", Punct: true}}}, false},
 	}
 
 	for _, tc := range tests {

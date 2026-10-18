@@ -5,6 +5,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/alexmarchi28/tt/internal/history"
 	"github.com/gdamore/tcell"
 )
 
@@ -28,7 +29,7 @@ type appDeps struct {
 type app struct {
 	rules    ruleSettings
 	output   outputSettings
-	kind     testKind
+	kind     history.Kind
 	store    sessionStore
 	now      func() time.Time
 	typer    *typer
@@ -105,10 +106,10 @@ func (a *app) useTyper(ty *typer) {
 // returns the exit code. It stops at the first test which can't be made or
 // whose outcome can't be saved.
 func (a *app) run(src testSource) (int, error) {
-	history := newTestHistory(src)
+	tests := newTestHistory(src)
 
 	for {
-		test, err := history.current()
+		test, err := tests.current()
 		if err == io.EOF {
 			return 0, nil
 		} else if err != nil {
@@ -121,15 +122,15 @@ func (a *app) run(src testSource) (int, error) {
 
 		switch o, res := a.typer.Start(test, a.rules.timeout); o {
 		case outcomeNext:
-			history.next()
+			tests.next()
 		case outcomePrevious:
-			history.previous()
+			tests.previous()
 		case outcomeComplete:
 			if stop, rc, err := a.complete(test, res); stop {
 				return rc, err
 			}
 
-			history.next()
+			tests.next()
 		case outcomeRestart: //The same test is shown again.
 		case outcomeQuit:
 			return 1, nil
@@ -172,12 +173,12 @@ func (a *app) record(res testResult) (personalBest, error) {
 	timestamp := a.now().Unix()
 
 	a.results = append(a.results, result{res.wpm(), res.cpm(), res.accuracy(), timestamp, res.mistakes})
-	previous, err := a.store.AddResult(persistedResult{
+	previous, err := a.store.AddResult(history.Result{
 		Wpm:       res.wpm(),
 		Accuracy:  res.accuracy(),
 		Timestamp: timestamp,
 		Duration:  res.duration.Seconds(),
-		testKind:  a.kind,
+		Kind:      a.kind,
 	})
 	if err != nil {
 		return personalBest{}, err

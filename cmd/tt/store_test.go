@@ -2,13 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
 	"time"
 
+	"github.com/alexmarchi28/tt/internal/history"
 	"github.com/alexmarchi28/tt/internal/keystats"
 	"github.com/alexmarchi28/tt/internal/typing"
 )
@@ -16,7 +16,7 @@ import (
 // memStore keeps the saved data in memory. Every access fails with err if it
 // is set.
 type memStore struct {
-	results    []persistedResult
+	results    []history.Result
 	mistakes   []typing.Mistake
 	keys       keystats.Stats
 	paragraphs map[string]int
@@ -24,9 +24,9 @@ type memStore struct {
 	err        error
 }
 
-func (s *memStore) Results() ([]persistedResult, error) { return s.results, s.err }
+func (s *memStore) Results() ([]history.Result, error) { return s.results, s.err }
 
-func (s *memStore) AddResult(r persistedResult) ([]persistedResult, error) {
+func (s *memStore) AddResult(r history.Result) ([]history.Result, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
@@ -121,18 +121,18 @@ func TestStoreResults(t *testing.T) {
 		t.Fatalf("reading missing results: %+v, %v, want none", got, err)
 	}
 
-	first := persistedResult{Wpm: 60, Accuracy: 95.5, Timestamp: 1000}
+	first := history.Result{Wpm: 60, Accuracy: 95.5, Timestamp: 1000}
 	if previous, err := s.AddResult(first); previous != nil || err != nil {
 		t.Errorf("results saved before the first one: %+v, %v", previous, err)
 	}
 
-	second := persistedResult{Wpm: 72, Accuracy: 100, Timestamp: 2000, Duration: 12.5, testKind: testKind{Mode: "quotes", Source: "en", Seconds: 30}}
-	if previous, err := s.AddResult(second); err != nil || !reflect.DeepEqual(previous, []persistedResult{first}) {
+	second := history.Result{Wpm: 72, Accuracy: 100, Timestamp: 2000, Duration: 12.5, Kind: history.Kind{Mode: "quotes", Source: "en", Seconds: 30}}
+	if previous, err := s.AddResult(second); err != nil || !reflect.DeepEqual(previous, []history.Result{first}) {
 		t.Errorf("results saved before the second one: %+v, %v, want the first one", previous, err)
 	}
 
 	got, err := s.Results()
-	if want := []persistedResult{first, second}; err != nil || !reflect.DeepEqual(got, want) {
+	if want := []history.Result{first, second}; err != nil || !reflect.DeepEqual(got, want) {
 		t.Errorf("stored results = %+v, %v, want %+v", got, err, want)
 	}
 }
@@ -144,7 +144,7 @@ func TestStoreResultsOfOlderVersions(t *testing.T) {
 	writeFile(t, s.path(resultsFile), `[{"wpm":60,"accuracy":95,"timestamp":1000}]`)
 
 	got, err := s.Results()
-	if want := []persistedResult{{Wpm: 60, Accuracy: 95, Timestamp: 1000}}; err != nil || !reflect.DeepEqual(got, want) {
+	if want := []history.Result{{Wpm: 60, Accuracy: 95, Timestamp: 1000}}; err != nil || !reflect.DeepEqual(got, want) {
 		t.Errorf("Results() = %+v, %v, want %+v", got, err, want)
 	}
 }
@@ -161,7 +161,7 @@ func TestStoreCorruptResults(t *testing.T) {
 	if _, err := s.Results(); err == nil || err.Error() != want {
 		t.Errorf("Results() = %v, want the error %q", err, want)
 	}
-	if _, err := s.AddResult(persistedResult{Wpm: 60}); err == nil || err.Error() != want {
+	if _, err := s.AddResult(history.Result{Wpm: 60}); err == nil || err.Error() != want {
 		t.Errorf("AddResult() = %v, want the error %q", err, want)
 	}
 	if b, _ := os.ReadFile(path); string(b) != `[{"wpm":60,"accur` {
@@ -336,7 +336,7 @@ func TestRememberedTheme(t *testing.T) {
 func TestPersistedResultFormat(t *testing.T) {
 	t.Parallel()
 
-	r := persistedResult{Wpm: 60, Accuracy: 95.5, Timestamp: 1000, Duration: 30, testKind: testKind{Mode: "adaptive", Source: "1000en", Seconds: 15, Words: 50, Punct: true, Numbers: true, Focus: 40}}
+	r := history.Result{Wpm: 60, Accuracy: 95.5, Timestamp: 1000, Duration: 30, Kind: history.Kind{Mode: "adaptive", Source: "1000en", Seconds: 15, Words: 50, Punct: true, Numbers: true, Focus: 40}}
 
 	b, err := json.Marshal(r)
 	if err != nil {
@@ -357,24 +357,12 @@ func TestPersistedResultFormat(t *testing.T) {
 	}
 
 	// Results saved by older versions have no kind or variant.
-	var old persistedResult
+	var old history.Result
 	if err := json.Unmarshal([]byte(`{"wpm":60,"accuracy":95.5,"timestamp":1000}`), &old); err != nil {
 		t.Fatal(err)
 	}
-	if old.testKind != (testKind{}) {
-		t.Errorf("kind of an old result = %+v, want none", old.testKind)
-	}
-}
-
-// Results are printed whole, not only their kind as the embedded testKind
-// would.
-func TestPersistedResultString(t *testing.T) {
-	t.Parallel()
-
-	r := persistedResult{Wpm: 60, Accuracy: 95.5, Timestamp: 1000, Duration: 30, testKind: testKind{Mode: "quotes", Source: "en"}}
-
-	if got, want := fmt.Sprint(r), "60 wpm, 95.50% accuracy, 30.0s at 1000 (quotes en)"; got != want {
-		t.Errorf("printed as %q, want %q", got, want)
+	if old.Kind != (history.Kind{}) {
+		t.Errorf("kind of an old result = %+v, want none", old.Kind)
 	}
 }
 

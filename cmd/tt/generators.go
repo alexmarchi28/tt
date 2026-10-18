@@ -12,6 +12,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/alexmarchi28/tt/internal/history"
 	"github.com/alexmarchi28/tt/internal/resource"
 	"github.com/alexmarchi28/tt/internal/typing"
 )
@@ -40,27 +41,27 @@ func newTestSource(s sourceSettings, src textSources) (testSource, error) {
 	res, rng, words := src.resources, src.rng, s.words
 
 	switch s.kind.Mode {
-	case modeAdaptive:
+	case history.ModeAdaptive:
 		tests, err := newAdaptiveSource(rng, res, s.path, words, s.focus, src.store)
 		if err != nil {
 			return nil, err
 		}
 
 		return tests, nil
-	case modeWords:
+	case history.ModeWords:
 		return fromFunc(generateWordTest(rng, res, s.path, words))
-	case modeQuotes:
+	case history.ModeQuotes:
 		return fromFunc(generateQuoteTest(rng, res, s.path))
-	case modeMistakes:
+	case history.ModeMistakes:
 		return fromFunc(generateMistakesTest(rng, words, src.store))
-	case modeText:
+	case history.ModeText:
 		b, err := io.ReadAll(src.stdin)
 		if err != nil {
 			return nil, err
 		}
 
 		return fromFunc(generateTestFromData(b, s.raw, s.multi))
-	case modeFile:
+	case history.ModeFile:
 		tests, err := newFileSource(s.path, s.startParagraph, src.store)
 		if err != nil {
 			return nil, err
@@ -84,15 +85,6 @@ func fromFunc(gen func() []segment, err error) (testSource, error) {
 // defaultWordList is the word list of word tests unless -words is given.
 const defaultWordList = "1000en"
 
-// adaptiveWordList returns the word list of adaptive tests.
-func adaptiveWordList(opts options) string {
-	if opts.wordFile != "" {
-		return opts.wordFile
-	}
-
-	return defaultWordList
-}
-
 // fastestCpm is a speed beyond the reach of any typist (500 wpm), at which
 // timed word tests still don't run out of words.
 const fastestCpm = 2500
@@ -104,17 +96,6 @@ type wordOptions struct {
 	punctuation bool // Turn the words into sentences.
 	numbers     bool // Replace some of the words with numbers.
 	minChars    int  // Groups are added until the test has this many characters.
-}
-
-// newWordOptions returns the options of word tests given on the command line.
-// Timed tests get enough words to last until the time is up.
-func newWordOptions(opts options) wordOptions {
-	o := wordOptions{n: opts.n, g: opts.g, punctuation: opts.punct, numbers: opts.numbers}
-	if opts.timeout != -1 {
-		o.minChars = int(opts.timeout.Minutes() * fastestCpm)
-	}
-
-	return o
 }
 
 func generateWordTest(rng *rand.Rand, res resourceReader, name string, o wordOptions) (func() []segment, error) {

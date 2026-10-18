@@ -5,6 +5,8 @@ import (
 	"math"
 	"strings"
 	"time"
+
+	"github.com/alexmarchi28/tt/internal/history"
 )
 
 // chartRows is the height of the progress chart.
@@ -21,7 +23,7 @@ type dayAverage struct {
 
 // dailyAverages returns the average WPM of each of the n days up to now,
 // oldest first. Days are those of the time zone of now.
-func dailyAverages(results []persistedResult, n int, now time.Time) []dayAverage {
+func dailyAverages(results []history.Result, n int, now time.Time) []dayAverage {
 	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	days := make([]dayAverage, n)
 	index := map[string]int{}

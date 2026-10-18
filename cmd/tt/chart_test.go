@@ -6,12 +6,14 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/alexmarchi28/tt/internal/history"
 )
 
 func TestDailyAverages(t *testing.T) {
 	t.Parallel()
 
-	stored := []persistedResult{
+	stored := []history.Result{
 		resultAt(10, 0, 30*24*time.Hour), // Too old.
 		resultAt(40, 0, 29*24*time.Hour),
 		resultAt(70, 0, 30*time.Minute),

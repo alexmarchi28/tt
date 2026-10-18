@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/alexmarchi28/tt/internal/history"
 )
 
 // settings is the configuration of tt resolved once from the command line
@@ -26,8 +28,8 @@ type settings struct {
 
 // sourceSettings say what the text of the tests is made of.
 type sourceSettings struct {
-	kind           testKind // Mode, source and variant of the tests.
-	path           string   // The word list, quote file or file typed, as given.
+	kind           history.Kind // Mode, source and variant of the tests.
+	path           string       // The word list, quote file or file typed, as given.
 	words          wordOptions
 	focus          int // Percentage of the words of adaptive tests with the pairs practiced.
 	startParagraph int // Paragraph of the file to start from, -1 for the one reached last.
@@ -188,25 +190,25 @@ func resolveSource(o options, stdinIsTerminal bool) (sourceSettings, error) {
 
 	switch {
 	case o.adaptive:
-		s.kind.Mode, s.path = modeAdaptive, adaptiveWordList(o)
+		s.kind.Mode, s.path = history.ModeAdaptive, adaptiveWordList(o)
 	case o.wordFile != "":
-		s.kind.Mode, s.path = modeWords, o.wordFile
+		s.kind.Mode, s.path = history.ModeWords, o.wordFile
 	case o.quoteFile != "":
-		s.kind.Mode, s.path = modeQuotes, o.quoteFile
+		s.kind.Mode, s.path = history.ModeQuotes, o.quoteFile
 	case o.mistakes:
-		s.kind.Mode = modeMistakes
+		s.kind.Mode = history.ModeMistakes
 	case len(o.files) > 0:
-		s.kind.Mode, s.path = modeFile, o.files[0]
+		s.kind.Mode, s.path = history.ModeFile, o.files[0]
 	case !stdinIsTerminal:
-		s.kind.Mode = modeText
+		s.kind.Mode = history.ModeText
 	default:
-		s.kind.Mode, s.path = modeWords, defaultWordList
+		s.kind.Mode, s.path = history.ModeWords, defaultWordList
 	}
 
 	if s.path != "" {
 		s.kind.Source = filepath.Base(s.path)
 	}
-	s.kind = s.kind.withVariant(o)
+	s.kind = withVariant(s.kind, o)
 
 	return s, nil
 }
@@ -227,4 +229,45 @@ func outputFormat(o options) string {
 	}
 
 	return ""
+}
+
+// adaptiveWordList returns the word list of adaptive tests.
+func adaptiveWordList(opts options) string {
+	if opts.wordFile != "" {
+		return opts.wordFile
+	}
+
+	return defaultWordList
+}
+
+// newWordOptions returns the options of word tests given on the command line.
+// Timed tests get enough words to last until the time is up.
+func newWordOptions(opts options) wordOptions {
+	o := wordOptions{n: opts.n, g: opts.g, punctuation: opts.punct, numbers: opts.numbers}
+	if opts.timeout != -1 {
+		o.minChars = int(opts.timeout.Minutes() * fastestCpm)
+	}
+
+	return o
+}
+
+// withVariant returns k completed with how the tests are made according to
+// the command line options.
+func withVariant(k history.Kind, opts options) history.Kind {
+	if opts.timeout != -1 {
+		k.Seconds = int(opts.timeout / time.Second)
+	}
+
+	if k.MadeOfWords() {
+		k.Punct, k.Numbers = opts.punct, opts.numbers
+		if opts.timeout == -1 {
+			k.Words = opts.n * opts.g
+		}
+	}
+
+	if k.Mode == history.ModeAdaptive {
+		k.Focus = opts.focus
+	}
+
+	return k
 }

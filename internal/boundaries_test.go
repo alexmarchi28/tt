@@ -19,6 +19,7 @@ const module = "github.com/alexmarchi28/tt"
 // none of them knows the screen or the command.
 var allowedImports = map[string][]string{
 	"typing":   nil,
+	"history":  nil,
 	"keystats": {module + "/internal/typing"},
 	"resource": {module},
 }

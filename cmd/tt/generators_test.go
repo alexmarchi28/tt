@@ -13,6 +13,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
+	"github.com/alexmarchi28/tt/internal/history"
 	"github.com/alexmarchi28/tt/internal/resource"
 	"github.com/alexmarchi28/tt/internal/typing"
 )
@@ -325,37 +326,37 @@ func TestNewTestGenerator(t *testing.T) {
 		stdin           string
 		stdinIsTerminal bool
 		check           func(t *testing.T, segments []segment)
-		kind            testKind
+		kind            history.Kind
 	}{
-		{"default", nil, "", true, wordsPerSegment(50), testKind{Mode: "words", Source: "1000en", Words: 50}},
-		{"word list", []string{"-words", "200en", "-n", "3", "-g", "2"}, "", true, wordsPerSegment(3, 3), testKind{Mode: "words", Source: "200en", Words: 6}},
+		{"default", nil, "", true, wordsPerSegment(50), history.Kind{Mode: "words", Source: "1000en", Words: 50}},
+		{"word list", []string{"-words", "200en", "-n", "3", "-g", "2"}, "", true, wordsPerSegment(3, 3), history.Kind{Mode: "words", Source: "200en", Words: 6}},
 		{"quotes", []string{"-quotes", "en"}, "", true, func(t *testing.T, segments []segment) {
 			if len(segments) != 1 || segments[0].Text == "" {
 				t.Errorf("got %q, want a quote", segments)
 			}
-		}, testKind{Mode: "quotes", Source: "en"}},
-		{"stdin", nil, "piped text\n\nmore", false, exactly("piped text", "more"), testKind{Mode: "text"}},
-		{"word list over stdin", []string{"-words", "200en", "-n", "4"}, "piped text", false, wordsPerSegment(4), testKind{Mode: "words", Source: "200en", Words: 4}},
-		{"file", []string{book}, "", true, exactly("first paragraph"), testKind{Mode: "file", Source: "book.txt"}},
-		{"file over stdin", []string{book}, "piped text", false, exactly("first paragraph"), testKind{Mode: "file", Source: "book.txt"}},
-		{"mistakes", []string{"-mistakes", "-n", "3"}, "", true, exactly("ab ab ab"), testKind{Mode: "mistakes", Words: 3}},
+		}, history.Kind{Mode: "quotes", Source: "en"}},
+		{"stdin", nil, "piped text\n\nmore", false, exactly("piped text", "more"), history.Kind{Mode: "text"}},
+		{"word list over stdin", []string{"-words", "200en", "-n", "4"}, "piped text", false, wordsPerSegment(4), history.Kind{Mode: "words", Source: "200en", Words: 4}},
+		{"file", []string{book}, "", true, exactly("first paragraph"), history.Kind{Mode: "file", Source: "book.txt"}},
+		{"file over stdin", []string{book}, "piped text", false, exactly("first paragraph"), history.Kind{Mode: "file", Source: "book.txt"}},
+		{"mistakes", []string{"-mistakes", "-n", "3"}, "", true, exactly("ab ab ab"), history.Kind{Mode: "mistakes", Words: 3}},
 		{"punctuation and numbers", []string{"-punct", "-numbers", "-n", "200"}, "", true, func(t *testing.T, segments []segment) {
 			if len(segments) != 1 || !endsSentence(segments[0].Text) || !strings.ContainsAny(segments[0].Text, "0123456789") {
 				t.Errorf("got %q, want sentences with numbers", segments)
 			}
-		}, testKind{Mode: "words", Source: "1000en", Words: 200, Punct: true, Numbers: true}},
-		{"mistakes over stdin", []string{"-mistakes", "-n", "2"}, "piped text", false, exactly("ab ab"), testKind{Mode: "mistakes", Words: 2}},
-		{"adaptive", []string{"-adaptive", "-n", "5"}, "", true, wordsPerSegment(5), testKind{Mode: "adaptive", Source: "1000en", Words: 5, Focus: 40}},
-		{"adaptive word list", []string{"-adaptive", "-words", "200en", "-n", "5", "-focus", "70"}, "piped text", false, wordsPerSegment(5), testKind{Mode: "adaptive", Source: "200en", Words: 5, Focus: 70}},
-		{"timed words", []string{"-t", "10", "-n", "5"}, "", true, lastsAtLeast(10*time.Second, 5), testKind{Mode: "words", Source: "1000en", Seconds: 10}},
-		{"timed mistakes", []string{"-mistakes", "-t", "10", "-n", "5"}, "", true, lastsAtLeast(10*time.Second, 5), testKind{Mode: "mistakes", Seconds: 10}},
-		{"timed adaptive", []string{"-adaptive", "-t", "10", "-n", "5"}, "", true, lastsAtLeast(10*time.Second, 5), testKind{Mode: "adaptive", Source: "1000en", Seconds: 10, Focus: 40}},
+		}, history.Kind{Mode: "words", Source: "1000en", Words: 200, Punct: true, Numbers: true}},
+		{"mistakes over stdin", []string{"-mistakes", "-n", "2"}, "piped text", false, exactly("ab ab"), history.Kind{Mode: "mistakes", Words: 2}},
+		{"adaptive", []string{"-adaptive", "-n", "5"}, "", true, wordsPerSegment(5), history.Kind{Mode: "adaptive", Source: "1000en", Words: 5, Focus: 40}},
+		{"adaptive word list", []string{"-adaptive", "-words", "200en", "-n", "5", "-focus", "70"}, "piped text", false, wordsPerSegment(5), history.Kind{Mode: "adaptive", Source: "200en", Words: 5, Focus: 70}},
+		{"timed words", []string{"-t", "10", "-n", "5"}, "", true, lastsAtLeast(10*time.Second, 5), history.Kind{Mode: "words", Source: "1000en", Seconds: 10}},
+		{"timed mistakes", []string{"-mistakes", "-t", "10", "-n", "5"}, "", true, lastsAtLeast(10*time.Second, 5), history.Kind{Mode: "mistakes", Seconds: 10}},
+		{"timed adaptive", []string{"-adaptive", "-t", "10", "-n", "5"}, "", true, lastsAtLeast(10*time.Second, 5), history.Kind{Mode: "adaptive", Source: "1000en", Seconds: 10, Focus: 40}},
 		{"timed quotes", []string{"-quotes", "en", "-t", "30"}, "", true, func(t *testing.T, segments []segment) {
 			if len(segments) != 1 || segments[0].Text == "" {
 				t.Errorf("got %q, want a quote", segments)
 			}
-		}, testKind{Mode: "quotes", Source: "en", Seconds: 30}},
-		{"word options over stdin", []string{"-punct", "-numbers", "-n", "3"}, "piped text", false, exactly("piped text"), testKind{Mode: "text"}},
+		}, history.Kind{Mode: "quotes", Source: "en", Seconds: 30}},
+		{"word options over stdin", []string{"-punct", "-numbers", "-n", "3"}, "piped text", false, exactly("piped text"), history.Kind{Mode: "text"}},
 	}
 
 	for _, tc := range tests {
