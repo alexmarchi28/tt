@@ -36,8 +36,10 @@ type typer struct {
 	keys       keymap
 	session    sessionDeps // Given to the session of each segment.
 	tick       time.Duration
+	newTicker  func(time.Duration) (ticks <-chan time.Time, stop func())
 	cursor     cursorShaper
 	cycleTheme func(direction int) (string, error) // Switches to another theme and returns its name.
+	frameHook  func(frame)                         // Observes each frame drawn, may be nil.
 
 	statusMessage      string
 	statusMessageUntil time.Time
@@ -76,6 +78,17 @@ func withTick(tick time.Duration) typerOption {
 	return func(t *typer) { t.tick = tick }
 }
 
+// withTicker makes the ticks updating the screen come from newTicker rather
+// than from a time.Ticker.
+func withTicker(newTicker func(time.Duration) (ticks <-chan time.Time, stop func())) typerOption {
+	return func(t *typer) { t.newTicker = newTicker }
+}
+
+// withFrameHook calls hook with each frame drawn, once it is on the screen.
+func withFrameHook(hook func(frame)) typerOption {
+	return func(t *typer) { t.frameHook = hook }
+}
+
 func withCursor(c cursorShaper) typerOption {
 	return func(t *typer) { t.cursor = c }
 }
@@ -95,6 +108,10 @@ func newTyper(scr tcell.Screen, v *view, opts ...typerOption) *typer {
 		session: sessionDeps{now: time.Now},
 		tick:    500 * time.Millisecond,
 		cursor:  keptCursor{},
+		newTicker: func(d time.Duration) (<-chan time.Time, func()) {
+			ticker := time.NewTicker(d)
+			return ticker.C, ticker.Stop
+		},
 	}
 
 	for _, opt := range opts {
@@ -240,6 +257,9 @@ func (t *typer) draw(s *session) {
 	f.showHelp = t.showHelp
 
 	t.view.draw(f)
+	if t.frameHook != nil {
+		t.frameHook(f)
+	}
 }
 
 // handleKey handles a key pressed while typing s and returns the outcome of
@@ -287,7 +307,7 @@ func (t *typer) handleKey(s *session, ev *tcell.EventKey) (outcome, bool) {
 // rather than waited on when the event queue is full, and no tick is posted
 // once stop has returned.
 func (t *typer) startTicker() (stop func()) {
-	ticker := time.NewTicker(t.refreshInterval())
+	ticks, stopTicks := t.newTicker(t.refreshInterval())
 	done, stopped := make(chan struct{}), make(chan struct{})
 
 	go func() {
@@ -296,14 +316,14 @@ func (t *typer) startTicker() (stop func()) {
 			select {
 			case <-done:
 				return
-			case <-ticker.C:
+			case <-ticks:
 				_ = t.scr.PostEvent(nil)
 			}
 		}
 	}()
 
 	return func() {
-		ticker.Stop()
+		stopTicks()
 		close(done)
 		<-stopped
 	}

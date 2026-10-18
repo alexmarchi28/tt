@@ -36,6 +36,8 @@ func typedFrame(text, typed string, x, y int) frame {
 }
 
 func TestViewDrawsTheText(t *testing.T) {
+	t.Parallel()
+
 	v, sim := newTestView(t, defaultViewOptions)
 
 	f := typedFrame("ab cd ef", "xb ", 2, 3)
@@ -71,6 +73,8 @@ func TestViewDrawsTheText(t *testing.T) {
 // Wide characters take two cells, the cursor and the following characters
 // being placed accordingly.
 func TestViewDrawsWideCharacters(t *testing.T) {
+	t.Parallel()
+
 	v, sim := newTestView(t, defaultViewOptions)
 
 	v.draw(typedFrame("日本 ab", "日本 ", 0, 0))
@@ -87,6 +91,8 @@ func TestViewDrawsWideCharacters(t *testing.T) {
 }
 
 func TestViewBlind(t *testing.T) {
+	t.Parallel()
+
 	v, sim := newTestView(t, viewOptions{blind: true})
 
 	v.draw(typedFrame("ab", "x", 0, 0))
@@ -97,6 +103,8 @@ func TestViewBlind(t *testing.T) {
 }
 
 func TestViewDrawsThePacer(t *testing.T) {
+	t.Parallel()
+
 	v, sim := newTestView(t, defaultViewOptions)
 
 	f := typedFrame("abcdef", "a", 0, 0)
@@ -109,6 +117,8 @@ func TestViewDrawsThePacer(t *testing.T) {
 }
 
 func TestViewDrawsTheTimerAndLiveStats(t *testing.T) {
+	t.Parallel()
+
 	v, sim := newTestView(t, viewOptions{showWpm: true, showAccuracy: true})
 
 	f := typedFrame("ab cd ef", "ax", 10, 5)
@@ -132,6 +142,8 @@ func TestViewDrawsTheTimerAndLiveStats(t *testing.T) {
 }
 
 func TestViewDrawsTheStatusAndHelp(t *testing.T) {
+	t.Parallel()
+
 	v, sim := newTestView(t, defaultViewOptions)
 
 	f := typedFrame("ab", "", 19, 8)
@@ -159,6 +171,8 @@ func TestViewDrawsTheStatusAndHelp(t *testing.T) {
 }
 
 func TestViewSetTheme(t *testing.T) {
+	t.Parallel()
+
 	v, sim := newTestView(t, defaultViewOptions)
 
 	v.setTheme(theme{tcell.ColorAqua, tcell.ColorNavy, tcell.ColorLime, tcell.ColorPurple, tcell.ColorOlive, tcell.ColorMaroon})
@@ -170,6 +184,8 @@ func TestViewSetTheme(t *testing.T) {
 }
 
 func TestTTYCursor(t *testing.T) {
+	t.Parallel()
+
 	var tty bytes.Buffer
 	c := ttyCursor{&tty}
 

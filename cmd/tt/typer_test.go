@@ -49,21 +49,34 @@ func simulationScreenText(sim tcell.SimulationScreen) string {
 	return b.String()
 }
 
+// poll tells whether cond becomes true within testWait. It is the only wait
+// of the tests not tied to an event: the simulation screen tells nobody when
+// it changes.
+func poll(cond func() bool) bool {
+	deadline := time.Now().Add(testWait)
+	for !cond() {
+		if time.Now().After(deadline) {
+			return false
+		}
+		time.Sleep(time.Millisecond)
+	}
+
+	return true
+}
+
 func waitForScreenText(t *testing.T, sim tcell.SimulationScreen, needle string, want bool) {
 	t.Helper()
 
-	deadline := time.Now().Add(testWait)
-	for time.Now().Before(deadline) {
-		if strings.Contains(simulationScreenText(sim), needle) == want {
-			return
-		}
-		time.Sleep(10 * time.Millisecond)
+	if poll(func() bool { return strings.Contains(simulationScreenText(sim), needle) == want }) {
+		return
 	}
 
 	t.Fatalf("screen contains %q = %t, want %t\n%s", needle, !want, want, simulationScreenText(sim))
 }
 
 func TestQuestionMarkTogglesKeyboardHelp(t *testing.T) {
+	t.Parallel()
+
 	typer, sim := newTestTyper(t)
 	done := make(chan outcome, 1)
 	go func() {
@@ -165,12 +178,8 @@ func sendKeys(t *testing.T, sim tcell.SimulationScreen, items ...interface{}) {
 	t.Helper()
 
 	for _, ev := range keys(items...) {
-		deadline := time.Now().Add(testWait)
-		for sim.PostEvent(ev) != nil {
-			if time.Now().After(deadline) {
-				t.Fatal("event queue is full")
-			}
-			time.Sleep(time.Millisecond)
+		if !poll(func() bool { return sim.PostEvent(ev) == nil }) {
+			t.Fatal("event queue is full")
 		}
 	}
 }
@@ -219,6 +228,8 @@ func assertOutcome(t *testing.T, got typed, o outcome, correctChars, correctKeys
 }
 
 func TestTyperCorrectText(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t)
 
 	got := typeText(t, ty, sim, "alpha beta", "alpha beta")
@@ -231,6 +242,8 @@ func TestTyperCorrectText(t *testing.T) {
 }
 
 func TestTyperTypo(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t)
 
 	got := typeText(t, ty, sim, "alpha beta", "alpxa beta")
@@ -238,6 +251,8 @@ func TestTyperTypo(t *testing.T) {
 }
 
 func TestTyperBackspace(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t)
 
 	got := typeText(t, ty, sim, "alpha beta", "alpx", tcell.KeyBackspace2, "ha beta")
@@ -248,6 +263,8 @@ func TestTyperBackspace(t *testing.T) {
 }
 
 func TestTyperBackspaceAcrossLineBreak(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t)
 
 	got := typeText(t, ty, sim, "ab \ncd", "ab ", tcell.KeyBackspace2, " cd")
@@ -255,6 +272,8 @@ func TestTyperBackspaceAcrossLineBreak(t *testing.T) {
 }
 
 func TestTyperDisableBackspace(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t, withRules(typingRules{noBackspace: true}))
 
 	got := typeText(t, ty, sim, "ab cd", "x", tcell.KeyBackspace2, "b c", tcell.KeyCtrlW, "d")
@@ -262,6 +281,8 @@ func TestTyperDisableBackspace(t *testing.T) {
 }
 
 func TestTyperDeleteWord(t *testing.T) {
+	t.Parallel()
+
 	deleteWordKeys := map[string]tcell.Event{
 		"C-w":           tcell.NewEventKey(tcell.KeyCtrlW, 0, tcell.ModCtrl),
 		"C-backspace":   tcell.NewEventKey(tcell.KeyBackspace, 0, tcell.ModNone),
@@ -289,6 +310,8 @@ func TestTyperDeleteWord(t *testing.T) {
 }
 
 func TestTyperSpaceSkipsWord(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t)
 
 	got := typeText(t, ty, sim, "alpha beta gamma", "al beta gamma")
@@ -296,6 +319,8 @@ func TestTyperSpaceSkipsWord(t *testing.T) {
 }
 
 func TestTyperSpaceAtWordStartIsIgnored(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t)
 
 	got := typeText(t, ty, sim, "alpha beta", "alpha  beta")
@@ -303,6 +328,8 @@ func TestTyperSpaceAtWordStartIsIgnored(t *testing.T) {
 }
 
 func TestTyperNoSkip(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t, withRules(typingRules{noSkip: true}))
 
 	got := typeText(t, ty, sim, "ab cd", "a  cd")
@@ -310,6 +337,8 @@ func TestTyperNoSkip(t *testing.T) {
 }
 
 func TestTyperSkipsLineBreaks(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t)
 
 	got := typeText(t, ty, sim, "ab\ncd", "abcd")
@@ -320,6 +349,8 @@ func TestTyperSkipsLineBreaks(t *testing.T) {
 }
 
 func TestTyperQuestionMarkInText(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t)
 
 	got := typeText(t, ty, sim, "why? because", "why? because")
@@ -327,6 +358,8 @@ func TestTyperQuestionMarkInText(t *testing.T) {
 }
 
 func TestTyperControlKeys(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name string
 		ev   tcell.Event
@@ -364,6 +397,8 @@ func wrapAtScreenWidth(text string, sw int) string {
 }
 
 func TestTyperResizeKeepsProgress(t *testing.T) {
+	t.Parallel()
+
 	clock := newFakeClock()
 	ty, sim := newTestTyper(t, withWrap(wrapAtScreenWidth), withFakeClock(clock))
 
@@ -389,6 +424,8 @@ func TestTyperResizeKeepsProgress(t *testing.T) {
 }
 
 func TestTyperResizeWithoutWrap(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t)
 
 	done := startTyper(ty, []segment{{"alpha beta", ""}}, -1)
@@ -401,6 +438,8 @@ func TestTyperResizeWithoutWrap(t *testing.T) {
 }
 
 func TestTyperWrapsEachSegmentAtTheCurrentWidth(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t, withWrap(wrapAtScreenWidth))
 
 	done := startTyper(ty, []segment{{"ab", ""}, {"alpha beta gamma delta", ""}}, -1)
@@ -415,6 +454,8 @@ func TestTyperWrapsEachSegmentAtTheCurrentWidth(t *testing.T) {
 }
 
 func TestTyperMultipleSegments(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t)
 
 	done := startTyper(ty, []segment{{"ab cd", ""}, {"ef", ""}}, -1)
@@ -433,6 +474,8 @@ func TestTyperMultipleSegments(t *testing.T) {
 }
 
 func TestTyperTimeout(t *testing.T) {
+	t.Parallel()
+
 	clock := newFakeClock()
 	ty, sim := newTestTyper(t, withFakeClock(clock))
 
@@ -451,6 +494,8 @@ func TestTyperTimeout(t *testing.T) {
 }
 
 func TestTyperTimeoutIgnoresLateKeys(t *testing.T) {
+	t.Parallel()
+
 	clock := newFakeClock()
 	ty, sim := newTestTyper(t, withFakeClock(clock))
 
@@ -473,6 +518,8 @@ func TestTyperTimeoutIgnoresLateKeys(t *testing.T) {
 }
 
 func TestTyperTimeoutSpansSegments(t *testing.T) {
+	t.Parallel()
+
 	clock := newFakeClock()
 	ty, sim := newTestTyper(t, withFakeClock(clock))
 
@@ -500,15 +547,18 @@ func TestTyperTimeoutSpansSegments(t *testing.T) {
 }
 
 func TestTyperTimerStartsOnFirstKey(t *testing.T) {
+	t.Parallel()
+
 	clock := newFakeClock()
-	ty, sim := newTestTyper(t, withFakeClock(clock))
+	var frames frameCounter
+	ty, sim := newTestTyper(t, withFakeClock(clock), frames.option())
 
 	done := startTyper(ty, []segment{{"ab", ""}}, 2*time.Second)
 	textOrigin(t, sim, "ab")
 
 	// Time passing before the first key doesn't count.
 	clock.advance(5 * time.Second)
-	time.Sleep(50 * time.Millisecond)
+	frames.waitFreshFrame(t, sim)
 	sendKeys(t, sim, "ab")
 
 	got := waitOutcome(t, done)
@@ -539,12 +589,8 @@ func textOrigin(t *testing.T, sim tcell.SimulationScreen, text string) (int, int
 func waitFor(t *testing.T, sim tcell.SimulationScreen, cond func() bool) {
 	t.Helper()
 
-	deadline := time.Now().Add(testWait)
-	for !cond() {
-		if time.Now().After(deadline) {
-			t.Fatalf("condition not met, screen:\n%s", simulationScreenText(sim))
-		}
-		time.Sleep(5 * time.Millisecond)
+	if !poll(cond) {
+		t.Fatalf("condition not met, screen:\n%s", simulationScreenText(sim))
 	}
 }
 
@@ -568,9 +614,9 @@ type cellWant struct {
 func waitForColors(t *testing.T, sim tcell.SimulationScreen, x, y int, want map[int]cellWant) {
 	t.Helper()
 
-	deadline := time.Now().Add(testWait)
-	for {
-		var diff []string
+	var diff []string
+	met := poll(func() bool {
+		diff = nil
 		for i := 0; i < 20; i++ {
 			w, ok := want[i]
 			if !ok {
@@ -583,17 +629,16 @@ func waitForColors(t *testing.T, sim tcell.SimulationScreen, x, y int, want map[
 			}
 		}
 
-		if len(diff) == 0 {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatal(strings.Join(diff, "\n"))
-		}
-		time.Sleep(5 * time.Millisecond)
+		return len(diff) == 0
+	})
+	if !met {
+		t.Fatal(strings.Join(diff, "\n"))
 	}
 }
 
 func TestTyperColors(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t, withRules(typingRules{noSkip: true}))
 
 	done := startTyper(ty, []segment{{"ab cd ef", ""}}, -1)
@@ -628,6 +673,8 @@ func TestTyperColors(t *testing.T) {
 }
 
 func TestTyperHighlightModes(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name                            string
 		highlightCurrent, highlightNext bool
@@ -659,6 +706,8 @@ func TestTyperHighlightModes(t *testing.T) {
 }
 
 func TestTyperSetThemeWhileTyping(t *testing.T) {
+	t.Parallel()
+
 	var ty *typer
 	ty, sim := newTestTyper(t, withThemeCycler(func(direction int) (string, error) {
 		ty.view.setTheme(theme{tcell.ColorAqua, tcell.ColorNavy, tcell.ColorLime, tcell.ColorPurple, tcell.ColorOlive, tcell.ColorMaroon})
@@ -680,6 +729,8 @@ func TestTyperSetThemeWhileTyping(t *testing.T) {
 }
 
 func TestTyperCycleTheme(t *testing.T) {
+	t.Parallel()
+
 	directions := make(chan int, 10)
 	ty, sim := newTestTyper(t, withThemeCycler(func(direction int) (string, error) {
 		directions <- direction
@@ -711,6 +762,8 @@ func TestTyperCycleTheme(t *testing.T) {
 }
 
 func TestTyperShowsAttribution(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t)
 
 	done := startTyper(ty, []segment{{"some quote text", "- Someone"}}, -1)
@@ -721,6 +774,8 @@ func TestTyperShowsAttribution(t *testing.T) {
 }
 
 func TestTyperShowsLiveStats(t *testing.T) {
+	t.Parallel()
+
 	clock := newFakeClock()
 	ty, sim := newTestTyperWithView(t, viewOptions{bold: true, highlightCurrent: true, highlightNext: true, showWpm: true, showAccuracy: true}, withFakeClock(clock))
 
@@ -751,6 +806,8 @@ func TestTyperShowsLiveStats(t *testing.T) {
 }
 
 func TestTyperCountsKeystrokesOfAllSegments(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t)
 
 	done := startTyper(ty, []segment{{"ab", ""}, {"cd", ""}}, -1)
@@ -760,6 +817,8 @@ func TestTyperCountsKeystrokesOfAllSegments(t *testing.T) {
 }
 
 func TestCalcAccuracy(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		correct, errors int
 		want            float64
@@ -778,6 +837,8 @@ func TestCalcAccuracy(t *testing.T) {
 }
 
 func TestTyperLiveAccuracyWithoutKeystrokes(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyperWithView(t, viewOptions{bold: true, highlightCurrent: true, highlightNext: true, showAccuracy: true})
 
 	done := startTyper(ty, []segment{{"ab cd", ""}}, -1)
@@ -789,6 +850,8 @@ func TestTyperLiveAccuracyWithoutKeystrokes(t *testing.T) {
 }
 
 func TestTyperSpaceAtLineStartIsIgnored(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t)
 
 	got := typeText(t, ty, sim, "ab \ncd", "ab  cd")
@@ -799,6 +862,8 @@ func TestTyperSpaceAtLineStartIsIgnored(t *testing.T) {
 }
 
 func TestTyperTypingQuestionMarkDoesNotToggleHelp(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t)
 
 	done := startTyper(ty, []segment{{"why? because", ""}}, -1)
@@ -815,6 +880,8 @@ func TestTyperTypingQuestionMarkDoesNotToggleHelp(t *testing.T) {
 }
 
 func TestTestResultStats(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		r        testResult
 		cpm, wpm int
@@ -833,6 +900,8 @@ func TestTestResultStats(t *testing.T) {
 }
 
 func TestTyperCursorShape(t *testing.T) {
+	t.Parallel()
+
 	var tty bytes.Buffer
 	ty, sim := newTestTyper(t, withCursor(ttyCursor{&tty}))
 
@@ -845,6 +914,8 @@ func TestTyperCursorShape(t *testing.T) {
 }
 
 func TestTyperTab(t *testing.T) {
+	t.Parallel()
+
 	for _, skip := range []bool{true, false} {
 		ty, sim := newTestTyper(t, withRules(typingRules{noSkip: !skip}))
 
@@ -856,6 +927,8 @@ func TestTyperTab(t *testing.T) {
 }
 
 func TestTyperDrawsTabs(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t, withRules(typingRules{noSkip: true}))
 
 	done := startTyper(ty, []segment{{"ab\n\tcd", ""}}, -1)
@@ -885,6 +958,8 @@ func TestTyperDrawsTabs(t *testing.T) {
 }
 
 func TestTyperBlind(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyperWithView(t, viewOptions{bold: true, highlightCurrent: true, highlightNext: true, blind: true}, withRules(typingRules{noSkip: true}))
 
 	done := startTyper(ty, []segment{{"ab cd ef", ""}}, -1)
@@ -935,6 +1010,8 @@ func withFakeClock(clock *fakeClock) typerOption {
 }
 
 func TestTyperMeasuresTimeWithItsClock(t *testing.T) {
+	t.Parallel()
+
 	clock := newFakeClock()
 	ty, sim := newTestTyper(t, withFakeClock(clock))
 
@@ -976,15 +1053,18 @@ func waitForReversed(t *testing.T, sim tcell.SimulationScreen, x, y, n int, want
 }
 
 func TestTyperPacer(t *testing.T) {
+	t.Parallel()
+
 	clock := newFakeClock()
-	ty, sim := newTestTyper(t, withPace(60), withFakeClock(clock))
+	var frames frameCounter
+	ty, sim := newTestTyper(t, withPace(60), withFakeClock(clock), frames.option())
 
 	done := startTyper(ty, []segment{{"abcdefghij", ""}}, -1)
 	x, y := textOrigin(t, sim, "abcdefghij")
 
 	// The pacer starts with the test.
 	clock.advance(time.Second)
-	time.Sleep(50 * time.Millisecond)
+	frames.waitFreshFrame(t, sim)
 	waitForReversed(t, sim, x, y, 10, nil)
 
 	sendKeys(t, sim, "a")
@@ -1005,8 +1085,11 @@ func TestTyperPacer(t *testing.T) {
 }
 
 func TestTyperWithoutPacer(t *testing.T) {
+	t.Parallel()
+
 	clock := newFakeClock()
-	ty, sim := newTestTyper(t, withFakeClock(clock))
+	var frames frameCounter
+	ty, sim := newTestTyper(t, withFakeClock(clock), frames.option())
 
 	done := startTyper(ty, []segment{{"abcdefghij", ""}}, -1)
 	x, y := textOrigin(t, sim, "abcdefghij")
@@ -1014,7 +1097,7 @@ func TestTyperWithoutPacer(t *testing.T) {
 	sendKeys(t, sim, "a")
 	waitForColors(t, sim, x, y, map[int]cellWant{0: {testHi, testBg, true}})
 	clock.advance(time.Second)
-	time.Sleep(50 * time.Millisecond)
+	frames.waitFreshFrame(t, sim)
 
 	if got := reversedCells(sim, x, y, 10); got != nil {
 		t.Errorf("reversed characters %v without a pacer", got)
@@ -1025,6 +1108,8 @@ func TestTyperWithoutPacer(t *testing.T) {
 }
 
 func TestTyperRefreshInterval(t *testing.T) {
+	t.Parallel()
+
 	if ty, _ := newTestTyper(t); ty.refreshInterval() != 500*time.Millisecond {
 		t.Errorf("without a pacer the screen is updated every %v, want 500ms", ty.refreshInterval())
 	}
@@ -1039,6 +1124,8 @@ func TestTyperRefreshInterval(t *testing.T) {
 }
 
 func TestTyperRecordsKeystrokes(t *testing.T) {
+	t.Parallel()
+
 	clock := newFakeClock()
 	ty, sim := newTestTyper(t, withFakeClock(clock))
 
@@ -1058,6 +1145,8 @@ func TestTyperRecordsKeystrokes(t *testing.T) {
 }
 
 func TestTyperEmptyText(t *testing.T) {
+	t.Parallel()
+
 	ty, sim := newTestTyper(t)
 
 	// The timer never starts, the test lasts no time at all.
@@ -1068,6 +1157,8 @@ func TestTyperEmptyText(t *testing.T) {
 }
 
 func TestTestResultWithoutDuration(t *testing.T) {
+	t.Parallel()
+
 	if got := (testResult{correctChars: 10}).cpm(); got != 0 {
 		t.Errorf("cpm() without duration = %d, want 0", got)
 	}
@@ -1088,11 +1179,28 @@ func (s *postCountingScreen) PostEventWait(ev tcell.Event) {
 	panic("the ticker must not block on a full event queue")
 }
 
+// fakeTicker delivers the ticks sent by a test, and remembers being stopped.
+type fakeTicker struct {
+	ticks   chan time.Time
+	stopped atomic.Bool
+}
+
+func newFakeTicker() *fakeTicker { return &fakeTicker{ticks: make(chan time.Time)} }
+
+func (f *fakeTicker) option() typerOption {
+	return withTicker(func(time.Duration) (<-chan time.Time, func()) {
+		return f.ticks, func() { f.stopped.Store(true) }
+	})
+}
+
 // The screen updates stop with the test, rather than reaching the next
 // screen.
 func TestTyperStopsTickingWithTheTest(t *testing.T) {
+	t.Parallel()
+
 	scr := &postCountingScreen{SimulationScreen: newSimScreen(t)}
-	ty := newTyper(scr, newView(scr, testTheme, defaultViewOptions), withKeymap(newKeymap("linux")), withTick(time.Millisecond))
+	ticker := newFakeTicker()
+	ty := newTyper(scr, newView(scr, testTheme, defaultViewOptions), withKeymap(newKeymap("linux")), ticker.option())
 
 	done := make(chan struct{})
 	go func() {
@@ -1100,13 +1208,67 @@ func TestTyperStopsTickingWithTheTest(t *testing.T) {
 		close(done)
 	}()
 
-	waitFor(t, scr.SimulationScreen, func() bool { return scr.posts.Load() > 3 })
+	// The ticks are received while the test runs, each posting an update.
+	ticker.ticks <- time.Time{}
+	ticker.ticks <- time.Time{}
+	waitFor(t, scr.SimulationScreen, func() bool { return scr.posts.Load() >= 2 })
+
 	sendKeys(t, scr.SimulationScreen, "ab")
 	<-done
 
-	posted := scr.posts.Load()
-	time.Sleep(30 * time.Millisecond)
-	if got := scr.posts.Load(); got != posted {
-		t.Errorf("%d screen updates posted after the test ended", got-posted)
+	if !ticker.stopped.Load() {
+		t.Error("the ticker was not stopped with the test")
 	}
+	select {
+	case ticker.ticks <- time.Time{}:
+		t.Error("a tick was received after the test ended")
+	default:
+	}
+}
+
+// frameCounter counts the frames drawn by a typer.
+type frameCounter struct {
+	n atomic.Int64
+}
+
+func (c *frameCounter) option() typerOption {
+	return withFrameHook(func(frame) { c.n.Add(1) })
+}
+
+// waitFreshFrame waits until a frame computed after the call is drawn. The
+// frame being drawn during the call may predate it, the following one can't.
+func (c *frameCounter) waitFreshFrame(t *testing.T, sim tcell.SimulationScreen) {
+	t.Helper()
+
+	n := c.n.Load()
+	waitFor(t, sim, func() bool { return c.n.Load() >= n+2 })
+}
+
+// The frame hook observes each frame drawn.
+func TestTyperFrameHook(t *testing.T) {
+	t.Parallel()
+
+	frames := make(chan frame, 100)
+	ty, sim := newTestTyper(t, withFrameHook(func(f frame) {
+		select {
+		case frames <- f:
+		default:
+		}
+	}))
+
+	done := startTyper(ty, []segment{{"ab", ""}}, -1)
+	sendKeys(t, sim, "a")
+
+	deadline := time.After(testWait)
+	for idx := 0; idx != 1; {
+		select {
+		case f := <-frames:
+			idx = f.idx
+		case <-deadline:
+			t.Fatal("no frame drawn with the key typed")
+		}
+	}
+
+	sendKeys(t, sim, "b")
+	waitOutcome(t, done)
 }

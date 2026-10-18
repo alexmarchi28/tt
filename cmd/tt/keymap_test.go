@@ -8,6 +8,8 @@ import (
 )
 
 func TestKeymapActions(t *testing.T) {
+	t.Parallel()
+
 	key := func(k tcell.Key, mods tcell.ModMask) *tcell.EventKey { return tcell.NewEventKey(k, 0, mods) }
 	char := func(r rune) *tcell.EventKey { return tcell.NewEventKey(tcell.KeyRune, r, tcell.ModNone) }
 
@@ -63,6 +65,8 @@ func TestKeymapActions(t *testing.T) {
 
 // The help is generated from the keymap, so it can't miss a key.
 func TestKeymapHelp(t *testing.T) {
+	t.Parallel()
+
 	want := []string{
 		"Help",
 		"? - show/hide this help",
@@ -87,6 +91,8 @@ func TestKeymapHelp(t *testing.T) {
 
 // Every action can be given with a key.
 func TestKeymapBindsEveryAction(t *testing.T) {
+	t.Parallel()
+
 	bound := map[action]bool{}
 	for _, b := range newKeymap("linux") {
 		if len(b.presses) > 0 {

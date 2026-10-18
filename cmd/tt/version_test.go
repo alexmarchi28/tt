@@ -6,6 +6,8 @@ import (
 )
 
 func TestResolveVersion(t *testing.T) {
+	t.Parallel()
+
 	module := func(v string) func() (*debug.BuildInfo, bool) {
 		return func() (*debug.BuildInfo, bool) {
 			return &debug.BuildInfo{Main: debug.Module{Version: v}}, true

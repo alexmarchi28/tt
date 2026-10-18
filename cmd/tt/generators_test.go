@@ -18,6 +18,8 @@ import (
 )
 
 func TestGenerateTestFromDataRaw(t *testing.T) {
+	t.Parallel()
+
 	gen := mustGen(generateTestFromData([]byte("one\n\ntwo  three\n"), true, false))
 
 	for i := 0; i < 2; i++ {
@@ -29,6 +31,8 @@ func TestGenerateTestFromDataRaw(t *testing.T) {
 }
 
 func TestGenerateTestFromDataMulti(t *testing.T) {
+	t.Parallel()
+
 	gen := mustGen(generateTestFromData([]byte("one\n\ntwo\nthree\n"), false, true))
 
 	for _, want := range [][]segment{{{"one", ""}}, {{"two\nthree", ""}}, nil, nil} {
@@ -39,6 +43,8 @@ func TestGenerateTestFromDataMulti(t *testing.T) {
 }
 
 func TestGenerateTestFromDataParagraphs(t *testing.T) {
+	t.Parallel()
+
 	gen := mustGen(generateTestFromData([]byte("one\n\ntwo\nthree\n"), false, false))
 
 	want := []segment{{"one", ""}, {"two\nthree", ""}}
@@ -50,6 +56,8 @@ func TestGenerateTestFromDataParagraphs(t *testing.T) {
 }
 
 func TestGenerateWordTest(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "greek", "alpha beta\tgamma\ndelta")
 
@@ -81,6 +89,8 @@ func TestGenerateWordTest(t *testing.T) {
 }
 
 func TestGenerateWordTestUsesBuiltinLists(t *testing.T) {
+	t.Parallel()
+
 	res, _ := newTestResources(t)
 
 	gen := mustGen(generateWordTest(newRand(), res, "1000en", wordOptions{n: 50, g: 1}))
@@ -94,6 +104,8 @@ func TestGenerateWordTestUsesBuiltinLists(t *testing.T) {
 }
 
 func TestGenerateWordTestIgnoresBlankEntries(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "blanks", "\n  alpha beta\n\ngamma\t\n")
 
@@ -120,6 +132,8 @@ func assertWords(t *testing.T, text string, n int) {
 }
 
 func TestGenerateQuoteTest(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "quotes", "mine", `[
 		{"text": "first quote", "attribution": "someone"},
@@ -149,6 +163,8 @@ func TestGenerateQuoteTest(t *testing.T) {
 }
 
 func TestBuiltinQuotesAreValid(t *testing.T) {
+	t.Parallel()
+
 	res, _ := newTestResources(t)
 
 	names := res.List("quotes")
@@ -189,6 +205,8 @@ var checkedWordLists = []struct {
 }
 
 func TestBuiltinWordLists(t *testing.T) {
+	t.Parallel()
+
 	res, _ := newTestResources(t)
 
 	for _, list := range checkedWordLists {
@@ -243,6 +261,8 @@ func assertNextParagraph(t *testing.T, gen func() []segment, want string) {
 }
 
 func TestGenerateTestFromFile(t *testing.T) {
+	t.Parallel()
+
 	st := &memStore{}
 	path := writeTextFile(t, "p0\n\np1\nstill p1\n\np2\n")
 
@@ -254,6 +274,8 @@ func TestGenerateTestFromFile(t *testing.T) {
 }
 
 func TestGenerateTestFromFileRemembersPosition(t *testing.T) {
+	t.Parallel()
+
 	st := &memStore{}
 	path := writeTextFile(t, "p0\n\np1\n\np2\n")
 
@@ -279,6 +301,8 @@ func TestGenerateTestFromFileRemembersPosition(t *testing.T) {
 }
 
 func TestGenerateTestFromFileTracksFilesSeparately(t *testing.T) {
+	t.Parallel()
+
 	st := &memStore{}
 	a := writeTextFile(t, "a0\n\na1\n")
 	b := writeTextFile(t, "b0\n\nb1\n")
@@ -289,6 +313,8 @@ func TestGenerateTestFromFileTracksFilesSeparately(t *testing.T) {
 }
 
 func TestNewTestGenerator(t *testing.T) {
+	t.Parallel()
+
 	res, _ := newTestResources(t)
 	book := writeTextFile(t, "first paragraph\n\nsecond paragraph\n")
 	st := mistakesOf("ab")
@@ -408,6 +434,8 @@ func mistakesOf(words ...string) *memStore {
 }
 
 func TestWeightedMistakes(t *testing.T) {
+	t.Parallel()
+
 	mistakes := []typing.Mistake{{Word: "a", Typed: "x"}, {Word: "b", Typed: "x"}, {Word: "a", Typed: "x"}, {Word: "c", Typed: "x"}, {Word: "a", Typed: "x"}}
 
 	got := weightedMistakes(mistakes, 10)
@@ -423,6 +451,8 @@ func TestWeightedMistakes(t *testing.T) {
 }
 
 func TestGenerateMistakesTest(t *testing.T) {
+	t.Parallel()
+
 	var words []string
 	for i := 0; i < 100; i++ {
 		words = append(words, "old")
@@ -457,6 +487,8 @@ func TestGenerateMistakesTest(t *testing.T) {
 }
 
 func TestRandomWords(t *testing.T) {
+	t.Parallel()
+
 	words := []string{"alpha", "beta", "gamma"}
 	rng := newRand()
 
@@ -478,6 +510,8 @@ func TestRandomWords(t *testing.T) {
 }
 
 func TestRandomWordsWithoutAlternatives(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string][]string{
 		"single word":     {"solo"},
 		"same word twice": {"solo", "solo"},
@@ -512,6 +546,8 @@ func endsSentence(w string) bool {
 }
 
 func TestPunctuate(t *testing.T) {
+	t.Parallel()
+
 	words := []string{"alpha", "beta", "gamma", "delta", "épsilon", "zeta", "eta", "theta"}
 	marks := map[string]int{}
 	rng := newRand()
@@ -554,6 +590,8 @@ func TestPunctuate(t *testing.T) {
 }
 
 func TestAddNumbers(t *testing.T) {
+	t.Parallel()
+
 	words := strings.Fields(strings.Repeat("word ", 20))
 	numbers := 0
 	rng := newRand()
@@ -582,6 +620,8 @@ func TestAddNumbers(t *testing.T) {
 }
 
 func TestGenerateWordTestDecorations(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "greek", "alpha beta gamma delta")
 
@@ -607,6 +647,8 @@ func TestGenerateWordTestDecorations(t *testing.T) {
 }
 
 func TestGenerateWordTestMinChars(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "greek", "alpha beta gamma delta")
 
@@ -645,6 +687,8 @@ func mustGen(gen func() []segment, err error) func() []segment {
 }
 
 func TestGeneratorsRejectEmptyText(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestResources(t)
 	blankFile := writeTextFile(t, "  \n\n\t\n")
 	writeUserResource(t, dir, "quotes", "blank", `[{"text": " "}, {"text": ""}]`)
@@ -671,6 +715,8 @@ func TestGeneratorsRejectEmptyText(t *testing.T) {
 }
 
 func TestGenerateQuoteTestIgnoresBlankQuotes(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "quotes", "some-blank", `[{"text": "  "}, {"text": "real quote"}]`)
 
@@ -683,6 +729,8 @@ func TestGenerateQuoteTestIgnoresBlankQuotes(t *testing.T) {
 }
 
 func TestGenerateQuoteTestReturnsCopies(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "quotes", "one", `[{"text": "the only quote"}]`)
 
@@ -704,6 +752,8 @@ func newRand() *rand.Rand {
 
 // The same source of randomness makes the same tests.
 func TestGeneratorsAreReproducible(t *testing.T) {
+	t.Parallel()
+
 	res, _ := newTestResources(t)
 	st := &memStore{mistakes: []typing.Mistake{{Word: "alpha", Typed: "x"}, {Word: "beta", Typed: "x"}, {Word: "gamma", Typed: "x"}}, keys: weakTH()}
 

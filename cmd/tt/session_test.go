@@ -7,6 +7,8 @@ import (
 
 // A session is typed and laid out without a screen.
 func TestSessionFrame(t *testing.T) {
+	t.Parallel()
+
 	clock := newFakeClock()
 	s := newSession("abcdefghij", "- me", 10*time.Second, 20, 10, sessionDeps{now: clock.now, pace: 60})
 
@@ -32,6 +34,8 @@ func TestSessionFrame(t *testing.T) {
 }
 
 func TestSessionResize(t *testing.T) {
+	t.Parallel()
+
 	s := newSession("alpha beta", "", -1, 40, 10, sessionDeps{now: newFakeClock().now, wrap: wrapAtScreenWidth})
 	s.typeRune('a')
 
@@ -43,6 +47,8 @@ func TestSessionResize(t *testing.T) {
 }
 
 func TestSessionRules(t *testing.T) {
+	t.Parallel()
+
 	s := newSession("ab cd", "", -1, 40, 10, sessionDeps{now: newFakeClock().now, rules: typingRules{noSkip: true, noBackspace: true}})
 
 	s.typeRune('a')

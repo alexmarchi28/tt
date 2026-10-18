@@ -164,7 +164,9 @@ In `cmd/tt`:
 Run the tests with `go test ./...`. They never touch your own data: the app
 works with an injected store, in memory or in a temporary directory,
 command line tests call `run` with a temporary home, and screen tests use the
-simulation screen of tcell with a clock they control.
+simulation screen of tcell with a clock they control. Every test calls
+`t.Parallel()` (checked by `parallel_test.go`), so a test relying on shared
+state shows up as a race under `go test -race ./...`.
 
 Pushing a tag such as `v1.1.0` publishes the release of that version with the
 binaries of every platform, the man page and their checksums (see `make rel`).

@@ -71,6 +71,8 @@ func waitExitCode(t *testing.T, done <-chan int) int {
 }
 
 func TestAppRecordsCompletedTests(t *testing.T) {
+	t.Parallel()
+
 	opts := resolveFlags(nil)
 	opts.output.noReport = true
 	a, sim := newTestApp(t, opts)
@@ -109,6 +111,8 @@ func TestAppRecordsCompletedTests(t *testing.T) {
 }
 
 func TestAppNavigation(t *testing.T) {
+	t.Parallel()
+
 	opts := resolveFlags(nil)
 	opts.output.noReport = true
 	a, sim := newTestApp(t, opts)
@@ -134,6 +138,8 @@ func TestAppNavigation(t *testing.T) {
 }
 
 func TestAppOneShot(t *testing.T) {
+	t.Parallel()
+
 	opts := resolveFlags(nil)
 	opts.output.noReport = true
 	opts.output.oneShot = true
@@ -149,6 +155,8 @@ func TestAppOneShot(t *testing.T) {
 }
 
 func TestAppQuit(t *testing.T) {
+	t.Parallel()
+
 	a, sim := newTestApp(t, resolveFlags(nil))
 
 	var calls int
@@ -161,6 +169,8 @@ func TestAppQuit(t *testing.T) {
 }
 
 func TestAppReport(t *testing.T) {
+	t.Parallel()
+
 	a, sim := newTestApp(t, resolveFlags(nil))
 
 	var calls int
@@ -187,6 +197,8 @@ func TestAppReport(t *testing.T) {
 }
 
 func TestAppReflowsText(t *testing.T) {
+	t.Parallel()
+
 	opts := resolveFlags(nil)
 	opts.output.noReport = true
 	opts.display.maxLineLen = 10
@@ -212,6 +224,8 @@ func TestAppReflowsText(t *testing.T) {
 }
 
 func TestAppResizeKeepsTheTest(t *testing.T) {
+	t.Parallel()
+
 	opts := resolveFlags(nil)
 	opts.output.noReport = true
 	opts.display.maxLineLen = 80
@@ -234,6 +248,8 @@ func TestAppResizeKeepsTheTest(t *testing.T) {
 }
 
 func TestAppRawMode(t *testing.T) {
+	t.Parallel()
+
 	opts := resolveFlags(nil)
 	opts.output.noReport = true
 	opts.display.reflow = false
@@ -250,6 +266,8 @@ func TestAppRawMode(t *testing.T) {
 }
 
 func TestAppCyclesThemes(t *testing.T) {
+	t.Parallel()
+
 	a, sim := newTestApp(t, resolveFlags(nil))
 
 	res, _ := newTestResources(t)
@@ -269,6 +287,8 @@ func TestAppCyclesThemes(t *testing.T) {
 }
 
 func TestAppWithoutTheme(t *testing.T) {
+	t.Parallel()
+
 	opts := resolveFlags(nil)
 	opts.display.noTheme = true
 	a, sim := newTestApp(t, opts)
@@ -284,6 +304,8 @@ func TestAppWithoutTheme(t *testing.T) {
 }
 
 func TestNewAppAppliesOptions(t *testing.T) {
+	t.Parallel()
+
 	opts := resolveFlags([]string{"-noskip", "-nobackspace", "-showwpm", "-showaccuracy", "-nohighlight", "-blind", "-pace", "70", "-raw"})
 	a, _ := newTestApp(t, opts)
 
@@ -300,6 +322,8 @@ func TestNewAppAppliesOptions(t *testing.T) {
 }
 
 func TestAppReportsPersonalBest(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name     string
 		previous []persistedResult
@@ -335,6 +359,8 @@ func TestAppReportsPersonalBest(t *testing.T) {
 }
 
 func TestAppRecordsTheTimeOfTests(t *testing.T) {
+	t.Parallel()
+
 	opts := resolveFlags(nil)
 	opts.output.noReport = true
 	a, sim := newTestApp(t, opts)
@@ -366,6 +392,8 @@ func (r *fakeReporter) show(report string) (quit bool) {
 }
 
 func TestAppReportsCompletedTests(t *testing.T) {
+	t.Parallel()
+
 	a, sim := newTestApp(t, resolveFlags(nil))
 	rep := &fakeReporter{quitAt: 2}
 	a.reporter = rep
@@ -382,6 +410,8 @@ func TestAppReportsCompletedTests(t *testing.T) {
 }
 
 func TestNewAppReporter(t *testing.T) {
+	t.Parallel()
+
 	if a, _ := newTestApp(t, resolveFlags([]string{"-noreport"})); a.reporter != (noReporter{}) {
 		t.Errorf("reporter = %#v with -noreport, want none", a.reporter)
 	}

@@ -101,6 +101,7 @@ func startRun(t *testing.T, text string, args ...string) (*testRun, <-chan int) 
 }
 
 func TestRunCommands(t *testing.T) {
+	t.Parallel()
 
 	tests := []struct {
 		args         []string
@@ -129,6 +130,8 @@ func TestRunCommands(t *testing.T) {
 }
 
 func TestRunTypesTests(t *testing.T) {
+	t.Parallel()
+
 	r, done := startRun(t, "hi there", "-oneshot", "-noreport", "-csv")
 
 	waitForScreenText(t, r.sim, "hi there", true)
@@ -151,6 +154,8 @@ func TestRunTypesTests(t *testing.T) {
 }
 
 func TestRunWithoutTheme(t *testing.T) {
+	t.Parallel()
+
 	r, done := startRun(t, "hi", "-oneshot", "-noreport", "-notheme")
 
 	sendKeys(t, r.sim, "hi")
@@ -164,6 +169,8 @@ func TestRunWithoutTheme(t *testing.T) {
 // The cursor has the shape of typing while typing, unless -blockcursor is
 // given.
 func TestRunShapesTheCursor(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct {
 		args []string
 		want string
@@ -187,6 +194,8 @@ func TestRunShapesTheCursor(t *testing.T) {
 // An outcome which can't be saved ends the session with an error rather than
 // a crash, the results typed so far still being printed.
 func TestRunReportsSaveErrors(t *testing.T) {
+	t.Parallel()
+
 	r, done := startRun(t, "hi", "-noreport", "-csv")
 
 	// A directory can't be replaced by the file of the key statistics.
@@ -208,6 +217,8 @@ func TestRunReportsSaveErrors(t *testing.T) {
 }
 
 func TestRunWithoutHome(t *testing.T) {
+	t.Parallel()
+
 	r := newTestRun(t)
 	env := r.environment("")
 	env.homeDir = func() (string, error) { return "", errors.New("no home") }
@@ -218,6 +229,7 @@ func TestRunWithoutHome(t *testing.T) {
 }
 
 func TestRunReportsScreenErrors(t *testing.T) {
+	t.Parallel()
 
 	r := newTestRun(t)
 	env := r.environment("hi")
@@ -229,6 +241,8 @@ func TestRunReportsScreenErrors(t *testing.T) {
 }
 
 func TestNewAppWithInvalidTheme(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "themes", "broken", "fgcol: nope")
 
@@ -239,6 +253,8 @@ func TestNewAppWithInvalidTheme(t *testing.T) {
 }
 
 func TestProcessEnvironment(t *testing.T) {
+	t.Parallel()
+
 	env := processEnvironment()
 
 	if env.stdin != os.Stdin || env.stdout != os.Stdout || env.stderr != os.Stderr || env.getenv == nil || env.homeDir == nil || env.now == nil || env.newScreen == nil {

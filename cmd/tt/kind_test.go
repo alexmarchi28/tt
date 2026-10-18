@@ -3,6 +3,8 @@ package main
 import "testing"
 
 func TestTestKindString(t *testing.T) {
+	t.Parallel()
+
 	tests := map[testKind]string{
 		{Mode: "words", Source: "1000en"}:                                          "words 1000en",
 		{Mode: "words", Source: "1000en", Words: 50}:                               "words 1000en, 50 words",

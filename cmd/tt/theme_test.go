@@ -9,6 +9,8 @@ import (
 )
 
 func TestNewTcellColor(t *testing.T) {
+	t.Parallel()
+
 	valid := map[string]tcell.Color{
 		"#000000": tcell.NewRGBColor(0, 0, 0),
 		"#ff8000": tcell.NewRGBColor(255, 128, 0),
@@ -33,6 +35,8 @@ func TestNewTcellColor(t *testing.T) {
 }
 
 func TestParseConfig(t *testing.T) {
+	t.Parallel()
+
 	if cfg := parseConfig(nil); cfg != nil {
 		t.Errorf("parseConfig(nil) = %v, want nil", cfg)
 	}
@@ -50,6 +54,8 @@ func TestParseConfig(t *testing.T) {
 }
 
 func TestBuiltinThemesAreValid(t *testing.T) {
+	t.Parallel()
+
 	res, _ := newTestResources(t)
 
 	for _, name := range res.List("themes") {
@@ -60,6 +66,8 @@ func TestBuiltinThemesAreValid(t *testing.T) {
 }
 
 func TestLoadTheme(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestResources(t)
 
 	got, err := loadTheme(res, "default", false)
@@ -104,6 +112,8 @@ func TestLoadTheme(t *testing.T) {
 }
 
 func TestNewTcellColorRejectsInvalidDigits(t *testing.T) {
+	t.Parallel()
+
 	for _, in := range []string{"#gggggg", "#12345z", "#+12345", "# 12345", "#0x1234"} {
 		if c, err := newTcellColor(in); err == nil {
 			t.Errorf("newTcellColor(%q) = %v, want an error", in, c)
@@ -120,6 +130,8 @@ type listing struct {
 func (l listing) List(string) []string { return l.names }
 
 func TestThemeCycler(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestResources(t)
 	valid := "fgcol: #ffffff\nhicol: #ffffff\nhicol2: #ffffff\nhicol3: #ffffff\nerrcol: #ffffff\n"
 	writeUserResource(t, dir, "themes", "a", valid)

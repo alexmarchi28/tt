@@ -61,6 +61,8 @@ func imports(t *testing.T, dir string) []string {
 }
 
 func TestPackageBoundaries(t *testing.T) {
+	t.Parallel()
+
 	dirs, err := filepath.Glob("*")
 	if err != nil {
 		t.Fatal(err)

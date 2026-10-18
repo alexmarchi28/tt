@@ -10,6 +10,8 @@ import (
 )
 
 func TestLayouts(t *testing.T) {
+	t.Parallel()
+
 	for name, rows := range layouts {
 		seen := map[rune]bool{}
 		letters := 0
@@ -37,6 +39,8 @@ func TestLayouts(t *testing.T) {
 }
 
 func TestLayoutNames(t *testing.T) {
+	t.Parallel()
+
 	want := []string{"colemak", "colemak-dh", "de", "dvorak", "es", "fr", "it", "uk", "us", "workman"}
 	if got := sortedKeys(layouts); !reflect.DeepEqual(got, want) {
 		t.Errorf("layouts %q, want %q", got, want)
@@ -44,6 +48,8 @@ func TestLayoutNames(t *testing.T) {
 }
 
 func TestKeyStatsByKey(t *testing.T) {
+	t.Parallel()
+
 	ks := keystats.Stats{Chars: map[string]keystats.Stat{
 		"a": {Count: 10, ErrorRate: 0.25},
 		"A": {Count: 10, ErrorRate: 0.75},
@@ -62,6 +68,8 @@ func TestKeyStatsByKey(t *testing.T) {
 }
 
 func TestKeyLevels(t *testing.T) {
+	t.Parallel()
+
 	values := map[rune]float64{'a': 10, 'b': 15, 'c': 20, 'd': 50}
 
 	want := map[rune]int{'a': 0, 'b': 1, 'c': 1, 'd': 4}
@@ -75,6 +83,8 @@ func TestKeyLevels(t *testing.T) {
 }
 
 func TestDrawKeyboard(t *testing.T) {
+	t.Parallel()
+
 	rows := []string{"ab", "cd"}
 	levels := map[rune]int{'a': 0, 'b': 4, 'd': 2, ' ': 3}
 
@@ -107,6 +117,8 @@ func testKeyStats() keystats.Stats {
 }
 
 func TestFormatKeys(t *testing.T) {
+	t.Parallel()
+
 	got := formatKeys(testKeyStats(), layouts["us"], false)
 
 	want := "" +
@@ -133,6 +145,8 @@ func TestFormatKeys(t *testing.T) {
 }
 
 func TestFormatKeysListsOnlyMissedKeys(t *testing.T) {
+	t.Parallel()
+
 	ks := keystats.New()
 	ks.Chars["a"] = keystats.Stat{Count: 20, ErrorRate: 0, Timed: 10, Latency: 100}
 	ks.Chars["b"] = keystats.Stat{Count: 20, ErrorRate: 0.1, Timed: 10, Latency: 100}

@@ -23,6 +23,8 @@ func near(a, b float64) bool {
 }
 
 func TestNewWeaknesses(t *testing.T) {
+	t.Parallel()
+
 	w := NewWeaknesses(weakTH())
 
 	// The average error rate is 0.1 and the average latency 166.67ms. The
@@ -51,6 +53,8 @@ func TestNewWeaknesses(t *testing.T) {
 }
 
 func TestNewWeaknessesTrustsPairsWithMoreKeystrokes(t *testing.T) {
+	t.Parallel()
+
 	ks := New()
 	ks.Bigrams["ab"] = Stat{Count: 6, ErrorRate: 1.0 / 6, Timed: 6, Latency: 200}
 	ks.Bigrams["cd"] = Stat{Count: 100, ErrorRate: 1.0 / 6, Timed: 100, Latency: 200}
@@ -64,6 +68,8 @@ func TestNewWeaknessesTrustsPairsWithMoreKeystrokes(t *testing.T) {
 }
 
 func TestNewWeaknessesOfRecentKeystrokes(t *testing.T) {
+	t.Parallel()
+
 	ks := New()
 	ks.Bigrams["ab"] = Stat{Count: recentKeystrokes, ErrorRate: 0.2, Timed: recentKeystrokes, Latency: 200}
 	ks.Bigrams["cd"] = Stat{Count: 1000, ErrorRate: 0.2, Timed: 1000, Latency: 200}
@@ -77,6 +83,8 @@ func TestNewWeaknessesOfRecentKeystrokes(t *testing.T) {
 }
 
 func TestNewWeaknessesWithoutTimings(t *testing.T) {
+	t.Parallel()
+
 	ks := New()
 	ks.Bigrams["ab"] = Stat{Count: 10, ErrorRate: 0}
 	ks.Bigrams["cd"] = Stat{Count: 10, ErrorRate: 0}
@@ -88,6 +96,8 @@ func TestNewWeaknessesWithoutTimings(t *testing.T) {
 }
 
 func TestWordWeakness(t *testing.T) {
+	t.Parallel()
+
 	w := NewWeaknesses(weakTH())
 
 	if got, want := w.Word("the"), w["th"]; !near(got, want) {
@@ -107,6 +117,8 @@ func TestWordWeakness(t *testing.T) {
 }
 
 func TestPairFrequencies(t *testing.T) {
+	t.Parallel()
+
 	got := PairFrequencies([]string{"the", "There", "a", "can't"})
 
 	// th, he, th, he, er, re, ca, an: the apostrophe isn't a letter.
@@ -117,6 +129,8 @@ func TestPairFrequencies(t *testing.T) {
 }
 
 func TestWeaknessFocus(t *testing.T) {
+	t.Parallel()
+
 	w := NewWeaknesses(weakTH())
 	w["er"] = 3
 	w["xy"] = 5

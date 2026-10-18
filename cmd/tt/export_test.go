@@ -32,6 +32,8 @@ func exportedResults() []persistedResult {
 }
 
 func TestExportResultsAsCSV(t *testing.T) {
+	t.Parallel()
+
 	st := &memStore{results: exportedResults()}
 
 	want := "" +
@@ -46,6 +48,8 @@ func TestExportResultsAsCSV(t *testing.T) {
 }
 
 func TestExportResultsAsJSON(t *testing.T) {
+	t.Parallel()
+
 	saved := exportedResults()
 
 	var got []persistedResult
@@ -58,6 +62,8 @@ func TestExportResultsAsJSON(t *testing.T) {
 }
 
 func TestExportMistakes(t *testing.T) {
+	t.Parallel()
+
 	st := &memStore{mistakes: []typing.Mistake{{Word: "the", Typed: "teh"}, {Word: "say,", Typed: "sya,"}}}
 
 	want := "word,typed\nthe,teh\n\"say,\",\"sya,\"\n"
@@ -72,6 +78,8 @@ func TestExportMistakes(t *testing.T) {
 }
 
 func TestExportWithoutData(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		data   string
 		asJSON bool
@@ -91,6 +99,8 @@ func TestExportWithoutData(t *testing.T) {
 }
 
 func TestExportErrors(t *testing.T) {
+	t.Parallel()
+
 	err := exportData(&bytes.Buffer{}, &memStore{}, "nope", false)
 	if err == nil || err.Error() != "unknown data nope, use one of: mistakes, results" {
 		t.Errorf("error = %v, want the data which can be exported", err)
