@@ -148,3 +148,14 @@ func sortedKeys[V any](m map[string]V) []string {
 
 	return keys
 }
+
+// contains reports whether list contains s.
+func contains(list []string, s string) bool {
+	for _, candidate := range list {
+		if candidate == s {
+			return true
+		}
+	}
+
+	return false
+}

@@ -10,6 +10,12 @@ Changed:
  - -adaptive practices the weak pairs of letters costing the most time, those
    frequent in the word list, and judges the pairs typed a few times
    cautiously, rather than chasing rare pairs missed once.
+ - Options which used to be silently ignored are rejected: modes which can't be
+   combined (e.g. -adaptive -quotes), more than one file, -focus without
+   -adaptive, several of -list, -stats, -keys, -export and -v, an unknown
+   -list type and an unknown -layout.
+ - A file given on the command line is typed even when stdin is not a
+   terminal, rather than the text piped to stdin.
 
 Fixed:
  - A test whose outcome can't be saved ends tt with an error, after printing

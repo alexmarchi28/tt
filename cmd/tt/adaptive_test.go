@@ -292,7 +292,7 @@ func TestAppShowsAdaptiveFocus(t *testing.T) {
 	writeUserResource(t, dir, "words", "list", "the her err rare")
 	src := mustSource(newAdaptiveSource(newRand(), res, "list", wordOptions{n: 5, g: 1}, 40, keyStatsOf(weakTH())))
 
-	a, sim := newTestApp(t, parseFlags([]string{"-noreport"}))
+	a, sim := newTestApp(t, resolveFlags([]string{"-noreport"}))
 	done := startSource(a, src)
 	waitForScreenText(t, sim, "Practicing th", true)
 
@@ -303,9 +303,9 @@ func TestAppShowsAdaptiveFocus(t *testing.T) {
 func TestAdaptiveWordListFromStdin(t *testing.T) {
 	res, _ := newTestResources(t)
 	res.stdin = &onceReader{r: strings.NewReader("alpha")}
-	opts := parseFlags([]string{"-adaptive", "-words", "-", "-n", "3"})
+	s := resolveFlags([]string{"-adaptive", "-words", "-", "-n", "3"})
 
-	src, _, err := newTestSource(opts, textSources{&memStore{}, res, newRand(), strings.NewReader(""), true})
+	src, err := newTestSource(s.source, textSources{&memStore{}, res, newRand(), strings.NewReader("")})
 	if err != nil {
 		t.Fatal(err)
 	}

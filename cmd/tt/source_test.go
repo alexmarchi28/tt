@@ -100,7 +100,7 @@ type errSource struct{}
 func (errSource) next() ([]segment, error) { return nil, errors.New("no test") }
 
 func TestAppStopsOnSourceErrors(t *testing.T) {
-	a, _ := newTestApp(t, parseFlags(nil))
+	a, _ := newTestApp(t, resolveFlags(nil))
 
 	if rc, err := a.run(errSource{}); rc != 1 || err == nil || err.Error() != "no test" {
 		t.Errorf("run() = %d, %v, want the error of the source", rc, err)
@@ -116,7 +116,7 @@ type describedSource struct {
 func (s describedSource) describe() string { return s.description }
 
 func TestAppShowsWhatSourcesPractice(t *testing.T) {
-	a, sim := newTestApp(t, parseFlags([]string{"-noreport"}))
+	a, sim := newTestApp(t, resolveFlags([]string{"-noreport"}))
 
 	var calls int
 	done := startSource(a, describedSource{funcSource(testSequence(&calls, "ab")), "Practicing ab"})

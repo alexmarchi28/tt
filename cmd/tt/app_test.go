@@ -10,13 +10,14 @@ import (
 	"github.com/gdamore/tcell"
 )
 
-func newTestApp(t *testing.T, opts options) (*app, tcell.SimulationScreen) {
+func newTestApp(t *testing.T, s settings) (*app, tcell.SimulationScreen) {
 	t.Helper()
 
 	res, _ := newTestResources(t)
 	sim := newSimScreen(t)
 
-	a, err := newApp(sim, opts, testKind{Mode: "words", Source: "test"}, appDeps{newTestStore(t), res, time.Now})
+	s.source.kind = testKind{Mode: "words", Source: "test"}
+	a, err := newApp(sim, s, appDeps{newTestStore(t), res, time.Now})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,8 +71,8 @@ func waitExitCode(t *testing.T, done <-chan int) int {
 }
 
 func TestAppRecordsCompletedTests(t *testing.T) {
-	opts := parseFlags(nil)
-	opts.noReport = true
+	opts := resolveFlags(nil)
+	opts.output.noReport = true
 	a, sim := newTestApp(t, opts)
 	a.kind = testKind{Mode: "words", Source: "test", Seconds: 30, Punct: true}
 
@@ -108,8 +109,8 @@ func TestAppRecordsCompletedTests(t *testing.T) {
 }
 
 func TestAppNavigation(t *testing.T) {
-	opts := parseFlags(nil)
-	opts.noReport = true
+	opts := resolveFlags(nil)
+	opts.output.noReport = true
 	a, sim := newTestApp(t, opts)
 
 	var calls int
@@ -133,9 +134,9 @@ func TestAppNavigation(t *testing.T) {
 }
 
 func TestAppOneShot(t *testing.T) {
-	opts := parseFlags(nil)
-	opts.noReport = true
-	opts.oneShot = true
+	opts := resolveFlags(nil)
+	opts.output.noReport = true
+	opts.output.oneShot = true
 	a, sim := newTestApp(t, opts)
 
 	var calls int
@@ -148,7 +149,7 @@ func TestAppOneShot(t *testing.T) {
 }
 
 func TestAppQuit(t *testing.T) {
-	a, sim := newTestApp(t, parseFlags(nil))
+	a, sim := newTestApp(t, resolveFlags(nil))
 
 	var calls int
 	done := startApp(a, testSequence(&calls, "ab"))
@@ -160,7 +161,7 @@ func TestAppQuit(t *testing.T) {
 }
 
 func TestAppReport(t *testing.T) {
-	a, sim := newTestApp(t, parseFlags(nil))
+	a, sim := newTestApp(t, resolveFlags(nil))
 
 	var calls int
 	done := startApp(a, func() []segment {
@@ -186,9 +187,9 @@ func TestAppReport(t *testing.T) {
 }
 
 func TestAppReflowsText(t *testing.T) {
-	opts := parseFlags(nil)
-	opts.noReport = true
-	opts.maxLineLen = 10
+	opts := resolveFlags(nil)
+	opts.output.noReport = true
+	opts.display.maxLineLen = 10
 	a, sim := newTestApp(t, opts)
 
 	var calls int
@@ -211,9 +212,9 @@ func TestAppReflowsText(t *testing.T) {
 }
 
 func TestAppResizeKeepsTheTest(t *testing.T) {
-	opts := parseFlags(nil)
-	opts.noReport = true
-	opts.maxLineLen = 80
+	opts := resolveFlags(nil)
+	opts.output.noReport = true
+	opts.display.maxLineLen = 80
 	a, sim := newTestApp(t, opts)
 
 	var calls int
@@ -233,9 +234,9 @@ func TestAppResizeKeepsTheTest(t *testing.T) {
 }
 
 func TestAppRawMode(t *testing.T) {
-	opts := parseFlags(nil)
-	opts.noReport = true
-	opts.raw = true
+	opts := resolveFlags(nil)
+	opts.output.noReport = true
+	opts.display.reflow = false
 	a, sim := newTestApp(t, opts)
 
 	var calls int
@@ -249,7 +250,7 @@ func TestAppRawMode(t *testing.T) {
 }
 
 func TestAppCyclesThemes(t *testing.T) {
-	a, sim := newTestApp(t, parseFlags(nil))
+	a, sim := newTestApp(t, resolveFlags(nil))
 
 	res, _ := newTestResources(t)
 	names := res.list("themes")
@@ -268,8 +269,8 @@ func TestAppCyclesThemes(t *testing.T) {
 }
 
 func TestAppWithoutTheme(t *testing.T) {
-	opts := parseFlags(nil)
-	opts.noTheme = true
+	opts := resolveFlags(nil)
+	opts.display.noTheme = true
 	a, sim := newTestApp(t, opts)
 
 	var calls int
@@ -283,7 +284,7 @@ func TestAppWithoutTheme(t *testing.T) {
 }
 
 func TestNewAppAppliesOptions(t *testing.T) {
-	opts := parseFlags([]string{"-noskip", "-nobackspace", "-showwpm", "-showaccuracy", "-nohighlight", "-blockcursor", "-blind", "-pace", "70"})
+	opts := resolveFlags([]string{"-noskip", "-nobackspace", "-showwpm", "-showaccuracy", "-nohighlight", "-blockcursor", "-blind", "-pace", "70"})
 	a, _ := newTestApp(t, opts)
 
 	ty := a.typer
@@ -310,7 +311,7 @@ func TestAppReportsPersonalBest(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			a, sim := newTestApp(t, parseFlags(nil))
+			a, sim := newTestApp(t, resolveFlags(nil))
 			if err := writeValue(a.store.(*jsonStore).path(resultsFile), tc.previous); err != nil {
 				t.Fatal(err)
 			}
@@ -331,8 +332,8 @@ func TestAppReportsPersonalBest(t *testing.T) {
 }
 
 func TestAppRecordsTheTimeOfTests(t *testing.T) {
-	opts := parseFlags(nil)
-	opts.noReport = true
+	opts := resolveFlags(nil)
+	opts.output.noReport = true
 	a, sim := newTestApp(t, opts)
 	a.now = func() time.Time { return time.Unix(1700000000, 0) }
 

@@ -23,8 +23,8 @@ func TestParseFlagsDefaults(t *testing.T) {
 	if got.n != 50 || got.g != 1 || got.startParagraph != -1 || got.maxLineLen != 80 || got.timeout != -1 || got.focus != 40 {
 		t.Errorf("unexpected numeric defaults %+v", got)
 	}
-	if got.themeName != "default" || got.themeExplicit {
-		t.Errorf("theme = %q (explicit %t), want the implicit default theme", got.themeName, got.themeExplicit)
+	if got.themeName != "default" || len(got.given) != 0 {
+		t.Errorf("theme = %q, flags given %v, want the default theme and no flag", got.themeName, got.given)
 	}
 	if len(got.files) != 0 {
 		t.Errorf("files = %q, want none", got.files)
@@ -37,8 +37,8 @@ func TestParseFlags(t *testing.T) {
 	if got.timeout != 30*time.Second {
 		t.Errorf("timeout = %v, want 30s", got.timeout)
 	}
-	if got.themeName != "nord" || !got.themeExplicit {
-		t.Errorf("theme = %q (explicit %t), want nord given explicitly", got.themeName, got.themeExplicit)
+	if got.themeName != "nord" || !got.given["theme"] || !got.given["t"] || got.given["w"] {
+		t.Errorf("theme = %q, flags given %v, want nord given explicitly", got.themeName, got.given)
 	}
 	if !got.noHighlightNext || !got.noHighlightCurrent || !got.opaqueBg || !got.punct || !got.numbers {
 		t.Errorf("flags not set: %+v", got)
@@ -47,17 +47,8 @@ func TestParseFlags(t *testing.T) {
 		t.Errorf("unexpected options %+v", got)
 	}
 
-	if got := parseFlags([]string{"-theme", "default"}); !got.themeExplicit {
+	if got := parseFlags([]string{"-theme", "default"}); !got.given["theme"] {
 		t.Error("-theme default should count as an explicit theme")
-	}
-}
-
-func TestOptionsValidate(t *testing.T) {
-	valid := [][]string{nil, {"-n", "1", "-g", "1", "-w", "1", "-t", "1", "-pace", "0"}, {"-t", "-1"}, {"-pace", "best"}, {"-pace", "avg"}, {"-focus", "0"}, {"-focus", "100"}}
-	for _, args := range valid {
-		if err := parseFlags(args).validate(); err != nil {
-			t.Errorf("%q: unexpected error %v", args, err)
-		}
 	}
 }
 
