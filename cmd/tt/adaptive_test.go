@@ -32,6 +32,8 @@ func weakTH() keystats.Stats {
 }
 
 func TestAdaptiveWordsFocusOnFrequentWeakPairs(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "list", "in into begin rain think during point inside soccer here")
 
@@ -53,6 +55,8 @@ func TestAdaptiveWordsFocusOnFrequentWeakPairs(t *testing.T) {
 }
 
 func TestAdaptiveWordsDescribe(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "list", "the her err rare")
 
@@ -70,6 +74,8 @@ func TestAdaptiveWordsDescribe(t *testing.T) {
 }
 
 func TestGenerateAdaptiveTestFavoursWeakWords(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "list", "the her err rare")
 
@@ -84,6 +90,8 @@ func TestGenerateAdaptiveTestFavoursWeakWords(t *testing.T) {
 }
 
 func TestGenerateAdaptiveTestWithoutStatistics(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "list", "the her err rare")
 
@@ -115,6 +123,8 @@ func thShare(t *testing.T, focus int) float64 {
 }
 
 func TestGenerateAdaptiveTestFocus(t *testing.T) {
+	t.Parallel()
+
 	// Without focus the words with th are only favoured.
 	share := thShare(t, 0)
 	if share < 0.3 || share > 0.5 {
@@ -134,6 +144,8 @@ func TestGenerateAdaptiveTestFocus(t *testing.T) {
 }
 
 func TestGenerateAdaptiveTestFocusOnASingleWord(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "list", "the ab cd")
 
@@ -176,6 +188,8 @@ func drawShares(t *testing.T, gen func() []segment) map[string]float64 {
 }
 
 func TestAppShowsAdaptiveFocus(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "list", "the her err rare")
 	src := mustSource(newAdaptiveSource(newRand(), res, "list", wordOptions{n: 5, g: 1}, 40, keyStatsOf(weakTH())))
@@ -189,6 +203,8 @@ func TestAppShowsAdaptiveFocus(t *testing.T) {
 }
 
 func TestAdaptiveWordListFromStdin(t *testing.T) {
+	t.Parallel()
+
 	res, _ := newTestResourcesWithStdin(t, "alpha")
 	s := resolveFlags([]string{"-adaptive", "-words", "-", "-n", "3"})
 

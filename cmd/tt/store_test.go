@@ -90,6 +90,8 @@ func newTestStore(t *testing.T) *jsonStore {
 }
 
 func TestNewJSONStore(t *testing.T) {
+	t.Parallel()
+
 	home := "/home/typist"
 	getenv := func(xdg string) func(string) string {
 		return func(key string) string {
@@ -111,6 +113,8 @@ func TestNewJSONStore(t *testing.T) {
 }
 
 func TestStoreResults(t *testing.T) {
+	t.Parallel()
+
 	s := newTestStore(t)
 
 	if got, err := s.Results(); got != nil || err != nil {
@@ -134,6 +138,8 @@ func TestStoreResults(t *testing.T) {
 }
 
 func TestStoreResultsOfOlderVersions(t *testing.T) {
+	t.Parallel()
+
 	s := newTestStore(t)
 	writeFile(t, s.path(resultsFile), `[{"wpm":60,"accuracy":95,"timestamp":1000}]`)
 
@@ -145,6 +151,8 @@ func TestStoreResultsOfOlderVersions(t *testing.T) {
 
 // Corrupt results are reported rather than replaced, which would lose them.
 func TestStoreCorruptResults(t *testing.T) {
+	t.Parallel()
+
 	s := newTestStore(t)
 	path := s.path(resultsFile)
 	writeFile(t, path, `[{"wpm":60,"accur`)
@@ -162,6 +170,8 @@ func TestStoreCorruptResults(t *testing.T) {
 }
 
 func TestStoreMistakes(t *testing.T) {
+	t.Parallel()
+
 	s := newTestStore(t)
 
 	if got, err := s.Mistakes(); got != nil || err != nil {
@@ -183,6 +193,8 @@ func TestStoreMistakes(t *testing.T) {
 // A corrupt file of mistakes is reported rather than replaced, which would
 // lose the mistakes recorded so far.
 func TestStoreCorruptMistakes(t *testing.T) {
+	t.Parallel()
+
 	s := newTestStore(t)
 	path := s.path(mistakesFile)
 	writeFile(t, path, `[{"word":"old","typed":"odl"},`)
@@ -197,6 +209,8 @@ func TestStoreCorruptMistakes(t *testing.T) {
 }
 
 func TestStoreKeyStats(t *testing.T) {
+	t.Parallel()
+
 	s := newTestStore(t)
 
 	if got := s.KeyStats(); len(got.Chars) != 0 || len(got.Bigrams) != 0 {
@@ -216,6 +230,8 @@ func TestStoreKeyStats(t *testing.T) {
 }
 
 func TestStoreKeyStatsOverCorruptFile(t *testing.T) {
+	t.Parallel()
+
 	s := newTestStore(t)
 	writeFile(t, s.path(keyStatsFile), "not json")
 
@@ -229,6 +245,8 @@ func TestStoreKeyStatsOverCorruptFile(t *testing.T) {
 }
 
 func TestStoreParagraphs(t *testing.T) {
+	t.Parallel()
+
 	s := newTestStore(t)
 
 	if got := s.Paragraph("/a"); got != 0 {
@@ -253,6 +271,8 @@ func TestStoreParagraphs(t *testing.T) {
 }
 
 func TestStoreConfig(t *testing.T) {
+	t.Parallel()
+
 	s := newTestStore(t)
 
 	if _, err := s.Config(); !os.IsNotExist(err) {
@@ -268,6 +288,8 @@ func TestStoreConfig(t *testing.T) {
 }
 
 func TestStoreReadsWithoutCreatingDirectories(t *testing.T) {
+	t.Parallel()
+
 	home := t.TempDir()
 	s := newJSONStore(func(string) string { return "" }, home)
 
@@ -283,6 +305,8 @@ func TestStoreReadsWithoutCreatingDirectories(t *testing.T) {
 }
 
 func TestRememberedTheme(t *testing.T) {
+	t.Parallel()
+
 	s := newTestStore(t)
 	res, _ := newTestResources(t)
 
@@ -310,6 +334,8 @@ func TestRememberedTheme(t *testing.T) {
 
 // The saved results must remain readable by other versions of tt.
 func TestPersistedResultFormat(t *testing.T) {
+	t.Parallel()
+
 	r := persistedResult{Wpm: 60, Accuracy: 95.5, Timestamp: 1000, Duration: 30, testKind: testKind{Mode: "adaptive", Source: "1000en", Seconds: 15, Words: 50, Punct: true, Numbers: true, Focus: 40}}
 
 	b, err := json.Marshal(r)
@@ -343,6 +369,8 @@ func TestPersistedResultFormat(t *testing.T) {
 // Results are printed whole, not only their kind as the embedded testKind
 // would.
 func TestPersistedResultString(t *testing.T) {
+	t.Parallel()
+
 	r := persistedResult{Wpm: 60, Accuracy: 95.5, Timestamp: 1000, Duration: 30, testKind: testKind{Mode: "quotes", Source: "en"}}
 
 	if got, want := fmt.Sprint(r), "60 wpm, 95.50% accuracy, 30.0s at 1000 (quotes en)"; got != want {
@@ -351,6 +379,8 @@ func TestPersistedResultString(t *testing.T) {
 }
 
 func TestWriteValueCreatesDirectories(t *testing.T) {
+	t.Parallel()
+
 	path := filepath.Join(t.TempDir(), "a", "b", "value.json")
 
 	if err := writeValue(path, map[string]int{"x": 1}); err != nil {
@@ -364,6 +394,8 @@ func TestWriteValueCreatesDirectories(t *testing.T) {
 }
 
 func TestWriteValueReplacesFilesAtomically(t *testing.T) {
+	t.Parallel()
+
 	dir := t.TempDir()
 	path := filepath.Join(dir, "value.json")
 

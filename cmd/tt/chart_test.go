@@ -9,6 +9,8 @@ import (
 )
 
 func TestDailyAverages(t *testing.T) {
+	t.Parallel()
+
 	stored := []persistedResult{
 		resultAt(10, 0, 30*24*time.Hour), // Too old.
 		resultAt(40, 0, 29*24*time.Hour),
@@ -53,6 +55,8 @@ func chartDays(wpm ...float64) []dayAverage {
 }
 
 func TestProgressChart(t *testing.T) {
+	t.Parallel()
+
 	nan := math.NaN()
 	wpm := make([]float64, 30)
 	for i := range wpm {
@@ -80,6 +84,8 @@ func TestProgressChart(t *testing.T) {
 }
 
 func TestProgressChartScale(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name   string
 		wpm    []float64
@@ -101,6 +107,8 @@ func TestProgressChartScale(t *testing.T) {
 }
 
 func TestProgressChartShowsEveryDayWithTests(t *testing.T) {
+	t.Parallel()
+
 	// The lowest average still gets a visible column.
 	got := progressChart(chartDays(60, 60.1, 69.9))
 	if bottom := got[chartRows-1]; !strings.HasSuffix(bottom, "▁▁█") {
@@ -109,6 +117,8 @@ func TestProgressChartShowsEveryDayWithTests(t *testing.T) {
 }
 
 func TestProgressChartRoundsHeights(t *testing.T) {
+	t.Parallel()
+
 	// From 40 to 80 wpm a level is 0.625 wpm: 41 wpm is 1.6 levels, shown as 2.
 	got := progressChart(chartDays(40, 41, 80))
 	if bottom := got[chartRows-1]; !strings.HasSuffix(bottom, "▁▂█") {

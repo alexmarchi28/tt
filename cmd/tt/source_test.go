@@ -38,6 +38,8 @@ func mustSource[S testSource](src S, err error) S {
 }
 
 func TestFuncSource(t *testing.T) {
+	t.Parallel()
+
 	var calls int
 	src := funcSource(testSequence(&calls, "a", "b"))
 
@@ -54,6 +56,8 @@ func TestFuncSource(t *testing.T) {
 // A paragraph reached which can't be saved ends the session rather than
 // crashing tt.
 func TestFileSourceReportsSaveErrors(t *testing.T) {
+	t.Parallel()
+
 	path := writeTextFile(t, "p0\n\np1\n")
 	st := &memStore{}
 	src := mustSource(newFileSource(path, -1, st))
@@ -76,6 +80,8 @@ func (c *countingKeyStats) KeyStats() keystats.Stats {
 }
 
 func TestAdaptiveSource(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "list", "the her err rare")
 	stats := &countingKeyStats{keyStatsOf: keyStatsOf(weakTH())}
@@ -101,6 +107,8 @@ type errSource struct{}
 func (errSource) next() ([]segment, error) { return nil, errors.New("no test") }
 
 func TestAppStopsOnSourceErrors(t *testing.T) {
+	t.Parallel()
+
 	a, _ := newTestApp(t, resolveFlags(nil))
 
 	if rc, err := a.run(errSource{}); rc != 1 || err == nil || err.Error() != "no test" {
@@ -117,6 +125,8 @@ type describedSource struct {
 func (s describedSource) describe() string { return s.description }
 
 func TestAppShowsWhatSourcesPractice(t *testing.T) {
+	t.Parallel()
+
 	a, sim := newTestApp(t, resolveFlags([]string{"-noreport"}))
 
 	var calls int

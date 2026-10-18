@@ -17,6 +17,8 @@ var testResults = []result{
 }
 
 func TestWriteResults(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name    string
 		results []result
@@ -56,6 +58,8 @@ func TestWriteResults(t *testing.T) {
 
 // Every output format can be requested with the flag of its name.
 func TestResultWritersHaveFlags(t *testing.T) {
+	t.Parallel()
+
 	for format := range resultWriters {
 		if s := resolveFlags([]string{"-" + format}); s.output.format != format {
 			t.Errorf("tt -%s: output format %q, want %q", format, s.output.format, format)
@@ -72,6 +76,8 @@ type failingWriter struct{}
 func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("disk full") }
 
 func TestWriteResultsReportsWriteErrors(t *testing.T) {
+	t.Parallel()
+
 	for format := range resultWriters {
 		if err := writeResults(failingWriter{}, testResults, format); err == nil {
 			t.Errorf("%s: no error on a failed write", format)
@@ -80,6 +86,8 @@ func TestWriteResultsReportsWriteErrors(t *testing.T) {
 }
 
 func TestWriteResultsEscapesCSV(t *testing.T) {
+	t.Parallel()
+
 	results := []result{{Wpm: 40, Cpm: 200, Accuracy: 90, Timestamp: 3000, Mistakes: []typing.Mistake{
 		{Word: "world,", Typed: "worl,"},
 		{Word: `"quoted"`, Typed: `"quoted_`},
@@ -99,6 +107,8 @@ func TestWriteResultsEscapesCSV(t *testing.T) {
 }
 
 func TestFormatReport(t *testing.T) {
+	t.Parallel()
+
 	res := testResult{
 		duration:     time.Minute,
 		correctChars: 300,
@@ -146,6 +156,8 @@ func TestFormatReport(t *testing.T) {
 // The report is shown in the colours of the theme, and centered again when
 // the screen is resized.
 func TestShowReport(t *testing.T) {
+	t.Parallel()
+
 	sim := newSimScreen(t)
 	sim.SetSize(40, 10)
 	style := tcell.StyleDefault.Foreground(testFg).Background(testBg)
@@ -177,6 +189,8 @@ func TestShowReport(t *testing.T) {
 
 // The report is shown in the colours of the current theme of the view.
 func TestScreenReporter(t *testing.T) {
+	t.Parallel()
+
 	v, sim := newTestView(t, defaultViewOptions)
 	v.setTheme(theme{testHi, testHi2, testHi3, testHi, testHi, testErrCol})
 
@@ -196,5 +210,21 @@ func TestScreenReporter(t *testing.T) {
 		}
 	case <-time.After(testWait):
 		t.Fatal("the report was not closed")
+	}
+}
+
+// Printing the results leaves them as they are, so that they can be shared.
+func TestWriteResultsKeepsTheResults(t *testing.T) {
+	t.Parallel()
+
+	results := []result{{Wpm: 60, Timestamp: 1000}}
+
+	for format := range resultWriters {
+		if err := writeResults(&bytes.Buffer{}, results, format); err != nil {
+			t.Fatal(err)
+		}
+		if results[0].Mistakes != nil {
+			t.Errorf("%s: the mistakes of the results were changed to %#v", format, results[0].Mistakes)
+		}
 	}
 }

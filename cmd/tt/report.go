@@ -121,12 +121,13 @@ func writeResults(w io.Writer, results []result, format string) error {
 }
 
 func writeResultsJSON(w io.Writer, results []result) error {
-	results = nonNil(results)
-	for i := range results {
-		results[i].Mistakes = nonNil(results[i].Mistakes)
+	out := make([]result, len(results)) //Not null in JSON, and not changing the results given.
+	for i, r := range results {
+		r.Mistakes = nonNil(r.Mistakes)
+		out[i] = r
 	}
 
-	b, err := json.Marshal(results)
+	b, err := json.Marshal(out)
 	if err != nil {
 		return err
 	}

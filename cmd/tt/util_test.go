@@ -11,6 +11,8 @@ import (
 )
 
 func TestGetParagraphs(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		in   string
 		want []string
@@ -32,6 +34,8 @@ func TestGetParagraphs(t *testing.T) {
 }
 
 func TestWordWrap(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		in   string
 		n    int
@@ -51,6 +55,8 @@ func TestWordWrap(t *testing.T) {
 }
 
 func TestCalcStringDimensions(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		in     string
 		nc, nr int
@@ -72,6 +78,8 @@ func TestCalcStringDimensions(t *testing.T) {
 }
 
 func TestDrawString(t *testing.T) {
+	t.Parallel()
+
 	sim := newSimScreen(t)
 	sim.SetSize(20, 5)
 
@@ -92,6 +100,8 @@ func TestDrawString(t *testing.T) {
 }
 
 func TestWordWrapCountsCharacters(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		in   string
 		n    int
@@ -112,6 +122,8 @@ func TestWordWrapCountsCharacters(t *testing.T) {
 }
 
 func TestReflow(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		in    string
 		width int
@@ -136,6 +148,8 @@ func TestReflow(t *testing.T) {
 }
 
 func TestLineWidth(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct{ maxLineLen, sw, want int }{
 		{80, 120, 80},
 		{80, 80, 80},
@@ -155,6 +169,8 @@ func TestLineWidth(t *testing.T) {
 }
 
 func TestBuiltinResourcesMatchFiles(t *testing.T) {
+	t.Parallel()
+
 	res, _ := newTestResources(t)
 
 	for _, typ := range []string{"themes", "words", "quotes"} {
@@ -182,6 +198,8 @@ func TestBuiltinResourcesMatchFiles(t *testing.T) {
 }
 
 func TestCellWidth(t *testing.T) {
+	t.Parallel()
+
 	for r, want := range map[rune]int{'a': 1, 'è': 1, 'ж': 1, '\t': tabWidth, '日': 2, '한': 2} {
 		if got := cellWidth(r); got != want {
 			t.Errorf("cellWidth(%q) = %d, want %d", r, got, want)
@@ -194,6 +212,8 @@ func TestCellWidth(t *testing.T) {
 }
 
 func TestDrawStringWithWideCharactersAndTabs(t *testing.T) {
+	t.Parallel()
+
 	sim := newSimScreen(t)
 	sim.SetSize(20, 5)
 

@@ -38,6 +38,8 @@ func writeUserResource(t *testing.T, dir, typ, name, content string) {
 }
 
 func TestIndex(t *testing.T) {
+	t.Parallel()
+
 	names := []string{"default", "gruvbox", "nord"}
 
 	tests := map[string]int{
@@ -56,6 +58,8 @@ func TestIndex(t *testing.T) {
 }
 
 func TestRead(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestLayers(t)
 
 	if got, err := res.Read("words", "200en"); err != nil || !strings.HasPrefix(string(got), "the\n") {
@@ -82,6 +86,8 @@ func TestRead(t *testing.T) {
 
 // The directories of resources are searched in order.
 func TestLayers(t *testing.T) {
+	t.Parallel()
+
 	res := &Layers{
 		dirs: []fs.FS{
 			fstest.MapFS{"words/mine": {Data: []byte("first")}, "words/sub/x": {Data: []byte("in a directory")}},
@@ -102,6 +108,8 @@ func TestLayers(t *testing.T) {
 }
 
 func TestList(t *testing.T) {
+	t.Parallel()
+
 	res, dir := newTestLayers(t)
 	writeUserResource(t, dir, "themes", "zzz-mine", "")
 	writeUserResource(t, dir, "themes", "default", "")
@@ -135,6 +143,8 @@ func TestList(t *testing.T) {
 }
 
 func TestReadStdinMoreThanOnce(t *testing.T) {
+	t.Parallel()
+
 	res := New(t.TempDir(), strings.NewReader("alpha beta"))
 
 	for i := 0; i < 2; i++ {

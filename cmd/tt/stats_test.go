@@ -17,6 +17,8 @@ func resultAt(wpm int, accuracy float64, ago time.Duration) persistedResult {
 }
 
 func TestFormatSummaryLine(t *testing.T) {
+	t.Parallel()
+
 	stored := []persistedResult{
 		resultAt(60, 90, 30*time.Minute),
 		resultAt(41, 99, 2*time.Hour),
@@ -43,6 +45,8 @@ func TestFormatSummaryLine(t *testing.T) {
 }
 
 func TestSummarize(t *testing.T) {
+	t.Parallel()
+
 	if got := summarize(nil); got != (summary{}) {
 		t.Errorf("summarize(nil) = %+v, want the zero summary", got)
 	}
@@ -56,6 +60,8 @@ func TestSummarize(t *testing.T) {
 }
 
 func TestSinceAndBefore(t *testing.T) {
+	t.Parallel()
+
 	a, b, c := resultAt(1, 0, 3*time.Hour), resultAt(2, 0, 2*time.Hour), resultAt(3, 0, time.Hour)
 	stored := []persistedResult{a, b, c}
 
@@ -68,6 +74,8 @@ func TestSinceAndBefore(t *testing.T) {
 }
 
 func TestMostMistyped(t *testing.T) {
+	t.Parallel()
+
 	mistakes := []typing.Mistake{
 		{Word: "the", Typed: "teh"}, {Word: "zebra", Typed: "zerba"}, {Word: "because", Typed: "becuase"}, {Word: "the", Typed: "th_"},
 		{Word: "a", Typed: "s"}, {Word: "because", Typed: "bec"}, {Word: "the", Typed: "hte"}, {Word: "a", Typed: "q"},
@@ -88,6 +96,8 @@ func TestMostMistyped(t *testing.T) {
 }
 
 func TestFormatStats(t *testing.T) {
+	t.Parallel()
+
 	day := 24 * time.Hour
 	stored := []persistedResult{
 		resultAt(20, 70, 40*day),
@@ -130,6 +140,8 @@ func TestFormatStats(t *testing.T) {
 }
 
 func TestFormatStatsWithoutHistory(t *testing.T) {
+	t.Parallel()
+
 	stored := []persistedResult{resultAt(50, 100, time.Minute)}
 
 	want := "" +
@@ -147,6 +159,8 @@ func TestFormatStatsWithoutHistory(t *testing.T) {
 }
 
 func TestFormatTypingTime(t *testing.T) {
+	t.Parallel()
+
 	tests := map[time.Duration]string{
 		45 * time.Second:                             "45s",
 		12*time.Minute + 5*time.Second:               "12m 05s",
@@ -161,6 +175,8 @@ func TestFormatTypingTime(t *testing.T) {
 }
 
 func TestSummarizeByKind(t *testing.T) {
+	t.Parallel()
+
 	quote := persistedResult{Wpm: 50, Accuracy: 90, testKind: testKind{Mode: "quotes", Source: "en"}}
 	words := persistedResult{Wpm: 70, Accuracy: 100, testKind: testKind{Mode: "words", Source: "1000en", Words: 50}}
 	timed := persistedResult{Wpm: 80, Accuracy: 100, testKind: testKind{Mode: "words", Source: "1000en", Seconds: 30}}
@@ -180,6 +196,8 @@ func TestSummarizeByKind(t *testing.T) {
 }
 
 func TestFormatStatsByTest(t *testing.T) {
+	t.Parallel()
+
 	stored := []persistedResult{
 		{Wpm: 40, Accuracy: 80, Timestamp: statsNow.Add(-time.Hour).Unix()},
 		{Wpm: 70, Accuracy: 100, Timestamp: statsNow.Add(-time.Minute).Unix(), Duration: 30, testKind: testKind{Mode: "words", Source: "1000en", Words: 50}},
@@ -209,6 +227,8 @@ func TestFormatStatsByTest(t *testing.T) {
 }
 
 func TestBestWpm(t *testing.T) {
+	t.Parallel()
+
 	stored := []persistedResult{
 		{Wpm: 90},
 		{Wpm: 50, testKind: testKind{Mode: "words", Source: "1000en", Words: 50}},
@@ -229,6 +249,8 @@ func TestBestWpm(t *testing.T) {
 }
 
 func TestPaceFromResults(t *testing.T) {
+	t.Parallel()
+
 	kind := testKind{Mode: "words", Source: "1000en", Words: 50}
 	other := persistedResult{Wpm: 200, testKind: testKind{Mode: "words", Source: "1000en", Words: 10}}
 

@@ -18,6 +18,8 @@ func parseFlags(args []string) options {
 }
 
 func TestParseFlagsDefaults(t *testing.T) {
+	t.Parallel()
+
 	got := parseFlags(nil)
 
 	if got.n != 50 || got.g != 1 || got.startParagraph != -1 || got.maxLineLen != 80 || got.timeout != -1 || got.focus != 40 {
@@ -32,6 +34,8 @@ func TestParseFlagsDefaults(t *testing.T) {
 }
 
 func TestParseFlags(t *testing.T) {
+	t.Parallel()
+
 	got := parseFlags([]string{"-t", "30", "-theme", "nord", "-highlight1", "-highlight2", "-notransparent", "-punct", "-numbers", "-n", "10", "-g", "3", "book.txt"})
 
 	if got.timeout != 30*time.Second {
@@ -53,6 +57,8 @@ func TestParseFlags(t *testing.T) {
 }
 
 func TestParsePace(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		arg    string
 		pace   int

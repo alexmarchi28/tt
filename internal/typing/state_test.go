@@ -23,6 +23,8 @@ func assertWordPosition(t *testing.T, positions []int, text, word string, want i
 }
 
 func TestHighlightWordPositionsAcrossWrappedLineBreak(t *testing.T) {
+	t.Parallel()
+
 	text := "alpha beta \ngamma delta"
 	idx := strings.Index(text, "beta")
 
@@ -34,6 +36,8 @@ func TestHighlightWordPositionsAcrossWrappedLineBreak(t *testing.T) {
 }
 
 func TestHighlightWordPositionsWhenCursorIsOnWrapWhitespace(t *testing.T) {
+	t.Parallel()
+
 	text := "alpha beta \ngamma delta"
 	idx := strings.Index(text, " \n")
 
@@ -44,6 +48,8 @@ func TestHighlightWordPositionsWhenCursorIsOnWrapWhitespace(t *testing.T) {
 }
 
 func TestExtractMistypedWords(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		text, typed string
 		want        []Mistake
@@ -64,6 +70,8 @@ func TestExtractMistypedWords(t *testing.T) {
 }
 
 func TestExtractMistypedWordsAcrossLines(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		text, typed string
 		want        []Mistake
@@ -101,6 +109,8 @@ func typeKeys(text, keys string, skipWord bool) *State {
 }
 
 func TestTypingState(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name         string
 		text, keys   string
@@ -147,6 +157,8 @@ func TestTypingState(t *testing.T) {
 }
 
 func TestTypingStateDone(t *testing.T) {
+	t.Parallel()
+
 	if !NewState("").Done() {
 		t.Error("an empty text should be done")
 	}
@@ -168,6 +180,8 @@ func TestTypingStateDone(t *testing.T) {
 }
 
 func TestTypingStateTabs(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name         string
 		text, keys   string
@@ -202,6 +216,8 @@ func TestTypingStateTabs(t *testing.T) {
 }
 
 func TestPaceIndex(t *testing.T) {
+	t.Parallel()
+
 	// At 60 wpm a pacer types 5 characters per second.
 	text := []rune("ab \ncd")
 
@@ -231,6 +247,8 @@ func TestPaceIndex(t *testing.T) {
 }
 
 func TestTypingStateRecordsKeystrokes(t *testing.T) {
+	t.Parallel()
+
 	ms := time.Millisecond
 	brk := Keystroke{}
 
@@ -262,6 +280,8 @@ func TestTypingStateRecordsKeystrokes(t *testing.T) {
 }
 
 func TestTypingStateRelayout(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name         string
 		from, to     string
@@ -305,6 +325,8 @@ func TestTypingStateRelayout(t *testing.T) {
 }
 
 func TestTypingStateRelayoutKeepsTyping(t *testing.T) {
+	t.Parallel()
+
 	s := typeKeys("ab cd ef", "ab c", true)
 	s.Relayout("ab \ncd \nef")
 
@@ -318,6 +340,8 @@ func TestTypingStateRelayoutKeepsTyping(t *testing.T) {
 }
 
 func TestStateAccessors(t *testing.T) {
+	t.Parallel()
+
 	s := NewState("ab")
 	s.Type('x', false, 0)
 

@@ -62,6 +62,8 @@ func writeFile(t *testing.T, path, content string) {
 }
 
 func TestCLIVersion(t *testing.T) {
+	t.Parallel()
+
 	got := runCLI(t, t.TempDir(), nil, "-v")
 
 	// The version itself comes from the build, see TestResolveVersion.
@@ -71,6 +73,8 @@ func TestCLIVersion(t *testing.T) {
 }
 
 func TestCLIHelp(t *testing.T) {
+	t.Parallel()
+
 	got := runCLI(t, t.TempDir(), nil, "-help")
 
 	if got.code != 0 || !strings.HasPrefix(got.stdout, "usage: tt [options] [file]\n") {
@@ -79,6 +83,8 @@ func TestCLIHelp(t *testing.T) {
 }
 
 func TestCLIUnknownFlag(t *testing.T) {
+	t.Parallel()
+
 	got := runCLI(t, t.TempDir(), nil, "-bogus")
 
 	if got.code != 2 || !strings.Contains(got.stderr, "flag provided but not defined: -bogus") {
@@ -87,6 +93,8 @@ func TestCLIUnknownFlag(t *testing.T) {
 }
 
 func TestCLIList(t *testing.T) {
+	t.Parallel()
+
 	home := t.TempDir()
 	writeFile(t, filepath.Join(home, ".tt", "themes", "my-theme"), "")
 
@@ -112,6 +120,8 @@ func TestCLIList(t *testing.T) {
 }
 
 func TestCLIStatsWithoutResults(t *testing.T) {
+	t.Parallel()
+
 	got := runCLI(t, t.TempDir(), nil, "-stats")
 
 	want := cliResult{"No saved results yet.\n", "", 0}
@@ -121,6 +131,8 @@ func TestCLIStatsWithoutResults(t *testing.T) {
 }
 
 func TestCLIStats(t *testing.T) {
+	t.Parallel()
+
 	home := t.TempDir()
 	now := time.Now().Unix()
 	// Both results are from the same day, so that no progress chart is shown.
@@ -151,6 +163,8 @@ func TestCLIStats(t *testing.T) {
 }
 
 func TestCLIStatsHonoursXDGDataHome(t *testing.T) {
+	t.Parallel()
+
 	home := t.TempDir()
 	data := filepath.Join(home, "xdg")
 	writeFile(t, filepath.Join(data, "tt", ".results"), fmt.Sprintf(`[{"wpm":30,"accuracy":100,"timestamp":%d}]`, time.Now().Unix()))
@@ -162,6 +176,8 @@ func TestCLIStatsHonoursXDGDataHome(t *testing.T) {
 }
 
 func TestCLIStatsWithCorruptResults(t *testing.T) {
+	t.Parallel()
+
 	home := t.TempDir()
 	writeFile(t, filepath.Join(home, ".local", "share", "tt", ".results"), "not json")
 
@@ -172,6 +188,8 @@ func TestCLIStatsWithCorruptResults(t *testing.T) {
 }
 
 func TestCLIExport(t *testing.T) {
+	t.Parallel()
+
 	home := t.TempDir()
 	writeFile(t, filepath.Join(home, ".local", "share", "tt", ".errors"), `[{"word":"the","typed":"teh"}]`)
 
@@ -189,6 +207,8 @@ func TestCLIExport(t *testing.T) {
 }
 
 func TestCLIInvalidResources(t *testing.T) {
+	t.Parallel()
+
 	home := t.TempDir()
 	badQuotes := filepath.Join(home, "quotes.json")
 	writeFile(t, badQuotes, "not json")
@@ -220,6 +240,8 @@ func TestCLIInvalidResources(t *testing.T) {
 }
 
 func TestCLIEmptyResources(t *testing.T) {
+	t.Parallel()
+
 	home := t.TempDir()
 	words := filepath.Join(home, "words.txt")
 	quotes := filepath.Join(home, "quotes.json")
@@ -238,6 +260,8 @@ func TestCLIEmptyResources(t *testing.T) {
 }
 
 func TestCLIHelpDescribesLineWidth(t *testing.T) {
+	t.Parallel()
+
 	got := runCLI(t, t.TempDir(), nil, "-help")
 
 	want := "" +
@@ -252,6 +276,8 @@ func TestCLIHelpDescribesLineWidth(t *testing.T) {
 }
 
 func TestCLIDoesNotCreateDirectoriesNeedlessly(t *testing.T) {
+	t.Parallel()
+
 	home := t.TempDir()
 
 	runCLI(t, home, nil, "-v")
@@ -267,6 +293,8 @@ func TestCLIDoesNotCreateDirectoriesNeedlessly(t *testing.T) {
 }
 
 func TestCLIMistakesWithoutMistakes(t *testing.T) {
+	t.Parallel()
+
 	got := runCLI(t, t.TempDir(), nil, "-mistakes")
 
 	want := cliResult{"", "ERROR: there are no recorded mistakes to practice yet\n", 1}
@@ -276,6 +304,8 @@ func TestCLIMistakesWithoutMistakes(t *testing.T) {
 }
 
 func TestCLIKeys(t *testing.T) {
+	t.Parallel()
+
 	home := t.TempDir()
 
 	if got := runCLI(t, home, nil, "-keys"); got != (cliResult{"No keystrokes recorded yet.\n", "", 0}) {
@@ -296,6 +326,8 @@ func TestCLIKeys(t *testing.T) {
 }
 
 func TestCLIRejectsInvalidNumbers(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		args []string
 		want string
@@ -322,6 +354,8 @@ func TestCLIRejectsInvalidNumbers(t *testing.T) {
 }
 
 func TestCLIPaceWithoutResults(t *testing.T) {
+	t.Parallel()
+
 	got := runCLI(t, t.TempDir(), nil, "-words", "200en", "-n", "10", "-pace", "best")
 
 	if want := (cliResult{"", "ERROR: -pace best needs a saved result of words 200en, 10 words\n", 1}); got != want {
@@ -330,6 +364,8 @@ func TestCLIPaceWithoutResults(t *testing.T) {
 }
 
 func TestCLIWithoutText(t *testing.T) {
+	t.Parallel()
+
 	// runCLI pipes nothing to stdin.
 	got := runCLI(t, t.TempDir(), nil)
 
@@ -339,6 +375,8 @@ func TestCLIWithoutText(t *testing.T) {
 }
 
 func TestCLIRefusesToStartWithCorruptResults(t *testing.T) {
+	t.Parallel()
+
 	home := t.TempDir()
 	results := filepath.Join(home, ".local", "share", "tt", ".results")
 	writeFile(t, results, `[{"wpm":60,"accur`)
@@ -357,6 +395,8 @@ func TestCLIRefusesToStartWithCorruptResults(t *testing.T) {
 }
 
 func TestCLIRefusesToStartWithCorruptMistakes(t *testing.T) {
+	t.Parallel()
+
 	home := t.TempDir()
 	mistakes := filepath.Join(home, ".local", "share", "tt", ".errors")
 	writeFile(t, mistakes, `[{"word":"old",`)
@@ -371,6 +411,8 @@ func TestCLIRefusesToStartWithCorruptMistakes(t *testing.T) {
 }
 
 func TestCLIWithoutHome(t *testing.T) {
+	t.Parallel()
+
 	got := runCLI(t, "", nil, "-v")
 
 	if want := (cliResult{"", "ERROR: could not resolve the home directory\n", 1}); got != want {

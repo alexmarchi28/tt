@@ -9,6 +9,8 @@ import (
 // The tests are made when first needed and kept, so that going back shows
 // the same tests again.
 func TestTestHistory(t *testing.T) {
+	t.Parallel()
+
 	var calls int
 	h := newTestHistory(funcSource(testSequence(&calls, "ab", "cd")))
 
@@ -41,6 +43,8 @@ func TestTestHistory(t *testing.T) {
 }
 
 func TestTestHistoryFailure(t *testing.T) {
+	t.Parallel()
+
 	h := newTestHistory(errSource{})
 
 	if _, err := h.current(); err == nil || err.Error() != "no test" {

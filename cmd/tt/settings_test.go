@@ -20,6 +20,8 @@ func resolveFlags(args []string) settings {
 // The mode of the tests is resolved once, explicit modes taking precedence
 // over the text piped to stdin.
 func TestResolveMode(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		name            string
 		args            []string
@@ -57,6 +59,8 @@ func TestResolveMode(t *testing.T) {
 
 // Options which would be silently ignored are rejected.
 func TestResolveRejectsConflicts(t *testing.T) {
+	t.Parallel()
+
 	tests := []struct {
 		args []string
 		want string
@@ -85,6 +89,8 @@ func TestResolveRejectsConflicts(t *testing.T) {
 }
 
 func TestResolveAcceptsValidOptions(t *testing.T) {
+	t.Parallel()
+
 	valid := [][]string{
 		nil,
 		{"-n", "1", "-g", "1", "-w", "1", "-t", "1", "-pace", "0"},
@@ -106,6 +112,8 @@ func TestResolveAcceptsValidOptions(t *testing.T) {
 }
 
 func TestResolveCommand(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string][]string{
 		"list":   {"-list", "themes"},
 		"v":      {"-v"},
@@ -123,6 +131,8 @@ func TestResolveCommand(t *testing.T) {
 
 // Each component gets the group of settings it concerns.
 func TestResolveGroups(t *testing.T) {
+	t.Parallel()
+
 	s := resolveFlags([]string{
 		"-theme", "nord", "-notransparent", "-bold", "-highlight1", "-blockcursor", "-showwpm", "-showaccuracy", "-w", "60",
 		"-t", "30", "-noskip", "-nobackspace", "-blind", "-pace", "best",

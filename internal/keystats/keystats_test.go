@@ -10,6 +10,8 @@ import (
 )
 
 func TestRecentAverage(t *testing.T) {
+	t.Parallel()
+
 	avg := 0.0
 	for n, x := range []float64{1, 0, 0, 1} {
 		avg = recentAverage(avg, n, x)
@@ -28,6 +30,8 @@ func TestRecentAverage(t *testing.T) {
 }
 
 func TestKeyStatsAdd(t *testing.T) {
+	t.Parallel()
+
 	ms := time.Millisecond
 	ks := New()
 	ks.Add([]typing.Keystroke{
@@ -72,6 +76,8 @@ func TestKeyStatsAdd(t *testing.T) {
 }
 
 func TestMergeKeyStats(t *testing.T) {
+	t.Parallel()
+
 	a := Stat{Count: 30, ErrorRate: 0.25, Timed: 10, Latency: 100}
 	b := Stat{Count: 10, ErrorRate: 0.75, Timed: 30, Latency: 200}
 
