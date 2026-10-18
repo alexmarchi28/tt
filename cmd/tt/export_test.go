@@ -3,27 +3,25 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"reflect"
-	"strings"
 	"testing"
 )
 
-// export returns what exportData prints, failing on errors.
-func export(t *testing.T, data string, asJSON bool) string {
+// export returns what exportData prints of st, failing on errors.
+func export(t *testing.T, st historyStore, data string, asJSON bool) string {
 	t.Helper()
 
 	var b bytes.Buffer
-	if err := exportData(&b, data, asJSON); err != nil {
+	if err := exportData(&b, st, data, asJSON); err != nil {
 		t.Fatalf("exportData(%s): %v", data, err)
 	}
 
 	return b.String()
 }
 
-func saveExportedResults(t *testing.T) []persistedResult {
-	t.Helper()
-
-	results := []persistedResult{
+func exportedResults() []persistedResult {
+	return []persistedResult{
 		{Wpm: 40, Accuracy: 80, Timestamp: 1000},
 		persistedResult{Wpm: 72, Accuracy: 96.5, Timestamp: 2000, Duration: 12.5}.
 			withKind(testKind{mode: "words", source: "1000en", seconds: 15, punct: true, numbers: true}),
@@ -32,16 +30,10 @@ func saveExportedResults(t *testing.T) []persistedResult {
 		persistedResult{Wpm: 55, Accuracy: 98, Timestamp: 4000, Duration: 20}.
 			withKind(testKind{mode: "adaptive", source: "1000en", words: 50, focus: 40}),
 	}
-	if err := writePersistedResults(results); err != nil {
-		t.Fatal(err)
-	}
-
-	return results
 }
 
 func TestExportResultsAsCSV(t *testing.T) {
-	useTempStorage(t)
-	saveExportedResults(t)
+	st := &memStore{results: exportedResults()}
 
 	want := "" +
 		"timestamp,wpm,accuracy,duration,mode,source,seconds,words,punct,numbers,focus\n" +
@@ -49,17 +41,16 @@ func TestExportResultsAsCSV(t *testing.T) {
 		"2000,72,96.50,12.50,words,1000en,15,0,true,true,0\n" +
 		"3000,65,100.00,30.00,quotes,\"my, quotes\",0,0,false,false,0\n" +
 		"4000,55,98.00,20.00,adaptive,1000en,0,50,false,false,40\n"
-	if got := export(t, "results", false); got != want {
+	if got := export(t, st, "results", false); got != want {
 		t.Errorf("got\n%s\nwant\n%s", got, want)
 	}
 }
 
 func TestExportResultsAsJSON(t *testing.T) {
-	useTempStorage(t)
-	saved := saveExportedResults(t)
+	saved := exportedResults()
 
 	var got []persistedResult
-	if err := json.Unmarshal([]byte(export(t, "results", true)), &got); err != nil {
+	if err := json.Unmarshal([]byte(export(t, &memStore{results: saved}, "results", true)), &got); err != nil {
 		t.Fatal(err)
 	}
 	if !reflect.DeepEqual(got, saved) {
@@ -68,18 +59,15 @@ func TestExportResultsAsJSON(t *testing.T) {
 }
 
 func TestExportMistakes(t *testing.T) {
-	useTempStorage(t)
-	if err := saveMistakes([]mistake{{"the", "teh"}, {"say,", "sya,"}}); err != nil {
-		t.Fatal(err)
-	}
+	st := &memStore{mistakes: []mistake{{"the", "teh"}, {"say,", "sya,"}}}
 
 	want := "word,typed\nthe,teh\n\"say,\",\"sya,\"\n"
-	if got := export(t, "mistakes", false); got != want {
+	if got := export(t, st, "mistakes", false); got != want {
 		t.Errorf("got\n%s\nwant\n%s", got, want)
 	}
 
 	want = `[{"word":"the","typed":"teh"},{"word":"say,","typed":"sya,"}]` + "\n"
-	if got := export(t, "mistakes", true); got != want {
+	if got := export(t, st, "mistakes", true); got != want {
 		t.Errorf("got %s, want %s", got, want)
 	}
 }
@@ -97,28 +85,22 @@ func TestExportWithoutData(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		useTempStorage(t)
-		if got := export(t, tc.data, tc.asJSON); got != tc.want {
+		if got := export(t, &memStore{}, tc.data, tc.asJSON); got != tc.want {
 			t.Errorf("export %s (JSON %t) = %q, want %q", tc.data, tc.asJSON, got, tc.want)
 		}
 	}
 }
 
 func TestExportErrors(t *testing.T) {
-	useTempStorage(t)
-
-	err := exportData(&bytes.Buffer{}, "nope", false)
+	err := exportData(&bytes.Buffer{}, &memStore{}, "nope", false)
 	if err == nil || err.Error() != "unknown data nope, use one of: mistakes, results" {
 		t.Errorf("error = %v, want the data which can be exported", err)
 	}
 
-	writeFile(t, resultsDB, "not json")
-	if err := exportData(&bytes.Buffer{}, "results", false); err == nil || !strings.HasPrefix(err.Error(), "could not read the saved results") {
-		t.Errorf("error = %v, want the results to be unreadable", err)
-	}
-
-	writeFile(t, mistakeDB, "not json")
-	if err := exportData(&bytes.Buffer{}, "mistakes", false); err == nil || !strings.HasPrefix(err.Error(), "could not read the recorded mistakes") {
-		t.Errorf("error = %v, want the mistakes to be unreadable", err)
+	unreadable := &memStore{err: errors.New("unreadable")}
+	for _, data := range []string{"results", "mistakes"} {
+		if err := exportData(&bytes.Buffer{}, unreadable, data, false); err == nil || err.Error() != "unreadable" {
+			t.Errorf("exporting unreadable %s: %v, want the error", data, err)
+		}
 	}
 }

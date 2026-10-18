@@ -235,10 +235,10 @@ func assertNextParagraph(t *testing.T, gen func() []segment, want string) {
 }
 
 func TestGenerateTestFromFile(t *testing.T) {
-	useTempStorage(t)
+	st := &memStore{}
 	path := writeTextFile(t, "p0\n\np1\nstill p1\n\np2\n")
 
-	gen := mustGen(generateTestFromFile(path, -1))
+	gen := mustGen(generateTestFromFile(path, -1, st))
 	assertNextParagraph(t, gen, "p0")
 	assertNextParagraph(t, gen, "p1\nstill p1")
 	assertNextParagraph(t, gen, "p2")
@@ -246,44 +246,44 @@ func TestGenerateTestFromFile(t *testing.T) {
 }
 
 func TestGenerateTestFromFileRemembersPosition(t *testing.T) {
-	useTempStorage(t)
+	st := &memStore{}
 	path := writeTextFile(t, "p0\n\np1\n\np2\n")
 
-	gen := mustGen(generateTestFromFile(path, -1))
+	gen := mustGen(generateTestFromFile(path, -1, st))
 	assertNextParagraph(t, gen, "p0")
 	assertNextParagraph(t, gen, "p1")
 
 	// A new run resumes from the paragraph that was last shown.
-	gen = mustGen(generateTestFromFile(path, -1))
+	gen = mustGen(generateTestFromFile(path, -1, st))
 	assertNextParagraph(t, gen, "p1")
 	assertNextParagraph(t, gen, "p2")
 	assertNextParagraph(t, gen, "")
 
-	gen = mustGen(generateTestFromFile(path, -1))
+	gen = mustGen(generateTestFromFile(path, -1, st))
 	assertNextParagraph(t, gen, "")
 
 	// -start overrides (and resets) the stored position.
-	gen = mustGen(generateTestFromFile(path, 0))
+	gen = mustGen(generateTestFromFile(path, 0, st))
 	assertNextParagraph(t, gen, "p0")
 
-	gen = mustGen(generateTestFromFile(path, 2))
+	gen = mustGen(generateTestFromFile(path, 2, st))
 	assertNextParagraph(t, gen, "p2")
 }
 
 func TestGenerateTestFromFileTracksFilesSeparately(t *testing.T) {
-	useTempStorage(t)
+	st := &memStore{}
 	a := writeTextFile(t, "a0\n\na1\n")
 	b := writeTextFile(t, "b0\n\nb1\n")
 
-	assertNextParagraph(t, mustGen(generateTestFromFile(a, 1)), "a1")
-	assertNextParagraph(t, mustGen(generateTestFromFile(b, -1)), "b0")
-	assertNextParagraph(t, mustGen(generateTestFromFile(a, -1)), "a1")
+	assertNextParagraph(t, mustGen(generateTestFromFile(a, 1, st)), "a1")
+	assertNextParagraph(t, mustGen(generateTestFromFile(b, -1, st)), "b0")
+	assertNextParagraph(t, mustGen(generateTestFromFile(a, -1, st)), "a1")
 }
 
 func TestNewTestGenerator(t *testing.T) {
 	useTempStorage(t)
 	book := writeTextFile(t, "first paragraph\n\nsecond paragraph\n")
-	saveTestMistakes(t, "ab")
+	st := mistakesOf("ab")
 
 	tests := []struct {
 		name            string
@@ -327,7 +327,7 @@ func TestNewTestGenerator(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			gen, kind, err := newTestGenerator(parseFlags(tc.args), strings.NewReader(tc.stdin), tc.stdinIsTerminal)
+			gen, kind, err := newTestGenerator(parseFlags(tc.args), strings.NewReader(tc.stdin), tc.stdinIsTerminal, st)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -386,16 +386,14 @@ func exactly(texts ...string) func(t *testing.T, segments []segment) {
 	}
 }
 
-func saveTestMistakes(t *testing.T, words ...string) {
-	t.Helper()
-
+// mistakesOf returns a store of mistakes in the given words.
+func mistakesOf(words ...string) *memStore {
 	var mistakes []mistake
 	for _, w := range words {
 		mistakes = append(mistakes, mistake{w, "x"})
 	}
-	if err := writeValue(mistakeDB, mistakes); err != nil {
-		t.Fatal(err)
-	}
+
+	return &memStore{mistakes: mistakes}
 }
 
 func TestWeightedMistakes(t *testing.T) {
@@ -414,8 +412,6 @@ func TestWeightedMistakes(t *testing.T) {
 }
 
 func TestGenerateMistakesTest(t *testing.T) {
-	useTempStorage(t)
-
 	var words []string
 	for i := 0; i < 100; i++ {
 		words = append(words, "old")
@@ -423,9 +419,7 @@ func TestGenerateMistakesTest(t *testing.T) {
 	for i := 0; i < recentMistakes/10; i++ {
 		words = append(words, "often", "often", "often", "often", "often", "often", "often", "often", "rarely", "seldom")
 	}
-	saveTestMistakes(t, words...)
-
-	gen := mustGen(generateMistakesTest(wordOptions{n: 50, g: 2}))
+	gen := mustGen(generateMistakesTest(wordOptions{n: 50, g: 2}, mistakesOf(words...)))
 	counts := map[string]int{}
 	for i := 0; i < 50; i++ {
 		segments := gen()
@@ -649,7 +643,7 @@ func TestGeneratorsRejectEmptyText(t *testing.T) {
 		{"raw", func() (func() []segment, error) { return generateTestFromData([]byte(" \n"), true, false) }, "there is no text to type"},
 		{"paragraphs", func() (func() []segment, error) { return generateTestFromData([]byte(" \n\n "), false, false) }, "there is no text to type"},
 		{"multi", func() (func() []segment, error) { return generateTestFromData(nil, false, true) }, "there is no text to type"},
-		{"file", func() (func() []segment, error) { return generateTestFromFile(blankFile, -1) }, blankFile + " does not contain any text"},
+		{"file", func() (func() []segment, error) { return generateTestFromFile(blankFile, -1, &memStore{}) }, blankFile + " does not contain any text"},
 		{"quotes", func() (func() []segment, error) { return generateQuoteTest("blank") }, "blank does not contain any quotes"},
 	}
 

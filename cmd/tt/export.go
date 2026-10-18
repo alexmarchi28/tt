@@ -10,23 +10,23 @@ import (
 )
 
 // exporters print each kind of saved data as CSV, or as JSON, see -export.
-var exporters = map[string]func(w io.Writer, asJSON bool) error{
+var exporters = map[string]func(w io.Writer, st historyStore, asJSON bool) error{
 	"results":  exportResults,
 	"mistakes": exportMistakes,
 }
 
 // exportData prints the saved data of the given kind.
-func exportData(w io.Writer, data string, asJSON bool) error {
+func exportData(w io.Writer, st historyStore, data string, asJSON bool) error {
 	export, ok := exporters[data]
 	if !ok {
 		return fmt.Errorf("unknown data %s, use one of: %s", data, strings.Join(sortedKeys(exporters), ", "))
 	}
 
-	return export(w, asJSON)
+	return export(w, st, asJSON)
 }
 
-func exportResults(w io.Writer, asJSON bool) error {
-	results, err := readPersistedResults()
+func exportResults(w io.Writer, st historyStore, asJSON bool) error {
+	results, err := st.Results()
 	if err != nil {
 		return err
 	}
@@ -55,8 +55,8 @@ func exportResults(w io.Writer, asJSON bool) error {
 	return csv.NewWriter(w).WriteAll(rows)
 }
 
-func exportMistakes(w io.Writer, asJSON bool) error {
-	mistakes, err := readMistakes()
+func exportMistakes(w io.Writer, st historyStore, asJSON bool) error {
+	mistakes, err := st.Mistakes()
 	if err != nil {
 		return err
 	}

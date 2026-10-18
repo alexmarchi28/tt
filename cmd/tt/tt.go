@@ -20,6 +20,7 @@ type environment struct {
 	stdinIsTerminal  bool
 	stdoutIsTerminal bool
 	getenv           func(key string) string
+	homeDir          func() (string, error)
 
 	// newScreen returns the screen tests are typed on, with true colour
 	// disabled unless trueColor is set.
@@ -34,6 +35,7 @@ func processEnvironment() environment {
 		stdinIsTerminal:  isatty.IsTerminal(os.Stdin.Fd()),
 		stdoutIsTerminal: isatty.IsTerminal(os.Stdout.Fd()),
 		getenv:           os.Getenv,
+		homeDir:          os.UserHomeDir, //$HOME on unix, %USERPROFILE% on windows.
 		newScreen: func(trueColor bool) (tcell.Screen, error) {
 			if !trueColor {
 				if err := os.Setenv("TCELL_TRUECOLOR", "disable"); err != nil {
@@ -61,8 +63,9 @@ func run(args []string, env environment) int {
 		return 2 //The flag package reports the error.
 	}
 
-	if storageErr != nil {
-		return fail(env.stderr, storageErr)
+	st, err := newJSONStore(env.getenv, env.homeDir)
+	if err != nil {
+		return fail(env.stderr, err)
 	}
 	if err := opts.validate(); err != nil {
 		return fail(env.stderr, err)
@@ -70,7 +73,7 @@ func run(args []string, env environment) int {
 
 	for _, c := range commands {
 		if c.requested(opts) {
-			if err := c.run(opts, env); err != nil {
+			if err := c.run(opts, env, st); err != nil {
 				return fail(env.stderr, err)
 			}
 
@@ -78,7 +81,7 @@ func run(args []string, env environment) int {
 		}
 	}
 
-	rc, err := runTests(opts, env)
+	rc, err := runTests(opts, env, st)
 	if err != nil {
 		return fail(env.stderr, err)
 	}
@@ -96,7 +99,7 @@ func fail(stderr io.Writer, err error) int {
 // requested being run.
 var commands = []struct {
 	requested func(options) bool
-	run       func(options, environment) error
+	run       func(options, environment, store) error
 }{
 	{func(o options) bool { return o.listType != "" }, listCommand},
 	{func(o options) bool { return o.version }, versionCommand},
@@ -105,7 +108,7 @@ var commands = []struct {
 	{func(o options) bool { return o.export != "" }, exportCommand},
 }
 
-func listCommand(opts options, env environment) error {
+func listCommand(opts options, env environment, _ store) error {
 	for _, name := range listResourceNames(opts.listType) {
 		fmt.Fprintln(env.stdout, name)
 	}
@@ -113,42 +116,42 @@ func listCommand(opts options, env environment) error {
 	return nil
 }
 
-func versionCommand(_ options, env environment) error {
+func versionCommand(_ options, env environment, _ store) error {
 	_, err := fmt.Fprintln(env.stdout, "tt version "+versionString())
 	return err
 }
 
-func statsCommand(_ options, env environment) error {
-	return printStats(env.stdout)
+func statsCommand(_ options, env environment, st store) error {
+	return printStats(env.stdout, st)
 }
 
-func keysCommand(opts options, env environment) error {
-	return printKeys(env.stdout, opts.layout, env.stdoutIsTerminal && env.getenv("NO_COLOR") == "")
+func keysCommand(opts options, env environment, st store) error {
+	return printKeys(env.stdout, st, opts.layout, env.stdoutIsTerminal && env.getenv("NO_COLOR") == "")
 }
 
-func exportCommand(opts options, env environment) error {
-	return exportData(env.stdout, opts.export, opts.json)
+func exportCommand(opts options, env environment, st store) error {
+	return exportData(env.stdout, st, opts.export, opts.json)
 }
 
 // runTests types the tests requested on the command line and returns the
 // exit code.
-func runTests(opts options, env environment) (int, error) {
+func runTests(opts options, env environment, st store) (int, error) {
 	if !opts.noTheme && !opts.themeExplicit {
-		if rememberedTheme := loadRememberedTheme(opts.opaqueBg); rememberedTheme != "" {
+		if rememberedTheme := loadRememberedTheme(st, opts.opaqueBg); rememberedTheme != "" {
 			opts.themeName = rememberedTheme
 		}
 	}
 
 	//Checked before typing a test whose result could not be saved.
-	stored, err := readPersistedResults()
+	stored, err := st.Results()
 	if err != nil {
 		return 0, err
 	}
-	if _, err := readMistakes(); err != nil {
+	if _, err := st.Mistakes(); err != nil {
 		return 0, err
 	}
 
-	testFn, kind, err := newTestGenerator(opts, env.stdin, env.stdinIsTerminal)
+	testFn, kind, err := newTestGenerator(opts, env.stdin, env.stdinIsTerminal, st)
 	if err != nil {
 		return 0, err
 	}
@@ -172,7 +175,7 @@ func runTests(opts options, env environment) (int, error) {
 	restore := func() { fini.Do(scr.Fini) }
 	defer restore()
 
-	a, err := newApp(scr, opts, kind)
+	a, err := newApp(scr, opts, kind, st)
 	if err != nil {
 		return 0, err
 	}

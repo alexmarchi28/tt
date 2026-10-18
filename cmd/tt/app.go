@@ -7,19 +7,28 @@ import (
 	"github.com/gdamore/tcell"
 )
 
+// sessionStore saves the outcome of the tests typed.
+type sessionStore interface {
+	resultStore
+	mistakeStore
+	keyStatsStore
+	configStore
+}
+
 // app runs the sequence of tests requested on the command line.
 type app struct {
 	opts    options
 	kind    testKind
 	scr     tcell.Screen
+	store   sessionStore
 	typer   *typer
 	results []result
 	theme   string         // Theme to remember on exit, empty if none.
 	words   *adaptiveWords // The word list of adaptive tests, nil for other tests.
 }
 
-func newApp(scr tcell.Screen, opts options, kind testKind) (*app, error) {
-	a := &app{opts: opts, kind: kind, scr: scr}
+func newApp(scr tcell.Screen, opts options, kind testKind, st sessionStore) (*app, error) {
+	a := &app{opts: opts, kind: kind, scr: scr, store: st}
 
 	if kind.mode == modeAdaptive {
 		words, err := loadAdaptiveWords(adaptiveWordList(opts))
@@ -92,7 +101,7 @@ func (a *app) run(testFn func() []segment) (int, error) {
 		}
 
 		if a.words != nil {
-			a.typer.ShowStatusMessage(a.words.describe(loadKeyStats()), 0)
+			a.typer.ShowStatusMessage(a.words.describe(a.store.KeyStats()), 0)
 		}
 
 		res := a.typer.Start(tests[idx], a.opts.timeout)
@@ -136,7 +145,7 @@ func (a *app) record(res testResult) (personalBest, error) {
 	timestamp := time.Now().Unix()
 
 	a.results = append(a.results, result{res.wpm(), res.cpm(), res.accuracy(), timestamp, res.mistakes})
-	previous, err := savePersistedResult(persistedResult{
+	previous, err := a.store.AddResult(persistedResult{
 		Wpm:       res.wpm(),
 		Accuracy:  res.accuracy(),
 		Timestamp: timestamp,
@@ -145,11 +154,11 @@ func (a *app) record(res testResult) (personalBest, error) {
 	if err != nil {
 		return personalBest{}, err
 	}
-	if err := saveMistakes(res.mistakes); err != nil {
-		return personalBest{}, fmt.Errorf("could not save the mistakes: %v", err)
+	if err := a.store.AddMistakes(res.mistakes); err != nil {
+		return personalBest{}, err
 	}
-	if err := saveKeyStats(res.keystrokes); err != nil {
-		return personalBest{}, fmt.Errorf("could not save the key statistics: %v", err)
+	if err := a.store.AddKeystrokes(res.keystrokes); err != nil {
+		return personalBest{}, err
 	}
 
 	if best, ok := bestWpm(previous, a.kind); ok && res.wpm() > best {
@@ -165,5 +174,5 @@ func (a *app) saveTheme() error {
 		return nil
 	}
 
-	return writeAppConfig(appConfig{Theme: a.theme})
+	return a.store.SaveConfig(appConfig{Theme: a.theme})
 }

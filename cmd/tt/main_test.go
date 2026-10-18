@@ -11,8 +11,8 @@ import (
 )
 
 // TestMain re-executes main() when asked to by runCLI, and otherwise points
-// every on-disk location at a throwaway directory so that tests never touch
-// the real user data.
+// the user resources at a throwaway directory so that tests never read the
+// real ones.
 func TestMain(m *testing.M) {
 	if os.Getenv("TT_TEST_RUN_MAIN") == "1" {
 		main()
@@ -31,25 +31,17 @@ func TestMain(m *testing.M) {
 }
 
 func setStorageDir(dir string) {
-	fileStateDB = filepath.Join(dir, ".db")
-	mistakeDB = filepath.Join(dir, ".errors")
-	resultsDB = filepath.Join(dir, ".results")
-	keyStatsDB = filepath.Join(dir, ".keys")
-	appConfigPath = filepath.Join(dir, "config.json")
 	configDirs = []string{filepath.Join(dir, ".tt")}
 }
 
-// useTempStorage gives the calling test its own empty storage directory and
-// returns its path. User resources can be placed in <dir>/.tt/<type>/<name>.
+// useTempStorage gives the calling test its own empty directory of user
+// resources and returns its path. User resources can be placed in
+// <dir>/.tt/<type>/<name>.
 func useTempStorage(t *testing.T) string {
 	t.Helper()
 
-	oldFileState, oldMistakes, oldResults, oldConfig := fileStateDB, mistakeDB, resultsDB, appConfigPath
-	oldKeyStats, oldConfigDirs := keyStatsDB, configDirs
-	t.Cleanup(func() {
-		fileStateDB, mistakeDB, resultsDB, appConfigPath = oldFileState, oldMistakes, oldResults, oldConfig
-		keyStatsDB, configDirs = oldKeyStats, oldConfigDirs
-	})
+	oldConfigDirs := configDirs
+	t.Cleanup(func() { configDirs = oldConfigDirs })
 
 	dir := t.TempDir()
 	setStorageDir(dir)

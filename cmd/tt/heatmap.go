@@ -200,13 +200,13 @@ func formatKeys(ks keyStats, rows []string, color bool) string {
 }
 
 // printKeys prints how each key is typed on the given keyboard layout.
-func printKeys(w io.Writer, layout string, color bool) error {
+func printKeys(w io.Writer, st keyStatsStore, layout string, color bool) error {
 	rows, ok := layouts[layout]
 	if !ok {
 		return fmt.Errorf("unknown layout %s, use one of: %s", layout, strings.Join(sortedKeys(layouts), ", "))
 	}
 
-	ks := loadKeyStats()
+	ks := st.KeyStats()
 	if len(ks.Chars) == 0 {
 		_, err := fmt.Fprintln(w, "No keystrokes recorded yet.")
 		return err
