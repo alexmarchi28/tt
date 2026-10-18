@@ -99,6 +99,9 @@ func TestWordWrapCountsCharacters(t *testing.T) {
 	}{
 		{"абв где жзи", 7, "абв где\nжзи"},
 		{"città più già", 9, "città più\ngià"},
+		//Wide characters take two cells.
+		{"日本語 日本語", 7, "日本語\n日本語"},
+		{"日本 ab", 7, "日本 ab"},
 	}
 
 	for _, tc := range tests {
@@ -138,6 +141,10 @@ func TestLineWidth(t *testing.T) {
 		{80, 80, 80},
 		{80, 50, 42},
 		{20, 50, 20},
+		//Very narrow screens leave no margin.
+		{80, 8, 8},
+		{80, 3, 3},
+		{80, 0, 1},
 	}
 
 	for _, tc := range tests {
@@ -171,5 +178,28 @@ func TestBuiltinResourcesMatchFiles(t *testing.T) {
 				t.Errorf("builtin %s/%s differs from the file in the repository", typ, e.Name())
 			}
 		}
+	}
+}
+
+func TestCellWidth(t *testing.T) {
+	for r, want := range map[rune]int{'a': 1, 'è': 1, 'ж': 1, '\t': tabWidth, '日': 2, '한': 2} {
+		if got := cellWidth(r); got != want {
+			t.Errorf("cellWidth(%q) = %d, want %d", r, got, want)
+		}
+	}
+
+	if nc, nr := calcStringDimensions("日本\nab"); nc != 4 || nr != 2 {
+		t.Errorf("calcStringDimensions = %d, %d, want 4 cells and 2 rows", nc, nr)
+	}
+}
+
+func TestDrawStringWithWideCharactersAndTabs(t *testing.T) {
+	sim := newSimScreen(t)
+	sim.SetSize(20, 5)
+
+	drawString(sim, 0, 0, "日本\tx", tcell.StyleDefault)
+
+	if got := screenLine(sim, 0); got != "日本    x" {
+		t.Errorf("line = %q, want the wide characters, the tab as spaces then x", got)
 	}
 }

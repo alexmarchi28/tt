@@ -13,7 +13,7 @@ Changed:
  - Options which used to be silently ignored are rejected: modes which can't be
    combined (e.g. -adaptive -quotes), more than one file, -focus without
    -adaptive, several of -list, -stats, -keys, -export and -v, an unknown
-   -list type and an unknown -layout.
+   -list type and an unknown -layout, and -csv with -json.
  - A file given on the command line is typed even when stdin is not a
    terminal, rather than the text piped to stdin.
 
@@ -32,6 +32,14 @@ Fixed:
  - A file of recorded mistakes which can't be read is no longer replaced, losing
    its mistakes: tt refuses to start until it is fixed or removed, as with the
    saved results.
+ - The report after a test is shown in the colours of the theme, and centered
+   again when the terminal is resized.
+ - Wide characters (e.g. Chinese, Japanese, Korean) take two cells: the text,
+   the cursor and the wrapping of the lines no longer overlap or drift.
+ - A terminal narrower than the margins no longer wraps the text at zero or
+   negative widths.
+ - The screen updates stop with the test, rather than blocking when events
+   pile up.
 
 # 1.1.0:
 

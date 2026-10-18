@@ -53,19 +53,30 @@ func formatReport(res testResult, attribution string, best personalBest) string 
 	return b.String()
 }
 
-// showReport shows a report until escape is pressed. It returns true if the
-// user asked to quit instead.
-func showReport(scr tcell.Screen, report string) (quit bool) {
-	scr.Clear()
-	drawStringAtCenter(scr, report, tcell.StyleDefault)
-	scr.HideCursor()
-	scr.Show()
+// showReport shows a report in the given style until escape is pressed,
+// centering it again when the screen is resized. It returns true if the user
+// asked to quit instead.
+func showReport(scr tcell.Screen, report string, style tcell.Style) (quit bool) {
+	draw := func() {
+		scr.SetStyle(style)
+		scr.Clear()
+		drawStringAtCenter(scr, report, style)
+		scr.HideCursor()
+		scr.Show()
+	}
+	draw()
 
 	for {
-		if key, ok := scr.PollEvent().(*tcell.EventKey); ok && key.Key() == tcell.KeyEscape {
-			return false
-		} else if ok && key.Key() == tcell.KeyCtrlC {
-			return true
+		switch ev := scr.PollEvent().(type) {
+		case *tcell.EventResize:
+			scr.Sync()
+			draw()
+		case *tcell.EventKey:
+			if ev.Key() == tcell.KeyEscape {
+				return false
+			} else if ev.Key() == tcell.KeyCtrlC {
+				return true
+			}
 		}
 	}
 }
@@ -91,15 +102,19 @@ func writeResults(w io.Writer, results []result, asJSON, asCSV bool) error {
 	if asCSV {
 		cw := csv.NewWriter(w)
 		for _, r := range results {
-			cw.Write([]string{
+			if err := cw.Write([]string{
 				"test",
 				strconv.Itoa(r.Wpm),
 				strconv.Itoa(r.Cpm),
 				strconv.FormatFloat(r.Accuracy, 'f', 2, 64),
 				strconv.FormatInt(r.Timestamp, 10),
-			})
+			}); err != nil {
+				return err
+			}
 			for _, m := range r.Mistakes {
-				cw.Write([]string{"mistake", m.Word, m.Typed})
+				if err := cw.Write([]string{"mistake", m.Word, m.Typed}); err != nil {
+					return err
+				}
 			}
 		}
 

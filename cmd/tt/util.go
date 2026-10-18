@@ -6,12 +6,16 @@ import (
 	"strings"
 
 	"github.com/gdamore/tcell"
+	"github.com/mattn/go-runewidth"
 )
+
+// blankLines matches the blank lines separating paragraphs.
+var blankLines = regexp.MustCompile("\n\n+")
 
 // getParagraphs returns the paragraphs of s which aren't blank.
 func getParagraphs(s string) []string {
 	s = strings.Replace(s, "\r", "", -1)
-	s = regexp.MustCompile("\n\n+").ReplaceAllString(s, "\n\n")
+	s = blankLines.ReplaceAllString(s, "\n\n")
 
 	var paragraphs []string
 	for _, p := range strings.Split(strings.Trim(s, "\n"), "\n\n") {
@@ -28,11 +32,11 @@ func wordWrapRunes(s []rune, n int) {
 	sz := 0
 
 	for i := 0; i < len(s); i++ {
-		sz++
-
 		if s[i] == '\n' {
 			s[i] = ' '
 		}
+
+		sz += cellWidth(s[i])
 
 		if s[i] == ' ' {
 			sp = i
@@ -43,7 +47,7 @@ func wordWrapRunes(s []rune, n int) {
 				s[sp] = '\n'
 			}
 
-			sz = i - sp
+			sz = runesWidth(s[sp+1 : i+1])
 		}
 	}
 
@@ -63,7 +67,14 @@ func reflow(s string, width int) string {
 // wide.
 func lineWidth(maxLineLen, sw int) int {
 	if maxLineLen > sw {
-		return sw - 8
+		maxLineLen = sw - 8
+		if maxLineLen < 1 {
+			maxLineLen = sw //Too narrow for a margin.
+		}
+	}
+
+	if maxLineLen < 1 {
+		return 1
 	}
 
 	return maxLineLen
@@ -83,8 +94,7 @@ func drawString(scr tcell.Screen, x, y int, s string, style tcell.Style) {
 			y++
 			x = sx
 		} else {
-			scr.SetContent(x, y, c, nil, style)
-			x++
+			x += drawRune(scr, x, y, c, style)
 		}
 	}
 }
@@ -108,7 +118,37 @@ func cellWidth(r rune) int {
 		return tabWidth
 	}
 
-	return 1
+	if w := runewidth.RuneWidth(r); w > 0 {
+		return w
+	}
+
+	return 1 //Control and combining characters still take a cell.
+}
+
+// runesWidth returns the number of cells taken by s.
+func runesWidth(s []rune) int {
+	w := 0
+	for _, r := range s {
+		w += cellWidth(r)
+	}
+
+	return w
+}
+
+// drawRune draws r at (x, y) and returns the number of cells it takes. A tab
+// is drawn as spaces, and a wide character once, the screen spanning it over
+// the following cell.
+func drawRune(scr tcell.Screen, x, y int, r rune, style tcell.Style) int {
+	w := cellWidth(r)
+	if r == '\t' {
+		for i := 0; i < w; i++ {
+			scr.SetContent(x+i, y, ' ', nil, style)
+		}
+	} else {
+		scr.SetContent(x, y, r, nil, style)
+	}
+
+	return w
 }
 
 func calcStringDimensions(s string) (nc, nr int) {

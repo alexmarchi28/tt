@@ -200,7 +200,7 @@ func parseArgs(args []string, stdout, stderr io.Writer) (options, error) {
 	fs.StringVar(&opts.layout, "layout", "us", "")
 	fs.StringVar(&opts.export, "export", "", "")
 
-	fs.Usage = func() { io.WriteString(stdout, usage) }
+	fs.Usage = func() { _, _ = io.WriteString(stdout, usage) }
 	if err := fs.Parse(args); err != nil {
 		return options{}, err
 	}

@@ -240,14 +240,14 @@ func writeValue(path string, o interface{}) error {
 	if err != nil {
 		return err
 	}
-	defer os.Remove(f.Name()) //Fails harmlessly once the file is renamed.
+	defer func() { _ = os.Remove(f.Name()) }() //Fails harmlessly once the file is renamed.
 
 	if _, err := f.Write(b); err != nil {
-		f.Close()
+		_ = f.Close() //The write error is the one worth reporting.
 		return err
 	}
 	if err := f.Sync(); err != nil {
-		f.Close()
+		_ = f.Close()
 		return err
 	}
 	if err := f.Close(); err != nil {
