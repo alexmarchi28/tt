@@ -134,7 +134,7 @@ func (a *app) run(src testSource) (int, error) {
 				if len(tests[idx]) == 1 {
 					attribution = tests[idx][0].Attribution
 				}
-				if quit := showReport(a.scr, formatReport(res, attribution, best)); quit {
+				if quit := showReport(a.scr, formatReport(res, attribution, best), a.typer.view.defaultStyle); quit {
 					return 1, nil
 				}
 			}

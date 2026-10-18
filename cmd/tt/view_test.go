@@ -68,6 +68,24 @@ func TestViewDrawsTheText(t *testing.T) {
 	}
 }
 
+// Wide characters take two cells, the cursor and the following characters
+// being placed accordingly.
+func TestViewDrawsWideCharacters(t *testing.T) {
+	v, sim := newTestView(t, defaultViewOptions)
+
+	v.draw(typedFrame("日本 ab", "日本 ", 0, 0))
+
+	if line := screenLine(sim, 0); line != "日本 ab" {
+		t.Errorf("text line = %q", line)
+	}
+	if fg, _, _ := cellColors(sim, 5, 0); fg != testHi2 {
+		t.Errorf("a drawn in %v, want the current word at cell 5", fg)
+	}
+	if x, _, _ := sim.GetCursor(); x != 5 {
+		t.Errorf("cursor at cell %d, want 5", x)
+	}
+}
+
 func TestViewBlind(t *testing.T) {
 	v, sim := newTestView(t, viewOptions{blind: true})
 

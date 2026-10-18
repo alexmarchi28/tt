@@ -163,14 +163,7 @@ func (v *view) drawText(f frame) {
 			style = style.Reverse(true)
 		}
 
-		glyph := r
-		if r == '\t' {
-			glyph = ' '
-		}
-		for j := 0; j < cellWidth(r); j++ {
-			v.scr.SetContent(cx+j, cy, glyph, nil, style)
-		}
-		cx += cellWidth(r)
+		cx += drawRune(v.scr, cx, cy, r, style)
 	}
 }
 
@@ -279,12 +272,12 @@ type cursorShaper interface {
 // the terminal.
 type ttyCursor struct{ tty io.Writer }
 
-func (c ttyCursor) typing() { io.WriteString(c.tty, "\033[5 q") }
+func (c ttyCursor) typing() { _, _ = io.WriteString(c.tty, "\033[5 q") }
 
 // restore assumes the original cursor shape was a block (the one true cursor
 // shape), there doesn't appear to be a good way to save/restore the shape if
 // the user has changed it from the otcs.
-func (c ttyCursor) restore() { io.WriteString(c.tty, "\033[2 q") }
+func (c ttyCursor) restore() { _, _ = io.WriteString(c.tty, "\033[2 q") }
 
 // keptCursor leaves the cursor shape as it is.
 type keptCursor struct{}

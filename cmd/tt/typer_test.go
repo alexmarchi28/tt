@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -38,6 +39,7 @@ func simulationScreenText(sim tcell.SimulationScreen) string {
 					b.WriteRune(' ')
 				} else {
 					b.WriteRune(cell.Runes[0])
+					x += cellWidth(cell.Runes[0]) - 1 //A wide character spans the following cells.
 				}
 			}
 			b.WriteRune('\n')
@@ -1068,5 +1070,43 @@ func TestTyperEmptyText(t *testing.T) {
 func TestTestResultWithoutDuration(t *testing.T) {
 	if got := (testResult{correctChars: 10}).cpm(); got != 0 {
 		t.Errorf("cpm() without duration = %d, want 0", got)
+	}
+}
+
+// postCountingScreen counts the events posted to it.
+type postCountingScreen struct {
+	tcell.SimulationScreen
+	posts atomic.Int32
+}
+
+func (s *postCountingScreen) PostEvent(ev tcell.Event) error {
+	s.posts.Add(1)
+	return s.SimulationScreen.PostEvent(ev)
+}
+
+func (s *postCountingScreen) PostEventWait(ev tcell.Event) {
+	panic("the ticker must not block on a full event queue")
+}
+
+// The screen updates stop with the test, rather than reaching the next
+// screen.
+func TestTyperStopsTickingWithTheTest(t *testing.T) {
+	scr := &postCountingScreen{SimulationScreen: newSimScreen(t)}
+	ty := newTyper(scr, newView(scr, testTheme, defaultViewOptions), withKeymap(newKeymap("linux")), withTick(time.Millisecond))
+
+	done := make(chan struct{})
+	go func() {
+		ty.Start([]segment{{"ab", ""}}, -1)
+		close(done)
+	}()
+
+	waitFor(t, scr.SimulationScreen, func() bool { return scr.posts.Load() > 3 })
+	sendKeys(t, scr.SimulationScreen, "ab")
+	<-done
+
+	posted := scr.posts.Load()
+	time.Sleep(30 * time.Millisecond)
+	if got := scr.posts.Load(); got != posted {
+		t.Errorf("%d screen updates posted after the test ended", got-posted)
 	}
 }

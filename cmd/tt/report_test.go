@@ -2,10 +2,12 @@ package main
 
 import (
 	"bytes"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/alexmarchi28/tt/internal/typing"
+	"github.com/gdamore/tcell"
 )
 
 var testResults = []result{
@@ -112,5 +114,37 @@ func TestFormatReport(t *testing.T) {
 				t.Errorf("got\n%s\nwant\n%s", got, tc.want)
 			}
 		})
+	}
+}
+
+// The report is shown in the colours of the theme, and centered again when
+// the screen is resized.
+func TestShowReport(t *testing.T) {
+	sim := newSimScreen(t)
+	sim.SetSize(40, 10)
+	style := tcell.StyleDefault.Foreground(testFg).Background(testBg)
+
+	done := make(chan bool, 1)
+	go func() { done <- showReport(sim, "WPM: 50\nCPM: 250", style) }()
+
+	waitForScreenText(t, sim, "WPM: 50", true)
+	if line := screenLine(sim, 4); line != strings.Repeat(" ", 16)+"WPM: 50" {
+		t.Errorf("report line = %q, want it centered", line)
+	}
+	if fg, bg, _ := cellColors(sim, 0, 0); fg != testFg || bg != testBg {
+		t.Errorf("background drawn in (%v, %v), want the colours of the theme", fg, bg)
+	}
+
+	resizeScreen(t, sim, 20, 6)
+	waitFor(t, sim, func() bool { return screenLine(sim, 2) == strings.Repeat(" ", 6)+"WPM: 50" })
+
+	sendKeys(t, sim, tcell.KeyEscape)
+	select {
+	case quit := <-done:
+		if quit {
+			t.Error("escape asked to quit")
+		}
+	case <-time.After(testWait):
+		t.Fatal("the report was not closed")
 	}
 }

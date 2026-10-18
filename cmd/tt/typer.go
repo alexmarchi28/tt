@@ -283,25 +283,30 @@ func (t *typer) handleKey(s *session, ev *tcell.EventKey) (outcome, bool) {
 }
 
 // startTicker injects nil events into the event loop at regular intervals to
-// update the screen, until the returned function is called.
+// update the screen, until the returned function is called. A tick is dropped
+// rather than waited on when the event queue is full, and no tick is posted
+// once stop has returned.
 func (t *typer) startTicker() (stop func()) {
-	done := make(chan struct{})
-	tick := t.refreshInterval()
+	ticker := time.NewTicker(t.refreshInterval())
+	done, stopped := make(chan struct{}), make(chan struct{})
 
 	go func() {
+		defer close(stopped)
 		for {
 			select {
 			case <-done:
 				return
-			default:
+			case <-ticker.C:
+				_ = t.scr.PostEvent(nil)
 			}
-
-			time.Sleep(tick)
-			t.scr.PostEventWait(nil)
 		}
 	}()
 
-	return func() { close(done) }
+	return func() {
+		ticker.Stop()
+		close(done)
+		<-stopped
+	}
 }
 
 // refreshInterval returns the interval between screen updates. The pacer

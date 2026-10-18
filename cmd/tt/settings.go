@@ -90,6 +90,9 @@ func resolve(o options, stdinIsTerminal bool) (settings, error) {
 	if _, err := keyboardLayout(o.layout); err != nil {
 		return settings{}, err
 	}
+	if o.csv && o.json {
+		return settings{}, notTogether([]string{"-csv", "-json"})
+	}
 
 	source, err := resolveSource(o, stdinIsTerminal)
 	if err != nil {

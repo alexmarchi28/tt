@@ -74,6 +74,7 @@ func TestResolveRejectsConflicts(t *testing.T) {
 		{[]string{"-list", "themes", "-export", "results"}, "-list and -export can't be used together"},
 		{[]string{"-list", "colours"}, "unknown resource type colours, use one of: quotes, themes, words"},
 		{[]string{"-layout", "nope"}, "unknown layout nope, use one of: "},
+		{[]string{"-csv", "-json"}, "-csv and -json can't be used together"},
 	}
 
 	for _, tc := range tests {
@@ -125,7 +126,7 @@ func TestResolveGroups(t *testing.T) {
 	s := resolveFlags([]string{
 		"-theme", "nord", "-notransparent", "-bold", "-highlight1", "-blockcursor", "-showwpm", "-showaccuracy", "-w", "60",
 		"-t", "30", "-noskip", "-nobackspace", "-blind", "-pace", "best",
-		"-noreport", "-oneshot", "-csv", "-json",
+		"-noreport", "-oneshot", "-csv",
 		"-n", "5", "-g", "2", "-punct", "-numbers",
 	})
 
@@ -143,7 +144,7 @@ func TestResolveGroups(t *testing.T) {
 		t.Errorf("rules = %+v, want %+v", s.rules, wantRules)
 	}
 
-	if want := (outputSettings{noReport: true, oneShot: true, csv: true, json: true}); s.output != want {
+	if want := (outputSettings{noReport: true, oneShot: true, csv: true}); s.output != want {
 		t.Errorf("output = %+v, want %+v", s.output, want)
 	}
 

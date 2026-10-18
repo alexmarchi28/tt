@@ -102,7 +102,7 @@ func run(args []string, env environment) int {
 
 // fail reports err and returns the exit code of a failure.
 func fail(stderr io.Writer, err error) int {
-	fmt.Fprintf(stderr, "ERROR: %v\n", err)
+	_, _ = fmt.Fprintf(stderr, "ERROR: %v\n", err)
 	return 1
 }
 
@@ -132,7 +132,9 @@ var commands = []command{
 
 func listCommand(s settings, env environment, deps dependencies) error {
 	for _, name := range deps.resources.List(s.list) {
-		fmt.Fprintln(env.stdout, name)
+		if _, err := fmt.Fprintln(env.stdout, name); err != nil {
+			return err
+		}
 	}
 
 	return nil
@@ -203,7 +205,7 @@ func runTests(s settings, env environment, deps dependencies) (int, error) {
 	if !s.display.blockCursor && env.openTTY != nil {
 		//Fails on windows, where tt is still mostly usable via tcell.
 		if tty, err := env.openTTY(); err == nil {
-			defer tty.Close()
+			defer func() { _ = tty.Close() }()
 			cursor = ttyCursor{tty}
 		}
 	}
@@ -217,7 +219,7 @@ func runTests(s settings, env environment, deps dependencies) (int, error) {
 	restore()
 
 	if err := a.saveTheme(); err != nil {
-		fmt.Fprintf(env.stderr, "WARNING: could not save theme selection: %v\n", err)
+		_, _ = fmt.Fprintf(env.stderr, "WARNING: could not save theme selection: %v\n", err)
 	}
 	if err := writeResults(env.stdout, a.results, s.output.json, s.output.csv); err != nil {
 		return 0, err
