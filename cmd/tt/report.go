@@ -103,46 +103,52 @@ func showReport(scr tcell.Screen, report string, style tcell.Style) (quit bool) 
 	}
 }
 
+// resultWriters print the results of the completed tests in each output
+// format, requested by the flag of its name.
+var resultWriters = map[string]func(w io.Writer, results []result) error{
+	"csv":  writeResultsCSV,
+	"json": writeResultsJSON,
+}
+
 // writeResults prints the results of the completed tests in the requested
-// formats.
-func writeResults(w io.Writer, results []result, asJSON, asCSV bool) error {
-	if asJSON {
-		results = nonNil(results)
-		for i := range results {
-			results[i].Mistakes = nonNil(results[i].Mistakes)
-		}
+// format, if any.
+func writeResults(w io.Writer, results []result, format string) error {
+	if format == "" {
+		return nil
+	}
 
-		b, err := json.Marshal(results)
-		if err != nil {
-			return err
-		}
-		if _, err := w.Write(b); err != nil {
-			return err
+	return resultWriters[format](w, results)
+}
+
+func writeResultsJSON(w io.Writer, results []result) error {
+	results = nonNil(results)
+	for i := range results {
+		results[i].Mistakes = nonNil(results[i].Mistakes)
+	}
+
+	b, err := json.Marshal(results)
+	if err != nil {
+		return err
+	}
+
+	_, err = w.Write(b)
+	return err
+}
+
+func writeResultsCSV(w io.Writer, results []result) error {
+	var rows [][]string
+	for _, r := range results {
+		rows = append(rows, []string{
+			"test",
+			strconv.Itoa(r.Wpm),
+			strconv.Itoa(r.Cpm),
+			strconv.FormatFloat(r.Accuracy, 'f', 2, 64),
+			strconv.FormatInt(r.Timestamp, 10),
+		})
+		for _, m := range r.Mistakes {
+			rows = append(rows, []string{"mistake", m.Word, m.Typed})
 		}
 	}
 
-	if asCSV {
-		cw := csv.NewWriter(w)
-		for _, r := range results {
-			if err := cw.Write([]string{
-				"test",
-				strconv.Itoa(r.Wpm),
-				strconv.Itoa(r.Cpm),
-				strconv.FormatFloat(r.Accuracy, 'f', 2, 64),
-				strconv.FormatInt(r.Timestamp, 10),
-			}); err != nil {
-				return err
-			}
-			for _, m := range r.Mistakes {
-				if err := cw.Write([]string{"mistake", m.Word, m.Typed}); err != nil {
-					return err
-				}
-			}
-		}
-
-		cw.Flush()
-		return cw.Error()
-	}
-
-	return nil
+	return csv.NewWriter(w).WriteAll(rows)
 }

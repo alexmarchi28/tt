@@ -144,7 +144,7 @@ func TestResolveGroups(t *testing.T) {
 		t.Errorf("rules = %+v, want %+v", s.rules, wantRules)
 	}
 
-	if want := (outputSettings{noReport: true, oneShot: true, csv: true}); s.output != want {
+	if want := (outputSettings{noReport: true, oneShot: true, format: "csv"}); s.output != want {
 		t.Errorf("output = %+v, want %+v", s.output, want)
 	}
 

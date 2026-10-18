@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -17,32 +18,32 @@ var testResults = []result{
 
 func TestWriteResults(t *testing.T) {
 	tests := []struct {
-		name          string
-		results       []result
-		asJSON, asCSV bool
-		want          string
+		name    string
+		results []result
+		format  string
+		want    string
 	}{
-		{"nothing requested", testResults, false, false, ""},
+		{"nothing requested", testResults, "", ""},
 		{
-			"json", testResults, true, false,
+			"json", testResults, "json",
 			`[{"wpm":60,"cpm":300,"accuracy":97.5,"timestamp":1000,"mistakes":[]},` +
 				`{"wpm":50,"cpm":250,"accuracy":100,"timestamp":2000,"mistakes":[{"word":"alpha","typed":"alpah"},{"word":"beta","typed":"bet_"}]}]`,
 		},
 		{
-			"csv", testResults, false, true,
+			"csv", testResults, "csv",
 			"test,60,300,97.50,1000\n" +
 				"test,50,250,100.00,2000\n" +
 				"mistake,alpha,alpah\n" +
 				"mistake,beta,bet_\n",
 		},
-		{"csv without results", nil, false, true, ""},
-		{"json without results", nil, true, false, "[]"},
+		{"csv without results", nil, "csv", ""},
+		{"json without results", nil, "json", "[]"},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			var b bytes.Buffer
-			if err := writeResults(&b, tc.results, tc.asJSON, tc.asCSV); err != nil {
+			if err := writeResults(&b, tc.results, tc.format); err != nil {
 				t.Fatal(err)
 			}
 
@@ -53,6 +54,31 @@ func TestWriteResults(t *testing.T) {
 	}
 }
 
+// Every output format can be requested with the flag of its name.
+func TestResultWritersHaveFlags(t *testing.T) {
+	for format := range resultWriters {
+		if s := resolveFlags([]string{"-" + format}); s.output.format != format {
+			t.Errorf("tt -%s: output format %q, want %q", format, s.output.format, format)
+		}
+	}
+	if s := resolveFlags(nil); s.output.format != "" {
+		t.Errorf("output format %q by default, want none", s.output.format)
+	}
+}
+
+// failingWriter fails every write.
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) { return 0, errors.New("disk full") }
+
+func TestWriteResultsReportsWriteErrors(t *testing.T) {
+	for format := range resultWriters {
+		if err := writeResults(failingWriter{}, testResults, format); err == nil {
+			t.Errorf("%s: no error on a failed write", format)
+		}
+	}
+}
+
 func TestWriteResultsEscapesCSV(t *testing.T) {
 	results := []result{{Wpm: 40, Cpm: 200, Accuracy: 90, Timestamp: 3000, Mistakes: []typing.Mistake{
 		{Word: "world,", Typed: "worl,"},
@@ -60,7 +86,7 @@ func TestWriteResultsEscapesCSV(t *testing.T) {
 	}}}
 
 	var b bytes.Buffer
-	if err := writeResults(&b, results, false, true); err != nil {
+	if err := writeResults(&b, results, "csv"); err != nil {
 		t.Fatal(err)
 	}
 
