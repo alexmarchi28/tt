@@ -65,8 +65,7 @@ type ruleSettings struct {
 type outputSettings struct {
 	noReport bool
 	oneShot  bool
-	csv      bool
-	json     bool
+	format   string // Format of the results printed on exit, empty for none.
 }
 
 // resourceTypes are the types of resources, see -list.
@@ -127,7 +126,7 @@ func resolve(o options, stdinIsTerminal bool) (settings, error) {
 			pace:        o.pace,
 			paceTarget:  o.paceTarget,
 		},
-		output: outputSettings{noReport: o.noReport, oneShot: o.oneShot, csv: o.csv, json: o.json},
+		output: outputSettings{noReport: o.noReport, oneShot: o.oneShot, format: outputFormat(o)},
 	}, nil
 }
 
@@ -215,4 +214,17 @@ func resolveSource(o options, stdinIsTerminal bool) (sourceSettings, error) {
 // notTogether returns the error of options which can't be used together.
 func notTogether(names []string) error {
 	return fmt.Errorf("%s can't be used together", strings.Join(names, " and "))
+}
+
+// outputFormat returns the format requested for the results printed on exit,
+// empty for none.
+func outputFormat(o options) string {
+	switch {
+	case o.csv:
+		return "csv"
+	case o.json:
+		return "json"
+	}
+
+	return ""
 }

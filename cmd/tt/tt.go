@@ -154,7 +154,7 @@ func keysCommand(s settings, env environment, deps dependencies) error {
 }
 
 func exportCommand(s settings, env environment, deps dependencies) error {
-	return exportData(env.stdout, deps.store, s.export, s.output.json)
+	return exportData(env.stdout, deps.store, s.export, s.output.format == "json")
 }
 
 // runTests types the tests requested on the command line and returns the
@@ -221,7 +221,7 @@ func runTests(s settings, env environment, deps dependencies) (int, error) {
 	if err := a.saveTheme(); err != nil {
 		_, _ = fmt.Fprintf(env.stderr, "WARNING: could not save theme selection: %v\n", err)
 	}
-	if err := writeResults(env.stdout, a.results, s.output.json, s.output.csv); err != nil {
+	if err := writeResults(env.stdout, a.results, s.output.format); err != nil {
 		return 0, err
 	}
 
