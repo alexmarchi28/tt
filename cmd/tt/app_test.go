@@ -352,3 +352,42 @@ func TestAppRecordsTheTimeOfTests(t *testing.T) {
 		t.Errorf("results = %+v, want the test typed at the time of the clock", a.results)
 	}
 }
+
+// fakeReporter records the reports shown, asking to quit on the quitAt-th
+// (from 1, never if 0).
+type fakeReporter struct {
+	reports []string
+	quitAt  int
+}
+
+func (r *fakeReporter) show(report string) (quit bool) {
+	r.reports = append(r.reports, report)
+	return len(r.reports) == r.quitAt
+}
+
+func TestAppReportsCompletedTests(t *testing.T) {
+	a, sim := newTestApp(t, resolveFlags(nil))
+	rep := &fakeReporter{quitAt: 2}
+	a.reporter = rep
+
+	done := startApp(a, func() []segment { return []segment{{"ab", "Someone"}} })
+	sendKeys(t, sim, "ab", "ab")
+
+	if rc := waitExitCode(t, done); rc != 1 {
+		t.Errorf("exit code = %d, want 1 as the report asked to quit", rc)
+	}
+	if len(rep.reports) != 2 || !strings.Contains(rep.reports[0], "Attribution: Someone") {
+		t.Errorf("reports = %q, want two reports with the attribution", rep.reports)
+	}
+}
+
+func TestNewAppReporter(t *testing.T) {
+	if a, _ := newTestApp(t, resolveFlags([]string{"-noreport"})); a.reporter != (noReporter{}) {
+		t.Errorf("reporter = %#v with -noreport, want none", a.reporter)
+	}
+
+	a, _ := newTestApp(t, resolveFlags(nil))
+	if r, ok := a.reporter.(screenReporter); !ok || r.view != a.typer.view {
+		t.Errorf("reporter = %#v, want the report shown on the screen of the typer", a.reporter)
+	}
+}

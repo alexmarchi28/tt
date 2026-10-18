@@ -53,6 +53,28 @@ func formatReport(res testResult, attribution string, best personalBest) string 
 	return b.String()
 }
 
+// reporter shows the report of a completed test.
+type reporter interface {
+	// show shows report until the user moves on, and returns true if they
+	// asked to quit instead.
+	show(report string) (quit bool)
+}
+
+// noReporter shows no report (-noreport).
+type noReporter struct{}
+
+func (noReporter) show(string) bool { return false }
+
+// screenReporter shows the report on the screen of view, in the colours of
+// its current theme.
+type screenReporter struct {
+	view *view
+}
+
+func (r screenReporter) show(report string) bool {
+	return showReport(r.view.scr, report, r.view.defaultStyle)
+}
+
 // showReport shows a report in the given style until escape is pressed,
 // centering it again when the screen is resized. It returns true if the user
 // asked to quit instead.

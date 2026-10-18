@@ -148,3 +148,27 @@ func TestShowReport(t *testing.T) {
 		t.Fatal("the report was not closed")
 	}
 }
+
+// The report is shown in the colours of the current theme of the view.
+func TestScreenReporter(t *testing.T) {
+	v, sim := newTestView(t, defaultViewOptions)
+	v.setTheme(theme{testHi, testHi2, testHi3, testHi, testHi, testErrCol})
+
+	done := make(chan bool, 1)
+	go func() { done <- screenReporter{v}.show("WPM: 50") }()
+
+	waitForScreenText(t, sim, "WPM: 50", true)
+	if fg, bg, _ := cellColors(sim, 0, 0); fg != testHi || bg != testHi2 {
+		t.Errorf("background drawn in (%v, %v), want the colours of the current theme", fg, bg)
+	}
+
+	sendKeys(t, sim, tcell.KeyCtrlC)
+	select {
+	case quit := <-done:
+		if !quit {
+			t.Error("C-c did not ask to quit")
+		}
+	case <-time.After(testWait):
+		t.Fatal("the report was not closed")
+	}
+}
