@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"time"
 
 	"github.com/gdamore/tcell"
@@ -31,21 +32,12 @@ type app struct {
 	now     func() time.Time
 	typer   *typer
 	results []result
-	theme   string         // Theme to remember on exit, empty if none.
-	words   *adaptiveWords // The word list of adaptive tests, nil for other tests.
+	theme   string // Theme to remember on exit, empty if none.
 }
 
 func newApp(scr tcell.Screen, opts options, kind testKind, deps appDeps) (*app, error) {
 	a := &app{opts: opts, kind: kind, scr: scr, store: deps.store, now: deps.now}
 	res := deps.resources
-
-	if kind.mode == modeAdaptive {
-		words, err := loadAdaptiveWords(res, adaptiveWordList(opts))
-		if err != nil {
-			return nil, err
-		}
-		a.words = &words
-	}
 
 	if opts.noTheme {
 		a.typer = NewTyper(scr, true, terminalTheme)
@@ -94,24 +86,27 @@ func newApp(scr tcell.Screen, opts options, kind testKind, deps appDeps) (*app, 
 	return a, nil
 }
 
-// run shows the tests produced by testFn until there are no more or the user
-// quits, and returns the exit code. It stops at the first test whose outcome
-// can't be saved.
-func (a *app) run(testFn func() []segment) (int, error) {
+// run shows the tests of src until there are no more or the user quits, and
+// returns the exit code. It stops at the first test which can't be made or
+// whose outcome can't be saved.
+func (a *app) run(src testSource) (int, error) {
 	var tests [][]segment
 	var idx = 0
 
 	for {
 		if idx >= len(tests) {
-			tests = append(tests, testFn())
+			test, err := src.next()
+			if err == io.EOF {
+				return 0, nil
+			} else if err != nil {
+				return 1, err
+			}
+
+			tests = append(tests, test)
 		}
 
-		if tests[idx] == nil {
-			return 0, nil
-		}
-
-		if a.words != nil {
-			a.typer.ShowStatusMessage(a.words.describe(a.store.KeyStats()), 0)
+		if d, ok := src.(describer); ok {
+			a.typer.ShowStatusMessage(d.describe(), 0)
 		}
 
 		res := a.typer.Start(tests[idx], a.opts.timeout)

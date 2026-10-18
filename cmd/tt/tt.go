@@ -169,7 +169,7 @@ func runTests(opts options, env environment, deps dependencies) (int, error) {
 		return 0, err
 	}
 
-	testFn, kind, err := newTestGenerator(opts, textSources{st, res, deps.rng, env.stdin, env.stdinIsTerminal})
+	tests, kind, err := newTestSource(opts, textSources{st, res, deps.rng, env.stdin, env.stdinIsTerminal})
 	if err != nil {
 		return 0, err
 	}
@@ -198,7 +198,7 @@ func runTests(opts options, env environment, deps dependencies) (int, error) {
 		return 0, err
 	}
 
-	rc, runErr := a.run(testFn)
+	rc, runErr := a.run(tests)
 	restore()
 
 	if err := a.saveTheme(); err != nil {

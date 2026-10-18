@@ -39,9 +39,15 @@ func testSequence(calls *int, texts ...string) func() []segment {
 }
 
 func startApp(a *app, testFn func() []segment) <-chan int {
+	return startSource(a, funcSource(testFn))
+}
+
+// startSource runs the app in the background on the tests of src. The exit
+// code is delivered on the returned channel, -1 for an error.
+func startSource(a *app, src testSource) <-chan int {
 	done := make(chan int, 1)
 	go func() {
-		rc, err := a.run(testFn)
+		rc, err := a.run(src)
 		if err != nil {
 			rc = -1
 		}

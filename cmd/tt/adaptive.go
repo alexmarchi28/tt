@@ -251,17 +251,3 @@ func weightedPick(rng *rand.Rand, words []string, weight func(word string) float
 		return words[sort.SearchFloat64s(cumulative, rng.Float64()*total)]
 	}
 }
-
-// generateAdaptiveTest draws words from the given word list according to the
-// latest key statistics, focus percent of them with the pairs of letters to
-// practice, see adaptiveWords.draw.
-func generateAdaptiveTest(rng *rand.Rand, res resourceReader, name string, o wordOptions, focus int, st keyStatsStore) (func() []segment, error) {
-	a, err := loadAdaptiveWords(res, name)
-	if err != nil {
-		return nil, err
-	}
-
-	return wordTest(rng, func(n int) []string {
-		return a.draw(rng, n, st.KeyStats(), float64(focus)/100)
-	}, o), nil
-}
