@@ -17,6 +17,9 @@ Fixed:
    for the new width, keeping what was typed and the time.
  - -adaptive -words - (the word list read from stdin) no longer fails with an
    empty word list.
+ - A file of recorded mistakes which can't be read is no longer replaced, losing
+   its mistakes: tt refuses to start until it is fixed or removed, as with the
+   saved results.
 
 # 1.1.0:
 

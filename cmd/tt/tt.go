@@ -71,6 +71,9 @@ func main() {
 	if err != nil {
 		die("%v", err)
 	}
+	if _, err := readMistakes(); err != nil {
+		die("%v", err)
+	}
 
 	testFn, kind, err := newTestGenerator(opts, os.Stdin, isatty.IsTerminal(os.Stdin.Fd()))
 	if err != nil {

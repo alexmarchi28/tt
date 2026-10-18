@@ -87,9 +87,11 @@ func TestPersistedResultFormat(t *testing.T) {
 func TestSaveMistakes(t *testing.T) {
 	useTempStorage(t)
 
-	saveMistakes([]mistake{{"alpha", "alpah"}})
-	saveMistakes(nil)
-	saveMistakes([]mistake{{"beta", "bteta"}, {"gamma", "gama_"}})
+	for _, m := range [][]mistake{{{"alpha", "alpah"}}, nil, {{"beta", "bteta"}, {"gamma", "gama_"}}} {
+		if err := saveMistakes(m); err != nil {
+			t.Fatal(err)
+		}
+	}
 
 	var got []mistake
 	if err := readValue(mistakeDB, &got); err != nil {
@@ -99,6 +101,23 @@ func TestSaveMistakes(t *testing.T) {
 	want := []mistake{{"alpha", "alpah"}, {"beta", "bteta"}, {"gamma", "gama_"}}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("stored mistakes = %v, want %v", got, want)
+	}
+}
+
+// A corrupt file of mistakes is reported rather than replaced, which would
+// lose the mistakes recorded so far.
+func TestSaveMistakesKeepsCorruptFile(t *testing.T) {
+	useTempStorage(t)
+	writeFile(t, mistakeDB, `[{"word":"old","typed":"odl"},`)
+
+	err := saveMistakes([]mistake{{"new", "nwe"}})
+
+	want := "could not read the recorded mistakes in " + mistakeDB + ": unexpected end of JSON input, fix or remove the file"
+	if err == nil || err.Error() != want {
+		t.Errorf("saveMistakes over a corrupt file: %v, want the error %q", err, want)
+	}
+	if b, _ := os.ReadFile(mistakeDB); string(b) != `[{"word":"old","typed":"odl"},` {
+		t.Errorf("the mistakes file was changed to %q", b)
 	}
 }
 

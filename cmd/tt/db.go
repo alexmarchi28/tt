@@ -148,23 +148,21 @@ func writePersistedResults(stored []persistedResult) error {
 func readMistakes() ([]mistake, error) {
 	var mistakes []mistake
 	if err := readValue(mistakeDB, &mistakes); err != nil && !os.IsNotExist(err) {
-		return nil, fmt.Errorf("could not read the recorded mistakes: %v", err)
+		return nil, fmt.Errorf("could not read the recorded mistakes in %s: %v, fix or remove the file", mistakeDB, err)
 	}
 
 	return mistakes, nil
 }
 
-func saveMistakes(mistakes []mistake) {
-	var db []mistake
-
-	if err := readValue(mistakeDB, &db); err != nil {
-		db = nil
+// saveMistakes adds mistakes to the recorded ones. A file which can't be read
+// is left as is rather than replaced, which would lose its mistakes.
+func saveMistakes(mistakes []mistake) error {
+	db, err := readMistakes()
+	if err != nil {
+		return err
 	}
 
-	db = append(db, mistakes...)
-	if err := writeValue(mistakeDB, db); err != nil {
-		panic(err)
-	}
+	return writeValue(mistakeDB, append(db, mistakes...))
 }
 
 // savePersistedResult adds r to the saved results and returns the ones saved

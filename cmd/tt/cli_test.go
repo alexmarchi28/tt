@@ -358,6 +358,20 @@ func TestCLIRefusesToStartWithCorruptResults(t *testing.T) {
 	}
 }
 
+func TestCLIRefusesToStartWithCorruptMistakes(t *testing.T) {
+	home := t.TempDir()
+	mistakes := filepath.Join(home, ".local", "share", "tt", ".errors")
+	writeFile(t, mistakes, `[{"word":"old",`)
+
+	// Checked before typing a test whose mistakes could not be saved.
+	got := runCLI(t, home, nil, "-n", "5")
+
+	want := "ERROR: could not read the recorded mistakes in " + mistakes + ": unexpected end of JSON input, fix or remove the file\n"
+	if got.code != 1 || got.stderr != want {
+		t.Errorf("tt with corrupt mistakes = %+v, want the error %q", got, want)
+	}
+}
+
 func TestCLIWithoutHome(t *testing.T) {
 	got := runCLI(t, "", nil, "-v")
 
