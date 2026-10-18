@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexmarchi28/tt/internal/textgen"
 	"github.com/alexmarchi28/tt/internal/typing"
 	"github.com/gdamore/tcell"
 )
@@ -141,7 +142,7 @@ type typed struct {
 
 // startTyper runs a test in the background; the outcome is delivered on the
 // returned channel once the typer returns.
-func startTyper(ty *typer, segments []segment, timeout time.Duration) <-chan typed {
+func startTyper(ty *typer, segments []textgen.Segment, timeout time.Duration) <-chan typed {
 	done := make(chan typed, 1)
 	go func() {
 		o, res := ty.Start(segments, timeout)
@@ -202,7 +203,7 @@ func waitOutcome(t *testing.T, done <-chan typed) typed {
 func typeText(t *testing.T, ty *typer, sim tcell.SimulationScreen, text string, items ...interface{}) typed {
 	t.Helper()
 
-	done := startTyper(ty, []segment{{text, ""}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: text}}, -1)
 	sendKeys(t, sim, items...)
 	return waitOutcome(t, done)
 }
@@ -402,7 +403,7 @@ func TestTyperResizeKeepsProgress(t *testing.T) {
 	clock := newFakeClock()
 	ty, sim := newTestTyper(t, withWrap(wrapAtScreenWidth), withFakeClock(clock))
 
-	done := startTyper(ty, []segment{{"alpha beta gamma delta", ""}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: "alpha beta gamma delta"}}, -1)
 	x, y := textOrigin(t, sim, "alpha beta gamma delta")
 
 	sendKeys(t, sim, "alpha bx")
@@ -428,7 +429,7 @@ func TestTyperResizeWithoutWrap(t *testing.T) {
 
 	ty, sim := newTestTyper(t)
 
-	done := startTyper(ty, []segment{{"alpha beta", ""}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: "alpha beta"}}, -1)
 	sendKeys(t, sim, "alpha")
 	resizeScreen(t, sim, 40, 10)
 	waitForScreenText(t, sim, "alpha beta", true)
@@ -442,7 +443,7 @@ func TestTyperWrapsEachSegmentAtTheCurrentWidth(t *testing.T) {
 
 	ty, sim := newTestTyper(t, withWrap(wrapAtScreenWidth))
 
-	done := startTyper(ty, []segment{{"ab", ""}, {"alpha beta gamma delta", ""}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: "ab"}, {Text: "alpha beta gamma delta"}}, -1)
 	waitForScreenText(t, sim, "ab", true)
 	resizeScreen(t, sim, 12, 25)
 	sendKeys(t, sim, "ab")
@@ -458,7 +459,7 @@ func TestTyperMultipleSegments(t *testing.T) {
 
 	ty, sim := newTestTyper(t)
 
-	done := startTyper(ty, []segment{{"ab cd", ""}, {"ef", ""}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: "ab cd"}, {Text: "ef"}}, -1)
 	sendKeys(t, sim, "ab cx", "ef")
 	got := waitOutcome(t, done)
 
@@ -466,7 +467,7 @@ func TestTyperMultipleSegments(t *testing.T) {
 		t.Errorf("got %+v, want outcome %d, 6 correct characters and mistakes [{cd cx}]", got, outcomeComplete)
 	}
 
-	done = startTyper(ty, []segment{{"ab", ""}, {"cd", ""}}, -1)
+	done = startTyper(ty, []textgen.Segment{{Text: "ab"}, {Text: "cd"}}, -1)
 	sendKeys(t, sim, "ab", "c", tcell.KeyEscape)
 	if got := waitOutcome(t, done); got.outcome != outcomeRestart {
 		t.Errorf("outcome = %d, want %d", got.outcome, outcomeRestart)
@@ -479,7 +480,7 @@ func TestTyperTimeout(t *testing.T) {
 	clock := newFakeClock()
 	ty, sim := newTestTyper(t, withFakeClock(clock))
 
-	done := startTyper(ty, []segment{{"alpha beta", ""}}, 10*time.Second)
+	done := startTyper(ty, []textgen.Segment{{Text: "alpha beta"}}, 10*time.Second)
 	x, y := textOrigin(t, sim, "alpha beta")
 
 	sendKeys(t, sim, "alx")
@@ -499,7 +500,7 @@ func TestTyperTimeoutIgnoresLateKeys(t *testing.T) {
 	clock := newFakeClock()
 	ty, sim := newTestTyper(t, withFakeClock(clock))
 
-	done := startTyper(ty, []segment{{"abcd", ""}}, 10*time.Second)
+	done := startTyper(ty, []textgen.Segment{{Text: "abcd"}}, 10*time.Second)
 	x, y := textOrigin(t, sim, "abcd")
 
 	sendKeys(t, sim, "a")
@@ -525,7 +526,7 @@ func TestTyperTimeoutSpansSegments(t *testing.T) {
 
 	// The time spent on the first segment is subtracted from the time
 	// available for the second one.
-	done := startTyper(ty, []segment{{"ab", ""}, {"cd ef", ""}}, 10*time.Second)
+	done := startTyper(ty, []textgen.Segment{{Text: "ab"}, {Text: "cd ef"}}, 10*time.Second)
 	x, y := textOrigin(t, sim, "ab")
 
 	sendKeys(t, sim, "a")
@@ -553,7 +554,7 @@ func TestTyperTimerStartsOnFirstKey(t *testing.T) {
 	var frames frameCounter
 	ty, sim := newTestTyper(t, withFakeClock(clock), frames.option())
 
-	done := startTyper(ty, []segment{{"ab", ""}}, 2*time.Second)
+	done := startTyper(ty, []textgen.Segment{{Text: "ab"}}, 2*time.Second)
 	textOrigin(t, sim, "ab")
 
 	// Time passing before the first key doesn't count.
@@ -641,7 +642,7 @@ func TestTyperColors(t *testing.T) {
 
 	ty, sim := newTestTyper(t, withRules(typingRules{noSkip: true}))
 
-	done := startTyper(ty, []segment{{"ab cd ef", ""}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: "ab cd ef"}}, -1)
 	x, y := textOrigin(t, sim, "ab cd ef")
 
 	def := cellWant{testFg, testBg, false}
@@ -690,7 +691,7 @@ func TestTyperHighlightModes(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			ty, sim := newTestTyperWithView(t, viewOptions{bold: true, highlightCurrent: tc.highlightCurrent, highlightNext: tc.highlightNext})
 
-			done := startTyper(ty, []segment{{"ab cd ef", ""}}, -1)
+			done := startTyper(ty, []textgen.Segment{{Text: "ab cd ef"}}, -1)
 			x, y := textOrigin(t, sim, "ab cd ef")
 
 			waitForColors(t, sim, x, y, map[int]cellWant{
@@ -714,7 +715,7 @@ func TestTyperSetThemeWhileTyping(t *testing.T) {
 		return "custom", nil
 	}))
 
-	done := startTyper(ty, []segment{{"ab cd", ""}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: "ab cd"}}, -1)
 	x, y := textOrigin(t, sim, "ab cd")
 
 	sendKeys(t, sim, "x", tcell.KeyCtrlN)
@@ -740,7 +741,7 @@ func TestTyperCycleTheme(t *testing.T) {
 		return "", fmt.Errorf("no valid themes available")
 	}))
 
-	done := startTyper(ty, []segment{{"ab", ""}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: "ab"}}, -1)
 
 	sendKeys(t, sim, tcell.KeyCtrlN)
 	waitForScreenText(t, sim, "Theme: nord", true)
@@ -766,7 +767,7 @@ func TestTyperShowsAttribution(t *testing.T) {
 
 	ty, sim := newTestTyper(t)
 
-	done := startTyper(ty, []segment{{"some quote text", "- Someone"}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: "some quote text", Attribution: "- Someone"}}, -1)
 	waitForScreenText(t, sim, "- Someone", true)
 
 	sendKeys(t, sim, tcell.KeyEscape)
@@ -779,7 +780,7 @@ func TestTyperShowsLiveStats(t *testing.T) {
 	clock := newFakeClock()
 	ty, sim := newTestTyperWithView(t, viewOptions{bold: true, highlightCurrent: true, highlightNext: true, showWpm: true, showAccuracy: true}, withFakeClock(clock))
 
-	done := startTyper(ty, []segment{{"ab cd ef", ""}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: "ab cd ef"}}, -1)
 	x, y := textOrigin(t, sim, "ab cd ef")
 	if strings.Contains(simulationScreenText(sim), "WPM:") {
 		t.Error("WPM shown before the test started")
@@ -795,7 +796,7 @@ func TestTyperShowsLiveStats(t *testing.T) {
 	sendKeys(t, sim, tcell.KeyEscape)
 	waitOutcome(t, done)
 
-	done = startTyper(ty, []segment{{"ab cd ef", ""}}, -1)
+	done = startTyper(ty, []textgen.Segment{{Text: "ab cd ef"}}, -1)
 	sendKeys(t, sim, "ab")
 	waitForColors(t, sim, x, y, map[int]cellWant{1: {testHi, testBg, true}})
 	clock.advance(time.Second)
@@ -810,7 +811,7 @@ func TestTyperCountsKeystrokesOfAllSegments(t *testing.T) {
 
 	ty, sim := newTestTyper(t)
 
-	done := startTyper(ty, []segment{{"ab", ""}, {"cd", ""}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: "ab"}, {Text: "cd"}}, -1)
 	sendKeys(t, sim, "xb", "cd")
 
 	assertOutcome(t, waitOutcome(t, done), outcomeComplete, 3, 3, 1, []typing.Mistake{{Word: "ab", Typed: "xb"}})
@@ -841,7 +842,7 @@ func TestTyperLiveAccuracyWithoutKeystrokes(t *testing.T) {
 
 	ty, sim := newTestTyperWithView(t, viewOptions{bold: true, highlightCurrent: true, highlightNext: true, showAccuracy: true})
 
-	done := startTyper(ty, []segment{{"ab cd", ""}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: "ab cd"}}, -1)
 	sendKeys(t, sim, " ")
 	waitForScreenText(t, sim, "Accuracy: 0.00%", true)
 
@@ -866,7 +867,7 @@ func TestTyperTypingQuestionMarkDoesNotToggleHelp(t *testing.T) {
 
 	ty, sim := newTestTyper(t)
 
-	done := startTyper(ty, []segment{{"why? because", ""}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: "why? because"}}, -1)
 	x, y := textOrigin(t, sim, "why? because")
 
 	sendKeys(t, sim, "why?")
@@ -931,7 +932,7 @@ func TestTyperDrawsTabs(t *testing.T) {
 
 	ty, sim := newTestTyper(t, withRules(typingRules{noSkip: true}))
 
-	done := startTyper(ty, []segment{{"ab\n\tcd", ""}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: "ab\n\tcd"}}, -1)
 	x, y := textOrigin(t, sim, "ab")
 
 	// A tab takes tabWidth cells, the text is centered accordingly.
@@ -962,7 +963,7 @@ func TestTyperBlind(t *testing.T) {
 
 	ty, sim := newTestTyperWithView(t, viewOptions{bold: true, highlightCurrent: true, highlightNext: true, blind: true}, withRules(typingRules{noSkip: true}))
 
-	done := startTyper(ty, []segment{{"ab cd ef", ""}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: "ab cd ef"}}, -1)
 	x, y := textOrigin(t, sim, "ab cd ef")
 
 	// Mistakes look like correctly typed characters.
@@ -1015,7 +1016,7 @@ func TestTyperMeasuresTimeWithItsClock(t *testing.T) {
 	clock := newFakeClock()
 	ty, sim := newTestTyper(t, withFakeClock(clock))
 
-	done := startTyper(ty, []segment{{"abcde", ""}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: "abcde"}}, -1)
 	x, y := textOrigin(t, sim, "abcde")
 
 	// The time starts with the first key.
@@ -1059,7 +1060,7 @@ func TestTyperPacer(t *testing.T) {
 	var frames frameCounter
 	ty, sim := newTestTyper(t, withPace(60), withFakeClock(clock), frames.option())
 
-	done := startTyper(ty, []segment{{"abcdefghij", ""}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: "abcdefghij"}}, -1)
 	x, y := textOrigin(t, sim, "abcdefghij")
 
 	// The pacer starts with the test.
@@ -1091,7 +1092,7 @@ func TestTyperWithoutPacer(t *testing.T) {
 	var frames frameCounter
 	ty, sim := newTestTyper(t, withFakeClock(clock), frames.option())
 
-	done := startTyper(ty, []segment{{"abcdefghij", ""}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: "abcdefghij"}}, -1)
 	x, y := textOrigin(t, sim, "abcdefghij")
 
 	sendKeys(t, sim, "a")
@@ -1129,7 +1130,7 @@ func TestTyperRecordsKeystrokes(t *testing.T) {
 	clock := newFakeClock()
 	ty, sim := newTestTyper(t, withFakeClock(clock))
 
-	done := startTyper(ty, []segment{{"ab", ""}, {"c", ""}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: "ab"}, {Text: "c"}}, -1)
 	x, y := textOrigin(t, sim, "ab")
 
 	sendKeys(t, sim, "a")
@@ -1204,7 +1205,7 @@ func TestTyperStopsTickingWithTheTest(t *testing.T) {
 
 	done := make(chan struct{})
 	go func() {
-		ty.Start([]segment{{"ab", ""}}, -1)
+		ty.Start([]textgen.Segment{{Text: "ab"}}, -1)
 		close(done)
 	}()
 
@@ -1256,7 +1257,7 @@ func TestTyperFrameHook(t *testing.T) {
 		}
 	}))
 
-	done := startTyper(ty, []segment{{"ab", ""}}, -1)
+	done := startTyper(ty, []textgen.Segment{{Text: "ab"}}, -1)
 	sendKeys(t, sim, "a")
 
 	deadline := time.After(testWait)

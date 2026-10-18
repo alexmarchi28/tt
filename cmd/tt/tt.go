@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/alexmarchi28/tt/internal/resource"
+	"github.com/alexmarchi28/tt/internal/stats"
+	"github.com/alexmarchi28/tt/internal/store"
 	"github.com/gdamore/tcell"
 	"github.com/mattn/go-isatty"
 )
@@ -80,7 +82,7 @@ func run(args []string, env environment) int {
 		return fail(env.stderr, errors.New("could not resolve the home directory"))
 	}
 	deps := dependencies{
-		store:     newJSONStore(env.getenv, home),
+		store:     store.New(env.getenv, home),
 		resources: resource.New(home, env.stdin),
 		rng:       rand.New(rand.NewSource(env.now().UnixNano())),
 	}
@@ -108,7 +110,7 @@ func fail(stderr io.Writer, err error) int {
 
 // dependencies are what tt works with besides the environment.
 type dependencies struct {
-	store     store
+	store     dataStore
 	resources resourceLister
 	rng       *rand.Rand
 }
@@ -183,7 +185,7 @@ func runTests(s settings, env environment, deps dependencies) (int, error) {
 	}
 
 	if s.rules.paceTarget != "" {
-		if s.rules.pace, err = paceFromResults(s.rules.paceTarget, stored, s.source.kind); err != nil {
+		if s.rules.pace, err = stats.Pace(s.rules.paceTarget, stored, s.source.kind); err != nil {
 			return 0, err
 		}
 	}

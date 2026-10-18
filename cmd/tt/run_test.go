@@ -5,10 +5,13 @@ import (
 	"errors"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/alexmarchi28/tt/internal/history"
+	"github.com/alexmarchi28/tt/internal/store"
 	"github.com/gdamore/tcell"
 )
 
@@ -73,10 +76,10 @@ func (r *testRun) environment(text string) environment {
 }
 
 // store returns the store of the run.
-func (r *testRun) store(t *testing.T) *jsonStore {
+func (r *testRun) store(t *testing.T) *store.JSON {
 	t.Helper()
 
-	return newJSONStore(func(string) string { return "" }, r.home)
+	return store.New(func(string) string { return "" }, r.home)
 }
 
 // startRun runs tt in the background with the given stdin text and
@@ -148,7 +151,7 @@ func TestRunTypesTests(t *testing.T) {
 	}
 
 	stored, err := r.store(t).Results()
-	if err != nil || len(stored) != 1 || stored[0].Mode != modeText {
+	if err != nil || len(stored) != 1 || stored[0].Mode != history.ModeText {
 		t.Errorf("saved results = %+v, %v, want the text test", stored, err)
 	}
 }
@@ -199,7 +202,7 @@ func TestRunReportsSaveErrors(t *testing.T) {
 	r, done := startRun(t, "hi", "-noreport", "-csv")
 
 	// A directory can't be replaced by the file of the key statistics.
-	if err := os.MkdirAll(r.store(t).path(keyStatsFile), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(r.home, ".local", "share", "tt", ".keys"), 0700); err != nil {
 		t.Fatal(err)
 	}
 

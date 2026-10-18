@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/alexmarchi28/tt/internal/history"
 	"github.com/alexmarchi28/tt/internal/resource"
+	"github.com/alexmarchi28/tt/internal/textgen"
 	"github.com/alexmarchi28/tt/internal/typing"
 	"github.com/gdamore/tcell"
 )
@@ -17,7 +19,7 @@ func newTestApp(t *testing.T, s settings) (*app, tcell.SimulationScreen) {
 	res, _ := newTestResources(t)
 	sim := newSimScreen(t)
 
-	s.source.kind = testKind{Mode: "words", Source: "test"}
+	s.source.kind = history.Kind{Mode: "words", Source: "test"}
 	a, err := newApp(sim, s, appDeps{newTestStore(t), res, time.Now, keptCursor{}})
 	if err != nil {
 		t.Fatal(err)
@@ -28,24 +30,24 @@ func newTestApp(t *testing.T, s settings) (*app, tcell.SimulationScreen) {
 
 // testSequence returns a test generator producing the given texts, one test
 // each, and then nil. The number of calls is stored in calls.
-func testSequence(calls *int, texts ...string) func() []segment {
-	return func() []segment {
+func testSequence(calls *int, texts ...string) func() []textgen.Segment {
+	return func() []textgen.Segment {
 		*calls++
 		if *calls > len(texts) {
 			return nil
 		}
 
-		return []segment{{texts[*calls-1], ""}}
+		return []textgen.Segment{{Text: texts[*calls-1]}}
 	}
 }
 
-func startApp(a *app, testFn func() []segment) <-chan int {
-	return startSource(a, funcSource(testFn))
+func startApp(a *app, testFn func() []textgen.Segment) <-chan int {
+	return startSource(a, textgen.Func(testFn))
 }
 
 // startSource runs the app in the background on the tests of src. The exit
 // code is delivered on the returned channel, -1 for an error.
-func startSource(a *app, src testSource) <-chan int {
+func startSource(a *app, src textgen.Source) <-chan int {
 	done := make(chan int, 1)
 	go func() {
 		rc, err := a.run(src)
@@ -76,7 +78,7 @@ func TestAppRecordsCompletedTests(t *testing.T) {
 	opts := resolveFlags(nil)
 	opts.output.noReport = true
 	a, sim := newTestApp(t, opts)
-	a.kind = testKind{Mode: "words", Source: "test", Seconds: 30, Punct: true}
+	a.kind = history.Kind{Mode: "words", Source: "test", Seconds: 30, Punct: true}
 
 	var calls int
 	done := startApp(a, testSequence(&calls, "ab", "cd"))
@@ -95,7 +97,7 @@ func TestAppRecordsCompletedTests(t *testing.T) {
 		t.Fatalf("persisted results = %+v (%v), want 2", stored, err)
 	}
 	for _, r := range stored {
-		if r.testKind != a.kind || r.Duration <= 0 || r.Duration > 5 {
+		if r.Kind != a.kind || r.Duration <= 0 || r.Duration > 5 {
 			t.Errorf("persisted result %+v, want the kind of test and its duration", r)
 		}
 	}
@@ -174,9 +176,9 @@ func TestAppReport(t *testing.T) {
 	a, sim := newTestApp(t, resolveFlags(nil))
 
 	var calls int
-	done := startApp(a, func() []segment {
+	done := startApp(a, func() []textgen.Segment {
 		calls++
-		return []segment{{"ab cd", "Someone"}}
+		return []textgen.Segment{{Text: "ab cd", Attribution: "Someone"}}
 	})
 
 	sendKeys(t, sim, "xb cd")
@@ -326,21 +328,23 @@ func TestAppReportsPersonalBest(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		previous []persistedResult
+		previous []history.Result
 		want     bool
 	}{
 		{"first test", nil, false},
-		{"beaten", []persistedResult{{Wpm: 1, testKind: testKind{Mode: "words", Source: "test"}}}, true},
-		{"not beaten", []persistedResult{{Wpm: 1_000_000_000, testKind: testKind{Mode: "words", Source: "test"}}}, false},
-		{"other kind of test", []persistedResult{{Wpm: 1, testKind: testKind{Mode: "quotes", Source: "en"}}}, false},
-		{"other variant of the test", []persistedResult{{Wpm: 1, testKind: testKind{Mode: "words", Source: "test", Punct: true}}}, false},
+		{"beaten", []history.Result{{Wpm: 1, Kind: history.Kind{Mode: "words", Source: "test"}}}, true},
+		{"not beaten", []history.Result{{Wpm: 1_000_000_000, Kind: history.Kind{Mode: "words", Source: "test"}}}, false},
+		{"other kind of test", []history.Result{{Wpm: 1, Kind: history.Kind{Mode: "quotes", Source: "en"}}}, false},
+		{"other variant of the test", []history.Result{{Wpm: 1, Kind: history.Kind{Mode: "words", Source: "test", Punct: true}}}, false},
 	}
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			a, sim := newTestApp(t, resolveFlags(nil))
-			if err := writeValue(a.store.(*jsonStore).path(resultsFile), tc.previous); err != nil {
-				t.Fatal(err)
+			for _, r := range tc.previous {
+				if _, err := a.store.AddResult(r); err != nil {
+					t.Fatal(err)
+				}
 			}
 
 			var calls int
@@ -398,7 +402,7 @@ func TestAppReportsCompletedTests(t *testing.T) {
 	rep := &fakeReporter{quitAt: 2}
 	a.reporter = rep
 
-	done := startApp(a, func() []segment { return []segment{{"ab", "Someone"}} })
+	done := startApp(a, func() []textgen.Segment { return []textgen.Segment{{Text: "ab", Attribution: "Someone"}} })
 	sendKeys(t, sim, "ab", "ab")
 
 	if rc := waitExitCode(t, done); rc != 1 {

@@ -7,6 +7,8 @@ import (
 	"io"
 	"strconv"
 	"strings"
+
+	"github.com/alexmarchi28/tt/internal/history"
 )
 
 // exporters print each kind of saved data as CSV, or as JSON, see -export.
@@ -55,19 +57,19 @@ func exportResults(w io.Writer, st historyStore, asJSON bool) error {
 // resultColumns are the columns of the results exported as CSV.
 var resultColumns = []struct {
 	name  string
-	value func(r persistedResult) string
+	value func(r history.Result) string
 }{
-	{"timestamp", func(r persistedResult) string { return strconv.FormatInt(r.Timestamp, 10) }},
-	{"wpm", func(r persistedResult) string { return strconv.Itoa(r.Wpm) }},
-	{"accuracy", func(r persistedResult) string { return strconv.FormatFloat(r.Accuracy, 'f', 2, 64) }},
-	{"duration", func(r persistedResult) string { return strconv.FormatFloat(r.Duration, 'f', 2, 64) }},
-	{"mode", func(r persistedResult) string { return r.Mode }},
-	{"source", func(r persistedResult) string { return r.Source }},
-	{"seconds", func(r persistedResult) string { return strconv.Itoa(r.Seconds) }},
-	{"words", func(r persistedResult) string { return strconv.Itoa(r.Words) }},
-	{"punct", func(r persistedResult) string { return strconv.FormatBool(r.Punct) }},
-	{"numbers", func(r persistedResult) string { return strconv.FormatBool(r.Numbers) }},
-	{"focus", func(r persistedResult) string { return strconv.Itoa(r.Focus) }},
+	{"timestamp", func(r history.Result) string { return strconv.FormatInt(r.Timestamp, 10) }},
+	{"wpm", func(r history.Result) string { return strconv.Itoa(r.Wpm) }},
+	{"accuracy", func(r history.Result) string { return strconv.FormatFloat(r.Accuracy, 'f', 2, 64) }},
+	{"duration", func(r history.Result) string { return strconv.FormatFloat(r.Duration, 'f', 2, 64) }},
+	{"mode", func(r history.Result) string { return r.Mode }},
+	{"source", func(r history.Result) string { return r.Source }},
+	{"seconds", func(r history.Result) string { return strconv.Itoa(r.Seconds) }},
+	{"words", func(r history.Result) string { return strconv.Itoa(r.Words) }},
+	{"punct", func(r history.Result) string { return strconv.FormatBool(r.Punct) }},
+	{"numbers", func(r history.Result) string { return strconv.FormatBool(r.Numbers) }},
+	{"focus", func(r history.Result) string { return strconv.Itoa(r.Focus) }},
 }
 
 func exportMistakes(w io.Writer, st historyStore, asJSON bool) error {

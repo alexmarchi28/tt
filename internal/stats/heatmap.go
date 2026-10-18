@@ -1,8 +1,7 @@
-package main
+package stats
 
 import (
 	"fmt"
-	"io"
 	"math"
 	"sort"
 	"strings"
@@ -133,9 +132,9 @@ func keyLabel(r rune) string {
 	}
 }
 
-// formatKeys describes how accurately and quickly each key is typed on a
+// FormatKeys describes how accurately and quickly each key is typed on a
 // keyboard with the given rows.
-func formatKeys(ks keystats.Stats, rows []string, color bool) string {
+func FormatKeys(ks keystats.Stats, rows []string, color bool) string {
 	accuracy, speed := map[rune]float64{}, map[rune]float64{}
 	for r, s := range keyStatsByKey(ks) {
 		if s.Count >= minKeyCount {
@@ -180,8 +179,8 @@ func formatKeys(ks keystats.Stats, rows []string, color bool) string {
 	return b.String()
 }
 
-// keyboardLayout returns the rows of the named keyboard layout, see layouts.
-func keyboardLayout(name string) ([]string, error) {
+// KeyboardLayout returns the rows of the named keyboard layout, see layouts.
+func KeyboardLayout(name string) ([]string, error) {
 	rows, ok := layouts[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown layout %s, use one of: %s", name, strings.Join(sortedKeys(layouts), ", "))
@@ -190,19 +189,13 @@ func keyboardLayout(name string) ([]string, error) {
 	return rows, nil
 }
 
-// printKeys prints how each key is typed on the given keyboard layout.
-func printKeys(w io.Writer, st keyStatsStore, layout string, color bool) error {
-	rows, err := keyboardLayout(layout)
-	if err != nil {
-		return err
+// sortedKeys returns the keys of m in order.
+func sortedKeys[V any](m map[string]V) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
 	}
+	sort.Strings(keys)
 
-	ks := st.KeyStats()
-	if len(ks.Chars) == 0 {
-		_, err := fmt.Fprintln(w, "No keystrokes recorded yet.")
-		return err
-	}
-
-	_, err = fmt.Fprint(w, formatKeys(ks, rows, color))
-	return err
+	return keys
 }

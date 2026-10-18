@@ -1,4 +1,4 @@
-package main
+package textgen
 
 import (
 	"math"
@@ -9,14 +9,14 @@ import (
 
 	"github.com/alexmarchi28/tt/internal/keystats"
 	"github.com/alexmarchi28/tt/internal/typing"
-	"github.com/gdamore/tcell"
 )
 
 // keyStatsOf is a store of the given key statistics, which ignores new
 // keystrokes.
 type keyStatsOf keystats.Stats
 
-func (k keyStatsOf) KeyStats() keystats.Stats               { return keystats.Stats(k) }
+func (k keyStatsOf) KeyStats() keystats.Stats { return keystats.Stats(k) }
+
 func (keyStatsOf) AddKeystrokes(_ []typing.Keystroke) error { return nil }
 
 // weakTH returns statistics where "th" is typed badly and "he" and "er" well.
@@ -79,7 +79,7 @@ func TestGenerateAdaptiveTestFavoursWeakWords(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "list", "the her err rare")
 
-	got := drawShares(t, nextFunc(t, mustSource(newAdaptiveSource(newRand(), res, "list", wordOptions{n: 100, g: 4}, 0, keyStatsOf(weakTH())))))
+	got := drawShares(t, nextFunc(t, mustSource(NewAdaptive(newRand(), res, "list", WordOptions{N: 100, G: 4}, 0, keyStatsOf(weakTH())))))
 
 	// Uniformly drawn every word would make a quarter of the test.
 	for _, w := range []string{"her", "err", "rare"} {
@@ -95,7 +95,7 @@ func TestGenerateAdaptiveTestWithoutStatistics(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "list", "the her err rare")
 
-	got := drawShares(t, nextFunc(t, mustSource(newAdaptiveSource(newRand(), res, "list", wordOptions{n: 100, g: 4}, 40, keyStatsOf(keystats.New())))))
+	got := drawShares(t, nextFunc(t, mustSource(NewAdaptive(newRand(), res, "list", WordOptions{N: 100, G: 4}, 40, keyStatsOf(keystats.New())))))
 
 	for _, w := range []string{"the", "her", "err", "rare"} {
 		if got[w] < 0.18 || got[w] > 0.32 {
@@ -113,7 +113,7 @@ func thShare(t *testing.T, focus int) float64 {
 	writeUserResource(t, dir, "words", "list", "the this that them then ab cd fg ij kl mn op qu vw xz ac bd ce df eg")
 
 	share := 0.0
-	for w, s := range drawShares(t, nextFunc(t, mustSource(newAdaptiveSource(newRand(), res, "list", wordOptions{n: 100, g: 4}, focus, keyStatsOf(weakTH()))))) {
+	for w, s := range drawShares(t, nextFunc(t, mustSource(NewAdaptive(newRand(), res, "list", WordOptions{N: 100, G: 4}, focus, keyStatsOf(weakTH()))))) {
 		if strings.Contains(w, "th") {
 			share += s
 		}
@@ -149,16 +149,16 @@ func TestGenerateAdaptiveTestFocusOnASingleWord(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "list", "the ab cd")
 
-	src := mustSource(newAdaptiveSource(newRand(), res, "list", wordOptions{n: 4, g: 1}, 100, keyStatsOf(weakTH())))
-	done := make(chan []segment, 1)
+	src := mustSource(NewAdaptive(newRand(), res, "list", WordOptions{N: 4, G: 1}, 100, keyStatsOf(weakTH())))
+	done := make(chan []Segment, 1)
 	go func() {
-		test, _ := src.next()
+		test, _ := src.Next()
 		done <- test
 	}()
 
 	select {
 	case got := <-done:
-		if want := []segment{{"the the the the", ""}}; !reflect.DeepEqual(got, want) {
+		if want := []Segment{{"the the the the", ""}}; !reflect.DeepEqual(got, want) {
 			t.Errorf("got %q, want %q", got, want)
 		}
 	case <-time.After(time.Second):
@@ -167,7 +167,7 @@ func TestGenerateAdaptiveTestFocusOnASingleWord(t *testing.T) {
 }
 
 // drawShares returns the share of each word in 10 tests made by gen.
-func drawShares(t *testing.T, gen func() []segment) map[string]float64 {
+func drawShares(t *testing.T, gen func() []Segment) map[string]float64 {
 	t.Helper()
 
 	counts, total := map[string]float64{}, 0.0
@@ -185,34 +185,4 @@ func drawShares(t *testing.T, gen func() []segment) map[string]float64 {
 	}
 
 	return counts
-}
-
-func TestAppShowsAdaptiveFocus(t *testing.T) {
-	t.Parallel()
-
-	res, dir := newTestResources(t)
-	writeUserResource(t, dir, "words", "list", "the her err rare")
-	src := mustSource(newAdaptiveSource(newRand(), res, "list", wordOptions{n: 5, g: 1}, 40, keyStatsOf(weakTH())))
-
-	a, sim := newTestApp(t, resolveFlags([]string{"-noreport"}))
-	done := startSource(a, src)
-	waitForScreenText(t, sim, "Practicing th", true)
-
-	sendKeys(t, sim, tcell.KeyCtrlC)
-	waitExitCode(t, done)
-}
-
-func TestAdaptiveWordListFromStdin(t *testing.T) {
-	t.Parallel()
-
-	res, _ := newTestResourcesWithStdin(t, "alpha")
-	s := resolveFlags([]string{"-adaptive", "-words", "-", "-n", "3"})
-
-	src, err := newTestSource(s.source, textSources{&memStore{}, res, newRand(), strings.NewReader("")})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if got := nextTest(t, src); !reflect.DeepEqual(got, []segment{{"alpha alpha alpha", ""}}) {
-		t.Errorf("next() = %q, want the words read from stdin", got)
-	}
 }

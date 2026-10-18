@@ -4,6 +4,9 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/alexmarchi28/tt/internal/history"
+	"github.com/alexmarchi28/tt/internal/textgen"
 )
 
 // resolveFlags resolves command line arguments known to be valid, stdin
@@ -26,19 +29,19 @@ func TestResolveMode(t *testing.T) {
 		name            string
 		args            []string
 		stdinIsTerminal bool
-		kind            testKind
+		kind            history.Kind
 		path            string
 	}{
-		{"default", nil, true, testKind{Mode: "words", Source: "1000en", Words: 50}, "1000en"},
-		{"word list", []string{"-words", "dir/200en"}, true, testKind{Mode: "words", Source: "200en", Words: 50}, "dir/200en"},
-		{"quotes", []string{"-quotes", "en"}, true, testKind{Mode: "quotes", Source: "en"}, "en"},
-		{"mistakes", []string{"-mistakes"}, true, testKind{Mode: "mistakes", Words: 50}, ""},
-		{"adaptive", []string{"-adaptive"}, true, testKind{Mode: "adaptive", Source: "1000en", Words: 50, Focus: 40}, "1000en"},
-		{"adaptive word list", []string{"-adaptive", "-words", "200en"}, true, testKind{Mode: "adaptive", Source: "200en", Words: 50, Focus: 40}, "200en"},
-		{"file", []string{"dir/book.txt"}, true, testKind{Mode: "file", Source: "book.txt"}, "dir/book.txt"},
-		{"stdin", nil, false, testKind{Mode: "text"}, ""},
-		{"file over stdin", []string{"book.txt"}, false, testKind{Mode: "file", Source: "book.txt"}, "book.txt"},
-		{"quotes over stdin", []string{"-quotes", "en"}, false, testKind{Mode: "quotes", Source: "en"}, "en"},
+		{"default", nil, true, history.Kind{Mode: "words", Source: "1000en", Words: 50}, "1000en"},
+		{"word list", []string{"-words", "dir/200en"}, true, history.Kind{Mode: "words", Source: "200en", Words: 50}, "dir/200en"},
+		{"quotes", []string{"-quotes", "en"}, true, history.Kind{Mode: "quotes", Source: "en"}, "en"},
+		{"mistakes", []string{"-mistakes"}, true, history.Kind{Mode: "mistakes", Words: 50}, ""},
+		{"adaptive", []string{"-adaptive"}, true, history.Kind{Mode: "adaptive", Source: "1000en", Words: 50, Focus: 40}, "1000en"},
+		{"adaptive word list", []string{"-adaptive", "-words", "200en"}, true, history.Kind{Mode: "adaptive", Source: "200en", Words: 50, Focus: 40}, "200en"},
+		{"file", []string{"dir/book.txt"}, true, history.Kind{Mode: "file", Source: "book.txt"}, "dir/book.txt"},
+		{"stdin", nil, false, history.Kind{Mode: "text"}, ""},
+		{"file over stdin", []string{"book.txt"}, false, history.Kind{Mode: "file", Source: "book.txt"}, "book.txt"},
+		{"quotes over stdin", []string{"-quotes", "en"}, false, history.Kind{Mode: "quotes", Source: "en"}, "en"},
 	}
 
 	for _, tc := range tests {
@@ -158,7 +161,7 @@ func TestResolveGroups(t *testing.T) {
 		t.Errorf("output = %+v, want %+v", s.output, want)
 	}
 
-	wantWords := wordOptions{n: 5, g: 2, punctuation: true, numbers: true, minChars: 30 * fastestCpm / 60}
+	wantWords := textgen.WordOptions{N: 5, G: 2, Punctuation: true, Numbers: true, MinChars: 30 * fastestCpm / 60}
 	if s.source.words != wantWords {
 		t.Errorf("words = %+v, want %+v", s.source.words, wantWords)
 	}

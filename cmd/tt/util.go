@@ -9,24 +9,6 @@ import (
 	"github.com/mattn/go-runewidth"
 )
 
-// blankLines matches the blank lines separating paragraphs.
-var blankLines = regexp.MustCompile("\n\n+")
-
-// getParagraphs returns the paragraphs of s which aren't blank.
-func getParagraphs(s string) []string {
-	s = strings.Replace(s, "\r", "", -1)
-	s = blankLines.ReplaceAllString(s, "\n\n")
-
-	var paragraphs []string
-	for _, p := range strings.Split(strings.Trim(s, "\n"), "\n\n") {
-		if strings.TrimSpace(p) != "" {
-			paragraphs = append(paragraphs, p)
-		}
-	}
-
-	return paragraphs
-}
-
 func wordWrapRunes(s []rune, n int) {
 	sp := 0
 	sz := 0

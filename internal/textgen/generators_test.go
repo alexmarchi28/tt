@@ -1,4 +1,4 @@
-package main
+package textgen
 
 import (
 	"encoding/json"
@@ -23,7 +23,7 @@ func TestGenerateTestFromDataRaw(t *testing.T) {
 	gen := mustGen(generateTestFromData([]byte("one\n\ntwo  three\n"), true, false))
 
 	for i := 0; i < 2; i++ {
-		want := []segment{{"one\n\ntwo  three\n", ""}}
+		want := []Segment{{"one\n\ntwo  three\n", ""}}
 		if got := gen(); !reflect.DeepEqual(got, want) {
 			t.Fatalf("call %d: got %q, want %q", i, got, want)
 		}
@@ -35,7 +35,7 @@ func TestGenerateTestFromDataMulti(t *testing.T) {
 
 	gen := mustGen(generateTestFromData([]byte("one\n\ntwo\nthree\n"), false, true))
 
-	for _, want := range [][]segment{{{"one", ""}}, {{"two\nthree", ""}}, nil, nil} {
+	for _, want := range [][]Segment{{{"one", ""}}, {{"two\nthree", ""}}, nil, nil} {
 		if got := gen(); !reflect.DeepEqual(got, want) {
 			t.Fatalf("got %q, want %q", got, want)
 		}
@@ -47,7 +47,7 @@ func TestGenerateTestFromDataParagraphs(t *testing.T) {
 
 	gen := mustGen(generateTestFromData([]byte("one\n\ntwo\nthree\n"), false, false))
 
-	want := []segment{{"one", ""}, {"two\nthree", ""}}
+	want := []Segment{{"one", ""}, {"two\nthree", ""}}
 	for i := 0; i < 2; i++ {
 		if got := gen(); !reflect.DeepEqual(got, want) {
 			t.Fatalf("call %d: got %q, want %q", i, got, want)
@@ -61,7 +61,7 @@ func TestGenerateWordTest(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "greek", "alpha beta\tgamma\ndelta")
 
-	gen := mustGen(generateWordTest(newRand(), res, "greek", wordOptions{n: 3, g: 2}))
+	gen := mustGen(generateWordTest(newRand(), res, "greek", WordOptions{N: 3, G: 2}))
 	allowed := map[string]bool{"alpha": true, "beta": true, "gamma": true, "delta": true}
 
 	for i := 0; i < 20; i++ {
@@ -93,7 +93,7 @@ func TestGenerateWordTestUsesBuiltinLists(t *testing.T) {
 
 	res, _ := newTestResources(t)
 
-	gen := mustGen(generateWordTest(newRand(), res, "1000en", wordOptions{n: 50, g: 1}))
+	gen := mustGen(generateWordTest(newRand(), res, "1000en", WordOptions{N: 50, G: 1}))
 	for i := 0; i < 100; i++ {
 		segments := gen()
 		if len(segments) != 1 {
@@ -109,7 +109,7 @@ func TestGenerateWordTestIgnoresBlankEntries(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "blanks", "\n  alpha beta\n\ngamma\t\n")
 
-	gen := mustGen(generateWordTest(newRand(), res, "blanks", wordOptions{n: 10, g: 1}))
+	gen := mustGen(generateWordTest(newRand(), res, "blanks", WordOptions{N: 10, G: 1}))
 	for i := 0; i < 100; i++ {
 		assertWords(t, gen()[0].Text, 10)
 	}
@@ -150,7 +150,7 @@ func TestGenerateQuoteTest(t *testing.T) {
 		}
 
 		switch got[0] {
-		case segment{"first quote", "someone"}, segment{"second quote", "someone else"}:
+		case Segment{"first quote", "someone"}, Segment{"second quote", "someone else"}:
 			seen[got[0].Text] = true
 		default:
 			t.Fatalf("unexpected quote %q", got[0])
@@ -175,7 +175,7 @@ func TestBuiltinQuotesAreValid(t *testing.T) {
 	}
 
 	for _, name := range names {
-		var quotes []segment
+		var quotes []Segment
 		b, err := res.Read("quotes", name)
 		if err != nil {
 			t.Fatal(err)
@@ -244,7 +244,7 @@ func writeTextFile(t *testing.T, content string) string {
 	return path
 }
 
-func assertNextParagraph(t *testing.T, gen func() []segment, want string) {
+func assertNextParagraph(t *testing.T, gen func() []Segment, want string) {
 	t.Helper()
 
 	got := gen()
@@ -255,7 +255,7 @@ func assertNextParagraph(t *testing.T, gen func() []segment, want string) {
 		return
 	}
 
-	if !reflect.DeepEqual(got, []segment{{want, ""}}) {
+	if !reflect.DeepEqual(got, []Segment{{want, ""}}) {
 		t.Fatalf("got %q, want paragraph %q", got, want)
 	}
 }
@@ -266,7 +266,7 @@ func TestGenerateTestFromFile(t *testing.T) {
 	st := &memStore{}
 	path := writeTextFile(t, "p0\n\np1\nstill p1\n\np2\n")
 
-	gen := nextFunc(t, mustSource(newFileSource(path, -1, st)))
+	gen := nextFunc(t, mustSource(NewFile(path, -1, st)))
 	assertNextParagraph(t, gen, "p0")
 	assertNextParagraph(t, gen, "p1\nstill p1")
 	assertNextParagraph(t, gen, "p2")
@@ -279,24 +279,24 @@ func TestGenerateTestFromFileRemembersPosition(t *testing.T) {
 	st := &memStore{}
 	path := writeTextFile(t, "p0\n\np1\n\np2\n")
 
-	gen := nextFunc(t, mustSource(newFileSource(path, -1, st)))
+	gen := nextFunc(t, mustSource(NewFile(path, -1, st)))
 	assertNextParagraph(t, gen, "p0")
 	assertNextParagraph(t, gen, "p1")
 
 	// A new run resumes from the paragraph that was last shown.
-	gen = nextFunc(t, mustSource(newFileSource(path, -1, st)))
+	gen = nextFunc(t, mustSource(NewFile(path, -1, st)))
 	assertNextParagraph(t, gen, "p1")
 	assertNextParagraph(t, gen, "p2")
 	assertNextParagraph(t, gen, "")
 
-	gen = nextFunc(t, mustSource(newFileSource(path, -1, st)))
+	gen = nextFunc(t, mustSource(NewFile(path, -1, st)))
 	assertNextParagraph(t, gen, "")
 
 	// -start overrides (and resets) the stored position.
-	gen = nextFunc(t, mustSource(newFileSource(path, 0, st)))
+	gen = nextFunc(t, mustSource(NewFile(path, 0, st)))
 	assertNextParagraph(t, gen, "p0")
 
-	gen = nextFunc(t, mustSource(newFileSource(path, 2, st)))
+	gen = nextFunc(t, mustSource(NewFile(path, 2, st)))
 	assertNextParagraph(t, gen, "p2")
 }
 
@@ -307,120 +307,9 @@ func TestGenerateTestFromFileTracksFilesSeparately(t *testing.T) {
 	a := writeTextFile(t, "a0\n\na1\n")
 	b := writeTextFile(t, "b0\n\nb1\n")
 
-	assertNextParagraph(t, nextFunc(t, mustSource(newFileSource(a, 1, st))), "a1")
-	assertNextParagraph(t, nextFunc(t, mustSource(newFileSource(b, -1, st))), "b0")
-	assertNextParagraph(t, nextFunc(t, mustSource(newFileSource(a, -1, st))), "a1")
-}
-
-func TestNewTestGenerator(t *testing.T) {
-	t.Parallel()
-
-	res, _ := newTestResources(t)
-	book := writeTextFile(t, "first paragraph\n\nsecond paragraph\n")
-	st := mistakesOf("ab")
-
-	tests := []struct {
-		name            string
-		args            []string
-		stdin           string
-		stdinIsTerminal bool
-		check           func(t *testing.T, segments []segment)
-		kind            testKind
-	}{
-		{"default", nil, "", true, wordsPerSegment(50), testKind{Mode: "words", Source: "1000en", Words: 50}},
-		{"word list", []string{"-words", "200en", "-n", "3", "-g", "2"}, "", true, wordsPerSegment(3, 3), testKind{Mode: "words", Source: "200en", Words: 6}},
-		{"quotes", []string{"-quotes", "en"}, "", true, func(t *testing.T, segments []segment) {
-			if len(segments) != 1 || segments[0].Text == "" {
-				t.Errorf("got %q, want a quote", segments)
-			}
-		}, testKind{Mode: "quotes", Source: "en"}},
-		{"stdin", nil, "piped text\n\nmore", false, exactly("piped text", "more"), testKind{Mode: "text"}},
-		{"word list over stdin", []string{"-words", "200en", "-n", "4"}, "piped text", false, wordsPerSegment(4), testKind{Mode: "words", Source: "200en", Words: 4}},
-		{"file", []string{book}, "", true, exactly("first paragraph"), testKind{Mode: "file", Source: "book.txt"}},
-		{"file over stdin", []string{book}, "piped text", false, exactly("first paragraph"), testKind{Mode: "file", Source: "book.txt"}},
-		{"mistakes", []string{"-mistakes", "-n", "3"}, "", true, exactly("ab ab ab"), testKind{Mode: "mistakes", Words: 3}},
-		{"punctuation and numbers", []string{"-punct", "-numbers", "-n", "200"}, "", true, func(t *testing.T, segments []segment) {
-			if len(segments) != 1 || !endsSentence(segments[0].Text) || !strings.ContainsAny(segments[0].Text, "0123456789") {
-				t.Errorf("got %q, want sentences with numbers", segments)
-			}
-		}, testKind{Mode: "words", Source: "1000en", Words: 200, Punct: true, Numbers: true}},
-		{"mistakes over stdin", []string{"-mistakes", "-n", "2"}, "piped text", false, exactly("ab ab"), testKind{Mode: "mistakes", Words: 2}},
-		{"adaptive", []string{"-adaptive", "-n", "5"}, "", true, wordsPerSegment(5), testKind{Mode: "adaptive", Source: "1000en", Words: 5, Focus: 40}},
-		{"adaptive word list", []string{"-adaptive", "-words", "200en", "-n", "5", "-focus", "70"}, "piped text", false, wordsPerSegment(5), testKind{Mode: "adaptive", Source: "200en", Words: 5, Focus: 70}},
-		{"timed words", []string{"-t", "10", "-n", "5"}, "", true, lastsAtLeast(10*time.Second, 5), testKind{Mode: "words", Source: "1000en", Seconds: 10}},
-		{"timed mistakes", []string{"-mistakes", "-t", "10", "-n", "5"}, "", true, lastsAtLeast(10*time.Second, 5), testKind{Mode: "mistakes", Seconds: 10}},
-		{"timed adaptive", []string{"-adaptive", "-t", "10", "-n", "5"}, "", true, lastsAtLeast(10*time.Second, 5), testKind{Mode: "adaptive", Source: "1000en", Seconds: 10, Focus: 40}},
-		{"timed quotes", []string{"-quotes", "en", "-t", "30"}, "", true, func(t *testing.T, segments []segment) {
-			if len(segments) != 1 || segments[0].Text == "" {
-				t.Errorf("got %q, want a quote", segments)
-			}
-		}, testKind{Mode: "quotes", Source: "en", Seconds: 30}},
-		{"word options over stdin", []string{"-punct", "-numbers", "-n", "3"}, "piped text", false, exactly("piped text"), testKind{Mode: "text"}},
-	}
-
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			s, err := resolve(parseFlags(tc.args), tc.stdinIsTerminal)
-			if err != nil {
-				t.Fatal(err)
-			}
-			gen, err := newTestSource(s.source, textSources{st, res, newRand(), strings.NewReader(tc.stdin)})
-			if err != nil {
-				t.Fatal(err)
-			}
-			tc.check(t, nextTest(t, gen))
-
-			if s.source.kind != tc.kind {
-				t.Errorf("kind = %+v, want %+v", s.source.kind, tc.kind)
-			}
-		})
-	}
-}
-
-// wordsPerSegment checks that there is a segment of n words for each given n.
-func wordsPerSegment(n ...int) func(t *testing.T, segments []segment) {
-	return func(t *testing.T, segments []segment) {
-		t.Helper()
-
-		if len(segments) != len(n) {
-			t.Fatalf("got %d segments, want %d", len(segments), len(n))
-		}
-		for i, s := range segments {
-			assertWords(t, s.Text, n[i])
-		}
-	}
-}
-
-// lastsAtLeast checks that the segments, of n words each, are too long to be
-// typed before the time limit even by a fast typist (300 wpm).
-func lastsAtLeast(limit time.Duration, n int) func(t *testing.T, segments []segment) {
-	return func(t *testing.T, segments []segment) {
-		t.Helper()
-
-		chars := 0
-		for _, s := range segments {
-			assertWords(t, s.Text, n)
-			chars += utf8.RuneCountInString(s.Text)
-		}
-
-		if typed := int(limit.Minutes() * 300 * 5); chars < typed {
-			t.Errorf("%d segments of %d characters, a typist at 300 wpm types %d in %v", len(segments), chars, typed, limit)
-		}
-	}
-}
-
-func exactly(texts ...string) func(t *testing.T, segments []segment) {
-	return func(t *testing.T, segments []segment) {
-		t.Helper()
-
-		var want []segment
-		for _, text := range texts {
-			want = append(want, segment{text, ""})
-		}
-		if !reflect.DeepEqual(segments, want) {
-			t.Errorf("got %q, want %q", segments, want)
-		}
-	}
+	assertNextParagraph(t, nextFunc(t, mustSource(NewFile(a, 1, st))), "a1")
+	assertNextParagraph(t, nextFunc(t, mustSource(NewFile(b, -1, st))), "b0")
+	assertNextParagraph(t, nextFunc(t, mustSource(NewFile(a, -1, st))), "a1")
 }
 
 // mistakesOf returns a store of mistakes in the given words.
@@ -460,7 +349,7 @@ func TestGenerateMistakesTest(t *testing.T) {
 	for i := 0; i < recentMistakes/10; i++ {
 		words = append(words, "often", "often", "often", "often", "often", "often", "often", "often", "rarely", "seldom")
 	}
-	gen := mustGen(generateMistakesTest(newRand(), wordOptions{n: 50, g: 2}, mistakesOf(words...)))
+	gen := mustGen(generateMistakesTest(newRand(), WordOptions{N: 50, G: 2}, mistakesOf(words...)))
 	counts := map[string]int{}
 	for i := 0; i < 50; i++ {
 		segments := gen()
@@ -625,7 +514,7 @@ func TestGenerateWordTestDecorations(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "greek", "alpha beta gamma delta")
 
-	gen := mustGen(generateWordTest(newRand(), res, "greek", wordOptions{n: 30, g: 2, punctuation: true, numbers: true}))
+	gen := mustGen(generateWordTest(newRand(), res, "greek", WordOptions{N: 30, G: 2, Punctuation: true, Numbers: true}))
 	digits := false
 
 	for i := 0; i < 20; i++ {
@@ -652,7 +541,7 @@ func TestGenerateWordTestMinChars(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "greek", "alpha beta gamma delta")
 
-	gen := mustGen(generateWordTest(newRand(), res, "greek", wordOptions{n: 3, g: 1, minChars: 100}))
+	gen := mustGen(generateWordTest(newRand(), res, "greek", WordOptions{N: 3, G: 1, MinChars: 100}))
 	for i := 0; i < 20; i++ {
 		segments := gen()
 
@@ -670,7 +559,7 @@ func TestGenerateWordTestMinChars(t *testing.T) {
 	}
 
 	// -g still sets the least number of groups.
-	gen = mustGen(generateWordTest(newRand(), res, "greek", wordOptions{n: 3, g: 50, minChars: 100}))
+	gen = mustGen(generateWordTest(newRand(), res, "greek", WordOptions{N: 3, G: 50, MinChars: 100}))
 	if segments := gen(); len(segments) != 50 {
 		t.Errorf("got %d segments, want 50", len(segments))
 	}
@@ -678,7 +567,7 @@ func TestGenerateWordTestMinChars(t *testing.T) {
 
 // mustGen returns the generator made by a generate function, failing on
 // errors.
-func mustGen(gen func() []segment, err error) func() []segment {
+func mustGen(gen func() []Segment, err error) func() []Segment {
 	if err != nil {
 		panic(err)
 	}
@@ -695,14 +584,14 @@ func TestGeneratorsRejectEmptyText(t *testing.T) {
 
 	tests := []struct {
 		name string
-		gen  func() (func() []segment, error)
+		gen  func() (func() []Segment, error)
 		want string
 	}{
-		{"raw", func() (func() []segment, error) { return generateTestFromData([]byte(" \n"), true, false) }, "there is no text to type"},
-		{"paragraphs", func() (func() []segment, error) { return generateTestFromData([]byte(" \n\n "), false, false) }, "there is no text to type"},
-		{"multi", func() (func() []segment, error) { return generateTestFromData(nil, false, true) }, "there is no text to type"},
-		{"file", func() (func() []segment, error) { _, err := newFileSource(blankFile, -1, &memStore{}); return nil, err }, blankFile + " does not contain any text"},
-		{"quotes", func() (func() []segment, error) { return generateQuoteTest(newRand(), res, "blank") }, "blank does not contain any quotes"},
+		{"raw", func() (func() []Segment, error) { return generateTestFromData([]byte(" \n"), true, false) }, "there is no text to type"},
+		{"paragraphs", func() (func() []Segment, error) { return generateTestFromData([]byte(" \n\n "), false, false) }, "there is no text to type"},
+		{"multi", func() (func() []Segment, error) { return generateTestFromData(nil, false, true) }, "there is no text to type"},
+		{"file", func() (func() []Segment, error) { _, err := NewFile(blankFile, -1, &memStore{}); return nil, err }, blankFile + " does not contain any text"},
+		{"quotes", func() (func() []Segment, error) { return generateQuoteTest(newRand(), res, "blank") }, "blank does not contain any quotes"},
 	}
 
 	for _, tc := range tests {
@@ -748,31 +637,4 @@ func TestGenerateQuoteTestReturnsCopies(t *testing.T) {
 // fail randomly.
 func newRand() *rand.Rand {
 	return rand.New(rand.NewSource(1))
-}
-
-// The same source of randomness makes the same tests.
-func TestGeneratorsAreReproducible(t *testing.T) {
-	t.Parallel()
-
-	res, _ := newTestResources(t)
-	st := &memStore{mistakes: []typing.Mistake{{Word: "alpha", Typed: "x"}, {Word: "beta", Typed: "x"}, {Word: "gamma", Typed: "x"}}, keys: weakTH()}
-
-	for _, args := range [][]string{
-		{"-punct", "-numbers"},
-		{"-quotes", "en"},
-		{"-mistakes", "-punct"},
-		{"-adaptive", "-numbers"},
-	} {
-		tests := func() [][]segment {
-			gen, err := newTestSource(resolveFlags(args).source, textSources{st, res, newRand(), strings.NewReader("")})
-			if err != nil {
-				t.Fatal(err)
-			}
-			return [][]segment{nextTest(t, gen), nextTest(t, gen), nextTest(t, gen)}
-		}
-
-		if first, second := tests(), tests(); !reflect.DeepEqual(first, second) {
-			t.Errorf("tt %s made\n%q\nthen\n%q", strings.Join(args, " "), first, second)
-		}
-	}
 }

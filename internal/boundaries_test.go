@@ -19,8 +19,12 @@ const module = "github.com/alexmarchi28/tt"
 // none of them knows the screen or the command.
 var allowedImports = map[string][]string{
 	"typing":   nil,
+	"history":  nil,
 	"keystats": {module + "/internal/typing"},
 	"resource": {module},
+	"stats":    {module + "/internal/history", module + "/internal/keystats", module + "/internal/typing"},
+	"store":    {module + "/internal/history", module + "/internal/keystats", module + "/internal/typing"},
+	"textgen":  {module + "/internal/keystats", module + "/internal/resource", module + "/internal/typing"},
 }
 
 // imports returns the non-standard packages imported by the non-test files

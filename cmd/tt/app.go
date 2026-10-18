@@ -5,6 +5,10 @@ import (
 	"io"
 	"time"
 
+	"github.com/alexmarchi28/tt/internal/history"
+	"github.com/alexmarchi28/tt/internal/stats"
+	"github.com/alexmarchi28/tt/internal/store"
+	"github.com/alexmarchi28/tt/internal/textgen"
 	"github.com/gdamore/tcell"
 )
 
@@ -28,7 +32,7 @@ type appDeps struct {
 type app struct {
 	rules    ruleSettings
 	output   outputSettings
-	kind     testKind
+	kind     history.Kind
 	store    sessionStore
 	now      func() time.Time
 	typer    *typer
@@ -104,32 +108,32 @@ func (a *app) useTyper(ty *typer) {
 // run shows the tests of src until there are no more or the user quits, and
 // returns the exit code. It stops at the first test which can't be made or
 // whose outcome can't be saved.
-func (a *app) run(src testSource) (int, error) {
-	history := newTestHistory(src)
+func (a *app) run(src textgen.Source) (int, error) {
+	tests := newTestHistory(src)
 
 	for {
-		test, err := history.current()
+		test, err := tests.current()
 		if err == io.EOF {
 			return 0, nil
 		} else if err != nil {
 			return 1, err
 		}
 
-		if d, ok := src.(describer); ok {
-			a.typer.showStatusMessage(d.describe(), 0)
+		if d, ok := src.(textgen.Describer); ok {
+			a.typer.showStatusMessage(d.Describe(), 0)
 		}
 
 		switch o, res := a.typer.Start(test, a.rules.timeout); o {
 		case outcomeNext:
-			history.next()
+			tests.next()
 		case outcomePrevious:
-			history.previous()
+			tests.previous()
 		case outcomeComplete:
 			if stop, rc, err := a.complete(test, res); stop {
 				return rc, err
 			}
 
-			history.next()
+			tests.next()
 		case outcomeRestart: //The same test is shown again.
 		case outcomeQuit:
 			return 1, nil
@@ -140,7 +144,7 @@ func (a *app) run(src testSource) (int, error) {
 // complete records and reports a completed test. It tells whether the app
 // must stop, with its exit code: the outcome can't be saved, the user quit
 // from the report, or a single test was requested.
-func (a *app) complete(test []segment, res testResult) (stop bool, rc int, err error) {
+func (a *app) complete(test []textgen.Segment, res testResult) (stop bool, rc int, err error) {
 	best, err := a.record(res)
 	if err != nil {
 		return true, 1, err
@@ -158,7 +162,7 @@ func (a *app) complete(test []segment, res testResult) (stop bool, rc int, err e
 
 // attributionOf returns the attribution of a test made of a single text, such
 // as a quote, and nothing for tests mixing several texts.
-func attributionOf(test []segment) string {
+func attributionOf(test []textgen.Segment) string {
 	if len(test) == 1 {
 		return test[0].Attribution
 	}
@@ -172,12 +176,12 @@ func (a *app) record(res testResult) (personalBest, error) {
 	timestamp := a.now().Unix()
 
 	a.results = append(a.results, result{res.wpm(), res.cpm(), res.accuracy(), timestamp, res.mistakes})
-	previous, err := a.store.AddResult(persistedResult{
+	previous, err := a.store.AddResult(history.Result{
 		Wpm:       res.wpm(),
 		Accuracy:  res.accuracy(),
 		Timestamp: timestamp,
 		Duration:  res.duration.Seconds(),
-		testKind:  a.kind,
+		Kind:      a.kind,
 	})
 	if err != nil {
 		return personalBest{}, err
@@ -189,7 +193,7 @@ func (a *app) record(res testResult) (personalBest, error) {
 		return personalBest{}, err
 	}
 
-	if best, ok := bestWpm(previous, a.kind); ok && res.wpm() > best {
+	if best, ok := stats.BestWpm(previous, a.kind); ok && res.wpm() > best {
 		return personalBest{beaten: true, previous: best}, nil
 	}
 
@@ -202,5 +206,5 @@ func (a *app) saveTheme() error {
 		return nil
 	}
 
-	return a.store.SaveConfig(appConfig{Theme: a.theme})
+	return a.store.SaveConfig(store.Config{Theme: a.theme})
 }
