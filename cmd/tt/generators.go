@@ -55,16 +55,16 @@ func selectTestSource(opts options, src textSources) (testSource, testKind, erro
 	case opts.adaptive:
 		list := adaptiveWordList(opts)
 		tests, err := newAdaptiveSource(rng, res, list, words, opts.focus, src.store)
-		return tests, testKind{mode: modeAdaptive, source: filepath.Base(list)}, err
+		return tests, testKind{Mode: modeAdaptive, Source: filepath.Base(list)}, err
 	case opts.wordFile != "":
 		tests, err := fromFunc(generateWordTest(rng, res, opts.wordFile, words))
-		return tests, testKind{mode: modeWords, source: filepath.Base(opts.wordFile)}, err
+		return tests, testKind{Mode: modeWords, Source: filepath.Base(opts.wordFile)}, err
 	case opts.quoteFile != "":
 		tests, err := fromFunc(generateQuoteTest(rng, res, opts.quoteFile))
-		return tests, testKind{mode: modeQuotes, source: filepath.Base(opts.quoteFile)}, err
+		return tests, testKind{Mode: modeQuotes, Source: filepath.Base(opts.quoteFile)}, err
 	case opts.mistakes:
 		tests, err := fromFunc(generateMistakesTest(rng, words, src.store))
-		return tests, testKind{mode: modeMistakes}, err
+		return tests, testKind{Mode: modeMistakes}, err
 	case !src.stdinIsTerminal:
 		b, err := io.ReadAll(src.stdin)
 		if err != nil {
@@ -72,13 +72,13 @@ func selectTestSource(opts options, src textSources) (testSource, testKind, erro
 		}
 
 		tests, err := fromFunc(generateTestFromData(b, opts.raw, opts.multi))
-		return tests, testKind{mode: modeText}, err
+		return tests, testKind{Mode: modeText}, err
 	case len(opts.files) > 0:
 		tests, err := newFileSource(opts.files[0], opts.startParagraph, src.store)
-		return tests, testKind{mode: modeFile, source: filepath.Base(opts.files[0])}, err
+		return tests, testKind{Mode: modeFile, Source: filepath.Base(opts.files[0])}, err
 	default:
 		tests, err := fromFunc(generateWordTest(rng, res, defaultWordList, words))
-		return tests, testKind{mode: modeWords, source: defaultWordList}, err
+		return tests, testKind{Mode: modeWords, Source: defaultWordList}, err
 	}
 }
 

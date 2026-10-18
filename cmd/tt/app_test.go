@@ -16,7 +16,7 @@ func newTestApp(t *testing.T, opts options) (*app, tcell.SimulationScreen) {
 	res, _ := newTestResources(t)
 	sim := newSimScreen(t)
 
-	a, err := newApp(sim, opts, testKind{mode: "words", source: "test"}, appDeps{newTestStore(t), res, time.Now})
+	a, err := newApp(sim, opts, testKind{Mode: "words", Source: "test"}, appDeps{newTestStore(t), res, time.Now})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -73,7 +73,7 @@ func TestAppRecordsCompletedTests(t *testing.T) {
 	opts := parseFlags(nil)
 	opts.noReport = true
 	a, sim := newTestApp(t, opts)
-	a.kind = testKind{mode: "words", source: "test", seconds: 30, punct: true}
+	a.kind = testKind{Mode: "words", Source: "test", Seconds: 30, Punct: true}
 
 	var calls int
 	done := startApp(a, testSequence(&calls, "ab", "cd"))
@@ -92,7 +92,7 @@ func TestAppRecordsCompletedTests(t *testing.T) {
 		t.Fatalf("persisted results = %+v (%v), want 2", stored, err)
 	}
 	for _, r := range stored {
-		if r.kind() != a.kind || r.Duration <= 0 || r.Duration > 5 {
+		if r.testKind != a.kind || r.Duration <= 0 || r.Duration > 5 {
 			t.Errorf("persisted result %+v, want the kind of test and its duration", r)
 		}
 	}
@@ -302,10 +302,10 @@ func TestAppReportsPersonalBest(t *testing.T) {
 		want     bool
 	}{
 		{"first test", nil, false},
-		{"beaten", []persistedResult{{Wpm: 1, Mode: "words", Source: "test"}}, true},
-		{"not beaten", []persistedResult{{Wpm: 1_000_000_000, Mode: "words", Source: "test"}}, false},
-		{"other kind of test", []persistedResult{{Wpm: 1, Mode: "quotes", Source: "en"}}, false},
-		{"other variant of the test", []persistedResult{{Wpm: 1, Mode: "words", Source: "test", Punct: true}}, false},
+		{"beaten", []persistedResult{{Wpm: 1, testKind: testKind{Mode: "words", Source: "test"}}}, true},
+		{"not beaten", []persistedResult{{Wpm: 1_000_000_000, testKind: testKind{Mode: "words", Source: "test"}}}, false},
+		{"other kind of test", []persistedResult{{Wpm: 1, testKind: testKind{Mode: "quotes", Source: "en"}}}, false},
+		{"other variant of the test", []persistedResult{{Wpm: 1, testKind: testKind{Mode: "words", Source: "test", Punct: true}}}, false},
 	}
 
 	for _, tc := range tests {

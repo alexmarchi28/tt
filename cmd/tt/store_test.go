@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -118,7 +119,7 @@ func TestStoreResults(t *testing.T) {
 		t.Errorf("results saved before the first one: %+v, %v", previous, err)
 	}
 
-	second := persistedResult{Wpm: 72, Accuracy: 100, Timestamp: 2000, Mode: "quotes", Source: "en", Duration: 12.5, Seconds: 30}
+	second := persistedResult{Wpm: 72, Accuracy: 100, Timestamp: 2000, Duration: 12.5, testKind: testKind{Mode: "quotes", Source: "en", Seconds: 30}}
 	if previous, err := s.AddResult(second); err != nil || !reflect.DeepEqual(previous, []persistedResult{first}) {
 		t.Errorf("results saved before the second one: %+v, %v, want the first one", previous, err)
 	}
@@ -304,38 +305,25 @@ func TestRememberedTheme(t *testing.T) {
 	}
 }
 
-func TestPersistedResultKind(t *testing.T) {
-	kinds := []testKind{
-		{},
-		{mode: "quotes", source: "en"},
-		{mode: "words", source: "1000en", words: 50, punct: true},
-		{mode: "mistakes", seconds: 60, numbers: true},
-		{mode: "adaptive", source: "1000en", words: 50, focus: 40},
-	}
-
-	for _, kind := range kinds {
-		r := persistedResult{Wpm: 60, Accuracy: 95, Timestamp: 1000, Duration: 30}.withKind(kind)
-		if got := r.kind(); got != kind {
-			t.Errorf("kind() = %+v, want %+v", got, kind)
-		}
-		if r.Wpm != 60 || r.Accuracy != 95 || r.Timestamp != 1000 || r.Duration != 30 {
-			t.Errorf("withKind() altered the result: %+v", r)
-		}
-	}
-}
-
 // The saved results must remain readable by other versions of tt.
 func TestPersistedResultFormat(t *testing.T) {
-	r := persistedResult{Wpm: 60, Accuracy: 95.5, Timestamp: 1000, Duration: 30}.
-		withKind(testKind{mode: "adaptive", source: "1000en", seconds: 15, words: 50, punct: true, numbers: true, focus: 40})
+	r := persistedResult{Wpm: 60, Accuracy: 95.5, Timestamp: 1000, Duration: 30, testKind: testKind{Mode: "adaptive", Source: "1000en", Seconds: 15, Words: 50, Punct: true, Numbers: true, Focus: 40}}
 
 	b, err := json.Marshal(r)
 	if err != nil {
 		t.Fatal(err)
 	}
 
+	// The order of the fields doesn't matter.
 	want := `{"wpm":60,"accuracy":95.5,"timestamp":1000,"mode":"adaptive","source":"1000en","duration":30,"seconds":15,"words":50,"punct":true,"numbers":true,"focus":40}`
-	if string(b) != want {
+	var gotFields, wantFields map[string]interface{}
+	if err := json.Unmarshal(b, &gotFields); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal([]byte(want), &wantFields); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(gotFields, wantFields) {
 		t.Errorf("saved as\n%s\nwant\n%s", b, want)
 	}
 
@@ -344,8 +332,18 @@ func TestPersistedResultFormat(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"wpm":60,"accuracy":95.5,"timestamp":1000}`), &old); err != nil {
 		t.Fatal(err)
 	}
-	if old.kind() != (testKind{}) {
-		t.Errorf("kind of an old result = %+v, want none", old.kind())
+	if old.testKind != (testKind{}) {
+		t.Errorf("kind of an old result = %+v, want none", old.testKind)
+	}
+}
+
+// Results are printed whole, not only their kind as the embedded testKind
+// would.
+func TestPersistedResultString(t *testing.T) {
+	r := persistedResult{Wpm: 60, Accuracy: 95.5, Timestamp: 1000, Duration: 30, testKind: testKind{Mode: "quotes", Source: "en"}}
+
+	if got, want := fmt.Sprint(r), "60 wpm, 95.50% accuracy, 30.0s at 1000 (quotes en)"; got != want {
+		t.Errorf("printed as %q, want %q", got, want)
 	}
 }
 

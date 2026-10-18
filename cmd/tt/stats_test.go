@@ -159,18 +159,18 @@ func TestFormatTypingTime(t *testing.T) {
 }
 
 func TestSummarizeByKind(t *testing.T) {
-	quote := persistedResult{Wpm: 50, Accuracy: 90, Mode: "quotes", Source: "en"}
-	words := persistedResult{Wpm: 70, Accuracy: 100, Mode: "words", Source: "1000en", Words: 50}
-	timed := persistedResult{Wpm: 80, Accuracy: 100, Mode: "words", Source: "1000en", Seconds: 30}
+	quote := persistedResult{Wpm: 50, Accuracy: 90, testKind: testKind{Mode: "quotes", Source: "en"}}
+	words := persistedResult{Wpm: 70, Accuracy: 100, testKind: testKind{Mode: "words", Source: "1000en", Words: 50}}
+	timed := persistedResult{Wpm: 80, Accuracy: 100, testKind: testKind{Mode: "words", Source: "1000en", Seconds: 30}}
 	old := persistedResult{Wpm: 40, Accuracy: 80}
 
 	got := summarizeByKind([]persistedResult{old, quote, words, timed, words, quote, words})
 
 	want := []kindSummary{
-		{testKind{mode: "words", source: "1000en", words: 50}, summarize([]persistedResult{words, words, words})},
-		{testKind{mode: "quotes", source: "en"}, summarize([]persistedResult{quote, quote})},
+		{testKind{Mode: "words", Source: "1000en", Words: 50}, summarize([]persistedResult{words, words, words})},
+		{testKind{Mode: "quotes", Source: "en"}, summarize([]persistedResult{quote, quote})},
 		{testKind{}, summarize([]persistedResult{old})},
-		{testKind{mode: "words", source: "1000en", seconds: 30}, summarize([]persistedResult{timed})},
+		{testKind{Mode: "words", Source: "1000en", Seconds: 30}, summarize([]persistedResult{timed})},
 	}
 	if !reflect.DeepEqual(got, want) {
 		t.Errorf("summarizeByKind() =\n%+v\nwant\n%+v", got, want)
@@ -180,10 +180,10 @@ func TestSummarizeByKind(t *testing.T) {
 func TestFormatStatsByTest(t *testing.T) {
 	stored := []persistedResult{
 		{Wpm: 40, Accuracy: 80, Timestamp: statsNow.Add(-time.Hour).Unix()},
-		{Wpm: 70, Accuracy: 100, Timestamp: statsNow.Add(-time.Minute).Unix(), Mode: "words", Source: "1000en", Duration: 30, Words: 50},
-		{Wpm: 50, Accuracy: 90, Timestamp: statsNow.Add(-time.Minute).Unix(), Mode: "quotes", Source: "en", Duration: 45.5},
-		{Wpm: 60, Accuracy: 96, Timestamp: statsNow.Add(-time.Minute).Unix(), Mode: "words", Source: "1000en", Duration: 20, Words: 50},
-		{Wpm: 66, Accuracy: 90, Timestamp: statsNow.Add(-time.Minute).Unix(), Mode: "words", Source: "1000en", Duration: 15, Seconds: 15, Punct: true},
+		{Wpm: 70, Accuracy: 100, Timestamp: statsNow.Add(-time.Minute).Unix(), Duration: 30, testKind: testKind{Mode: "words", Source: "1000en", Words: 50}},
+		{Wpm: 50, Accuracy: 90, Timestamp: statsNow.Add(-time.Minute).Unix(), Duration: 45.5, testKind: testKind{Mode: "quotes", Source: "en"}},
+		{Wpm: 60, Accuracy: 96, Timestamp: statsNow.Add(-time.Minute).Unix(), Duration: 20, testKind: testKind{Mode: "words", Source: "1000en", Words: 50}},
+		{Wpm: 66, Accuracy: 90, Timestamp: statsNow.Add(-time.Minute).Unix(), Duration: 15, testKind: testKind{Mode: "words", Source: "1000en", Seconds: 15, Punct: true}},
 	}
 
 	want := "" +
@@ -209,30 +209,30 @@ func TestFormatStatsByTest(t *testing.T) {
 func TestBestWpm(t *testing.T) {
 	stored := []persistedResult{
 		{Wpm: 90},
-		{Wpm: 50, Mode: "words", Source: "1000en", Words: 50},
-		{Wpm: 70, Mode: "words", Source: "1000en", Words: 50},
-		{Wpm: 80, Mode: "words", Source: "200en", Words: 50},
-		{Wpm: 85, Mode: "words", Source: "1000en", Words: 10},
-		{Wpm: 75, Mode: "words", Source: "1000en", Words: 50, Numbers: true},
-		{Wpm: 60, Mode: "words", Source: "1000en", Words: 50},
+		{Wpm: 50, testKind: testKind{Mode: "words", Source: "1000en", Words: 50}},
+		{Wpm: 70, testKind: testKind{Mode: "words", Source: "1000en", Words: 50}},
+		{Wpm: 80, testKind: testKind{Mode: "words", Source: "200en", Words: 50}},
+		{Wpm: 85, testKind: testKind{Mode: "words", Source: "1000en", Words: 10}},
+		{Wpm: 75, testKind: testKind{Mode: "words", Source: "1000en", Words: 50, Numbers: true}},
+		{Wpm: 60, testKind: testKind{Mode: "words", Source: "1000en", Words: 50}},
 	}
 
-	if best, ok := bestWpm(stored, testKind{mode: "words", source: "1000en", words: 50}); best != 70 || !ok {
+	if best, ok := bestWpm(stored, testKind{Mode: "words", Source: "1000en", Words: 50}); best != 70 || !ok {
 		t.Errorf("bestWpm(words 1000en, 50 words) = %d, %t, want 70, true", best, ok)
 	}
 
-	if best, ok := bestWpm(stored, testKind{mode: "quotes", source: "en"}); ok {
+	if best, ok := bestWpm(stored, testKind{Mode: "quotes", Source: "en"}); ok {
 		t.Errorf("bestWpm(quotes en) = %d, %t, want no result", best, ok)
 	}
 }
 
 func TestPaceFromResults(t *testing.T) {
-	kind := testKind{mode: "words", source: "1000en", words: 50}
-	other := persistedResult{Wpm: 200}.withKind(testKind{mode: "words", source: "1000en", words: 10})
+	kind := testKind{Mode: "words", Source: "1000en", Words: 50}
+	other := persistedResult{Wpm: 200, testKind: testKind{Mode: "words", Source: "1000en", Words: 10}}
 
 	stored := []persistedResult{other}
 	for _, wpm := range []int{90, 10, 50, 50, 50, 50, 50, 60, 60, 60, 60, 60} {
-		stored = append(stored, persistedResult{Wpm: wpm}.withKind(kind), other)
+		stored = append(stored, persistedResult{Wpm: wpm, testKind: kind}, other)
 	}
 
 	if got, err := paceFromResults("best", stored, kind); got != 90 || err != nil {

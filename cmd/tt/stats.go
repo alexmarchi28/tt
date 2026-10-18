@@ -69,7 +69,7 @@ func before(results []persistedResult, t time.Time) []persistedResult {
 
 // ofKind returns the results of the given kind of test.
 func ofKind(results []persistedResult, kind testKind) []persistedResult {
-	return filterResults(results, func(r persistedResult) bool { return r.kind() == kind })
+	return filterResults(results, func(r persistedResult) bool { return r.testKind == kind })
 }
 
 // bestWpm returns the best WPM achieved on the given kind of test, and false
@@ -89,7 +89,7 @@ type kindSummary struct {
 func summarizeByKind(results []persistedResult) []kindSummary {
 	groups := map[testKind][]persistedResult{}
 	for _, r := range results {
-		groups[r.kind()] = append(groups[r.kind()], r)
+		groups[r.testKind] = append(groups[r.testKind], r)
 	}
 
 	summaries := make([]kindSummary, 0, len(groups))
@@ -173,7 +173,7 @@ func formatStats(stored []persistedResult, mistakes []mistake, now time.Time) st
 
 	best := bestDate.Format("2006-01-02")
 	if all.best.Mode != "" {
-		best += ", " + all.best.kind().String()
+		best += ", " + all.best.testKind.String()
 	}
 
 	fmt.Fprintln(&b, "Typing stats")
