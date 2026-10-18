@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"os"
-	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -14,6 +13,7 @@ import (
 
 // testRun is a run of tt in the test process.
 type testRun struct {
+	home           string // The home directory of the user.
 	stdout, stderr bytes.Buffer
 	sim            tcell.SimulationScreen
 	trueColor      bool          // As requested by run.
@@ -32,6 +32,10 @@ func (s initSignallingScreen) Init() error {
 	return s.SimulationScreen.Init()
 }
 
+func newTestRun(t *testing.T) *testRun {
+	return &testRun{home: t.TempDir()}
+}
+
 // environment returns the environment of a run reading stdin from text, as
 // if piped unless text is empty, and typing on a simulation screen.
 func (r *testRun) environment(text string) environment {
@@ -44,11 +48,24 @@ func (r *testRun) environment(text string) environment {
 		stderr:          &r.stderr,
 		stdinIsTerminal: text == "",
 		getenv:          func(string) string { return "" },
+		homeDir:         func() (string, error) { return r.home, nil },
 		newScreen: func(trueColor bool) (tcell.Screen, error) {
 			r.trueColor = trueColor
 			return initSignallingScreen{r.sim, r.initialized}, nil
 		},
 	}
+}
+
+// store returns the store of the run.
+func (r *testRun) store(t *testing.T) *jsonStore {
+	t.Helper()
+
+	st, err := newJSONStore(func(string) string { return "" }, func() (string, error) { return r.home, nil })
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	return st
 }
 
 // startRun runs tt in the background with the given stdin text and
@@ -57,7 +74,7 @@ func (r *testRun) environment(text string) environment {
 func startRun(t *testing.T, text string, args ...string) (*testRun, <-chan int) {
 	t.Helper()
 
-	r := &testRun{}
+	r := newTestRun(t)
 	env := r.environment(text)
 	done := make(chan int, 1)
 	go func() { done <- run(append([]string{"-blockcursor"}, args...), env) }()
@@ -92,7 +109,7 @@ func TestRunCommands(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		var r testRun
+		r := newTestRun(t)
 		code := run(tc.args, r.environment(""))
 
 		if code != tc.code || !strings.HasPrefix(r.stdout.String(), tc.stdout) || !strings.Contains(r.stderr.String(), tc.stderrSubstr) {
@@ -119,7 +136,7 @@ func TestRunTypesTests(t *testing.T) {
 		t.Error("true colour disabled without -notheme")
 	}
 
-	stored, err := readPersistedResults()
+	stored, err := r.store(t).Results()
 	if err != nil || len(stored) != 1 || stored[0].Mode != modeText {
 		t.Errorf("saved results = %+v, %v, want the text test", stored, err)
 	}
@@ -141,11 +158,12 @@ func TestRunWithoutTheme(t *testing.T) {
 // a crash, the results typed so far still being printed.
 func TestRunReportsSaveErrors(t *testing.T) {
 	useTempStorage(t)
-	notDir := filepath.Join(t.TempDir(), "file")
-	writeFile(t, notDir, "")
-	keyStatsDB = filepath.Join(notDir, ".keys")
-
 	r, done := startRun(t, "hi", "-noreport", "-csv")
+
+	// A directory can't be replaced by the file of the key statistics.
+	if err := os.MkdirAll(r.store(t).path(keyStatsFile), 0700); err != nil {
+		t.Fatal(err)
+	}
 
 	sendKeys(t, r.sim, "hi")
 
@@ -163,7 +181,7 @@ func TestRunReportsSaveErrors(t *testing.T) {
 func TestRunReportsScreenErrors(t *testing.T) {
 	useTempStorage(t)
 
-	var r testRun
+	r := newTestRun(t)
 	env := r.environment("hi")
 	env.newScreen = func(bool) (tcell.Screen, error) { return nil, errors.New("no terminal") }
 
@@ -176,7 +194,7 @@ func TestNewAppWithInvalidTheme(t *testing.T) {
 	dir := useTempStorage(t)
 	writeUserResource(t, dir, "themes", "broken", "fgcol: nope")
 
-	_, err := newApp(newSimScreen(t), parseFlags([]string{"-theme", "broken"}), testKind{})
+	_, err := newApp(newSimScreen(t), parseFlags([]string{"-theme", "broken"}), testKind{}, &memStore{})
 	if err == nil || !strings.HasPrefix(err.Error(), "broken theme is invalid: ") {
 		t.Errorf("newApp with an invalid theme: %v, want an error", err)
 	}
@@ -185,7 +203,7 @@ func TestNewAppWithInvalidTheme(t *testing.T) {
 func TestProcessEnvironment(t *testing.T) {
 	env := processEnvironment()
 
-	if env.stdin != os.Stdin || env.stdout != os.Stdout || env.stderr != os.Stderr || env.getenv == nil || env.newScreen == nil {
+	if env.stdin != os.Stdin || env.stdout != os.Stdout || env.stderr != os.Stderr || env.getenv == nil || env.homeDir == nil || env.newScreen == nil {
 		t.Errorf("processEnvironment() = %+v", env)
 	}
 }

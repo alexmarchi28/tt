@@ -2,7 +2,6 @@ package main
 
 import (
 	"math"
-	"os"
 	"reflect"
 	"testing"
 	"time"
@@ -67,40 +66,5 @@ func TestKeyStatsAdd(t *testing.T) {
 	}
 	if got := ks.Chars["c"]; got != (keyStat{Count: 2, ErrorRate: 0.5, Timed: 1, Latency: 100}) {
 		t.Errorf("c after two tests = %+v, want a 50%% error rate", got)
-	}
-}
-
-func TestSaveKeyStats(t *testing.T) {
-	useTempStorage(t)
-
-	if got := loadKeyStats(); len(got.Chars) != 0 || len(got.Bigrams) != 0 {
-		t.Errorf("loadKeyStats() without a file = %+v, want empty statistics", got)
-	}
-
-	for _, strokes := range [][]keystroke{{{'a', 'a', 0}, {'b', 'x', 100 * time.Millisecond}}, {{'a', 'a', 0}}} {
-		if err := saveKeyStats(strokes); err != nil {
-			t.Fatal(err)
-		}
-	}
-
-	got := loadKeyStats()
-	if got.Chars["a"].Count != 2 || got.Chars["b"].ErrorRate != 1 || got.Bigrams["ab"].Count != 1 {
-		t.Errorf("saved statistics = %+v", got)
-	}
-}
-
-func TestSaveKeyStatsOverCorruptFile(t *testing.T) {
-	useTempStorage(t)
-
-	if err := os.WriteFile(keyStatsDB, []byte("not json"), 0600); err != nil {
-		t.Fatal(err)
-	}
-
-	// The statistics are only an aid, they start over rather than stopping tt.
-	if err := saveKeyStats([]keystroke{{'a', 'a', 0}}); err != nil {
-		t.Fatal(err)
-	}
-	if got := loadKeyStats(); got.Chars["a"].Count != 1 {
-		t.Errorf("statistics = %+v, want them to start over", got)
 	}
 }

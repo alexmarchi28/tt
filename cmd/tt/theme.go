@@ -97,8 +97,9 @@ func newTcellColor(s string) (tcell.Color, error) {
 	return tcell.NewHexColor(int32(rgb)), nil
 }
 
-func loadRememberedTheme(disableTransparentBg bool) string {
-	cfg, err := readAppConfig()
+// loadRememberedTheme returns the theme selected last, if it is still valid.
+func loadRememberedTheme(st configStore, disableTransparentBg bool) string {
+	cfg, err := st.Config()
 	if err != nil {
 		return ""
 	}

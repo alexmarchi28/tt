@@ -11,6 +11,13 @@ import (
 	"github.com/gdamore/tcell"
 )
 
+// keyStatsOf is a store of the given key statistics, which ignores new
+// keystrokes.
+type keyStatsOf keyStats
+
+func (k keyStatsOf) KeyStats() keyStats              { return keyStats(k) }
+func (keyStatsOf) AddKeystrokes(_ []keystroke) error { return nil }
+
 // weakTH returns statistics where "th" is typed badly and "he" and "er" well.
 func weakTH() keyStats {
 	ks := newKeyStats()
@@ -178,11 +185,8 @@ func TestAdaptiveWordsDescribe(t *testing.T) {
 func TestGenerateAdaptiveTestFavoursWeakWords(t *testing.T) {
 	dir := useTempStorage(t)
 	writeUserResource(t, dir, "words", "list", "the her err rare")
-	if err := writeValue(keyStatsDB, weakTH()); err != nil {
-		t.Fatal(err)
-	}
 
-	got := drawShares(t, mustGen(generateAdaptiveTest("list", wordOptions{n: 100, g: 4}, 0)))
+	got := drawShares(t, mustGen(generateAdaptiveTest("list", wordOptions{n: 100, g: 4}, 0, keyStatsOf(weakTH()))))
 
 	// Uniformly drawn every word would make a quarter of the test.
 	for _, w := range []string{"her", "err", "rare"} {
@@ -196,7 +200,7 @@ func TestGenerateAdaptiveTestWithoutStatistics(t *testing.T) {
 	dir := useTempStorage(t)
 	writeUserResource(t, dir, "words", "list", "the her err rare")
 
-	got := drawShares(t, mustGen(generateAdaptiveTest("list", wordOptions{n: 100, g: 4}, 40)))
+	got := drawShares(t, mustGen(generateAdaptiveTest("list", wordOptions{n: 100, g: 4}, 40, keyStatsOf(newKeyStats()))))
 
 	for _, w := range []string{"the", "her", "err", "rare"} {
 		if got[w] < 0.18 || got[w] > 0.32 {
@@ -212,12 +216,9 @@ func thShare(t *testing.T, focus int) float64 {
 
 	dir := useTempStorage(t)
 	writeUserResource(t, dir, "words", "list", "the this that them then ab cd fg ij kl mn op qu vw xz ac bd ce df eg")
-	if err := writeValue(keyStatsDB, weakTH()); err != nil {
-		t.Fatal(err)
-	}
 
 	share := 0.0
-	for w, s := range drawShares(t, mustGen(generateAdaptiveTest("list", wordOptions{n: 100, g: 4}, focus))) {
+	for w, s := range drawShares(t, mustGen(generateAdaptiveTest("list", wordOptions{n: 100, g: 4}, focus, keyStatsOf(weakTH())))) {
 		if strings.Contains(w, "th") {
 			share += s
 		}
@@ -248,12 +249,11 @@ func TestGenerateAdaptiveTestFocus(t *testing.T) {
 func TestGenerateAdaptiveTestFocusOnASingleWord(t *testing.T) {
 	dir := useTempStorage(t)
 	writeUserResource(t, dir, "words", "list", "the ab cd")
-	if err := writeValue(keyStatsDB, weakTH()); err != nil {
-		t.Fatal(err)
-	}
 
 	done := make(chan []segment, 1)
-	go func() { done <- mustGen(generateAdaptiveTest("list", wordOptions{n: 4, g: 1}, 100))() }()
+	go func() {
+		done <- mustGen(generateAdaptiveTest("list", wordOptions{n: 4, g: 1}, 100, keyStatsOf(weakTH())))()
+	}()
 
 	select {
 	case got := <-done:
@@ -289,12 +289,13 @@ func drawShares(t *testing.T, gen func() []segment) map[string]float64 {
 func TestAppShowsAdaptiveFocus(t *testing.T) {
 	dir := useTempStorage(t)
 	writeUserResource(t, dir, "words", "list", "the her err rare")
-	if err := writeValue(keyStatsDB, weakTH()); err != nil {
+	st := newTestStore(t)
+	if err := writeValue(st.path(keyStatsFile), weakTH()); err != nil {
 		t.Fatal(err)
 	}
 
 	sim := newSimScreen(t)
-	a, err := newApp(sim, parseFlags([]string{"-adaptive", "-words", "list", "-noreport"}), testKind{mode: "adaptive", source: "list"})
+	a, err := newApp(sim, parseFlags([]string{"-adaptive", "-words", "list", "-noreport"}), testKind{mode: "adaptive", source: "list"}, st)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -314,7 +315,7 @@ func TestAdaptiveWordListFromStdin(t *testing.T) {
 	useStdin(t, "alpha beta gamma delta")
 	opts := parseFlags([]string{"-adaptive", "-words", "-"})
 
-	if _, _, err := newTestGenerator(opts, strings.NewReader(""), true); err != nil {
+	if _, _, err := newTestGenerator(opts, strings.NewReader(""), true, newTestStore(t)); err != nil {
 		t.Fatalf("generator: %v", err)
 	}
 	if _, err := loadAdaptiveWords(adaptiveWordList(opts)); err != nil {

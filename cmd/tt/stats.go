@@ -223,8 +223,8 @@ func formatStats(stored []persistedResult, mistakes []mistake, now time.Time) st
 	return b.String()
 }
 
-func printStats(w io.Writer) error {
-	stored, err := readPersistedResults()
+func printStats(w io.Writer, st historyStore) error {
+	stored, err := st.Results()
 	if err != nil {
 		return err
 	}
@@ -235,7 +235,7 @@ func printStats(w io.Writer) error {
 	}
 
 	//Mistakes are only an addition to the results, ignore them if they can't be read.
-	mistakes, _ := readMistakes()
+	mistakes, _ := st.Mistakes()
 
 	_, err = fmt.Fprint(w, formatStats(stored, mistakes, time.Now()))
 	return err

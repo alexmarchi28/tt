@@ -16,7 +16,7 @@ func newTestApp(t *testing.T, opts options) (*app, tcell.SimulationScreen) {
 	useTempStorage(t)
 	sim := newSimScreen(t)
 
-	a, err := newApp(sim, opts, testKind{mode: "words", source: "test"})
+	a, err := newApp(sim, opts, testKind{mode: "words", source: "test"}, newTestStore(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestAppRecordsCompletedTests(t *testing.T) {
 		t.Errorf("results = %+v, want two tests with a single mistake in the second", a.results)
 	}
 
-	stored, err := readPersistedResults()
+	stored, err := a.store.Results()
 	if err != nil || len(stored) != 2 {
 		t.Fatalf("persisted results = %+v (%v), want 2", stored, err)
 	}
@@ -91,13 +91,12 @@ func TestAppRecordsCompletedTests(t *testing.T) {
 		}
 	}
 
-	if ks := loadKeyStats(); ks.Chars["a"].Count != 1 || ks.Chars["d"].ErrorRate != 1 {
+	if ks := a.store.KeyStats(); ks.Chars["a"].Count != 1 || ks.Chars["d"].ErrorRate != 1 {
 		t.Errorf("key statistics = %+v, want those of the completed tests", ks)
 	}
 
 	// The mistake of the restarted attempt is not recorded.
-	var mistakes []mistake
-	if err := readValue(mistakeDB, &mistakes); err != nil || !reflect.DeepEqual(mistakes, []mistake{{"cd", "cx"}}) {
+	if mistakes, err := a.store.Mistakes(); err != nil || !reflect.DeepEqual(mistakes, []mistake{{"cd", "cx"}}) {
 		t.Errorf("stored mistakes = %v (%v), want [{cd cx}]", mistakes, err)
 	}
 }
@@ -305,7 +304,7 @@ func TestAppReportsPersonalBest(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			a, sim := newTestApp(t, parseFlags(nil))
-			if err := writePersistedResults(tc.previous); err != nil {
+			if err := writeValue(a.store.(*jsonStore).path(resultsFile), tc.previous); err != nil {
 				t.Fatal(err)
 			}
 

@@ -19,11 +19,18 @@ import (
 // session, each made of one or more segments. They return nil once there are
 // no more tests.
 
+// generatorStore gives the generators the saved data they make tests from.
+type generatorStore interface {
+	mistakeStore
+	keyStatsStore
+	paragraphStore
+}
+
 // newTestGenerator returns a function producing the successive tests
 // requested on the command line, or nil once there are no more, and what they
 // are made of. Text piped to stdin is used unless stdin is a terminal.
-func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func() []segment, testKind, error) {
-	gen, kind, err := selectTestGenerator(opts, stdin, stdinIsTerminal)
+func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool, st generatorStore) (func() []segment, testKind, error) {
+	gen, kind, err := selectTestGenerator(opts, stdin, stdinIsTerminal, st)
 	if err != nil {
 		return nil, testKind{}, err
 	}
@@ -33,13 +40,13 @@ func newTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func
 
 // selectTestGenerator returns the generator of the tests requested on the
 // command line and where their text comes from, see newTestGenerator.
-func selectTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (func() []segment, testKind, error) {
+func selectTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool, st generatorStore) (func() []segment, testKind, error) {
 	words := newWordOptions(opts)
 
 	switch {
 	case opts.adaptive:
 		list := adaptiveWordList(opts)
-		gen, err := generateAdaptiveTest(list, words, opts.focus)
+		gen, err := generateAdaptiveTest(list, words, opts.focus, st)
 		return gen, testKind{mode: modeAdaptive, source: filepath.Base(list)}, err
 	case opts.wordFile != "":
 		gen, err := generateWordTest(opts.wordFile, words)
@@ -48,7 +55,7 @@ func selectTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (f
 		gen, err := generateQuoteTest(opts.quoteFile)
 		return gen, testKind{mode: modeQuotes, source: filepath.Base(opts.quoteFile)}, err
 	case opts.mistakes:
-		gen, err := generateMistakesTest(words)
+		gen, err := generateMistakesTest(words, st)
 		return gen, testKind{mode: modeMistakes}, err
 	case !stdinIsTerminal:
 		b, err := io.ReadAll(stdin)
@@ -59,7 +66,7 @@ func selectTestGenerator(opts options, stdin io.Reader, stdinIsTerminal bool) (f
 		gen, err := generateTestFromData(b, opts.raw, opts.multi)
 		return gen, testKind{mode: modeText}, err
 	case len(opts.files) > 0:
-		gen, err := generateTestFromFile(opts.files[0], opts.startParagraph)
+		gen, err := generateTestFromFile(opts.files[0], opts.startParagraph, st)
 		return gen, testKind{mode: modeFile, source: filepath.Base(opts.files[0])}, err
 	default:
 		gen, err := generateWordTest(defaultWordList, words)
@@ -151,8 +158,8 @@ func weightedMistakes(mistakes []mistake, n int) []string {
 
 // generateMistakesTest practices the recently mistyped words, the most
 // frequently mistyped ones coming up more often.
-func generateMistakesTest(o wordOptions) (func() []segment, error) {
-	mistakes, err := readMistakes()
+func generateMistakesTest(o wordOptions, st mistakeStore) (func() []segment, error) {
+	mistakes, err := st.Mistakes()
 	if err != nil {
 		return nil, err
 	}
@@ -338,26 +345,22 @@ func generateTestFromData(data []byte, raw bool, split bool) (func() []segment, 
 	}
 }
 
-func generateTestFromFile(path string, startParagraph int) (func() []segment, error) {
-	var db map[string]int
+// generateTestFromFile makes a test of each paragraph of the file at path,
+// starting from the given paragraph, or else from the one reached last.
+func generateTestFromFile(path string, startParagraph int, st paragraphStore) (func() []segment, error) {
 	var err error
 
 	if path, err = filepath.Abs(path); err != nil {
 		return nil, err
 	}
 
-	if err := readValue(fileStateDB, &db); err != nil {
-		db = map[string]int{}
-	}
-
 	if startParagraph != -1 {
-		db[path] = startParagraph
-		if err := writeValue(fileStateDB, db); err != nil {
+		if err := st.SetParagraph(path, startParagraph); err != nil {
 			return nil, err
 		}
 	}
 
-	idx := db[path] - 1
+	idx := st.Paragraph(path) - 1
 
 	b, err := os.ReadFile(path)
 	if err != nil {
@@ -370,8 +373,7 @@ func generateTestFromFile(path string, startParagraph int) (func() []segment, er
 
 	return func() []segment {
 		idx++
-		db[path] = idx
-		if err := writeValue(fileStateDB, db); err != nil {
+		if err := st.SetParagraph(path, idx); err != nil {
 			panic(err)
 		}
 
