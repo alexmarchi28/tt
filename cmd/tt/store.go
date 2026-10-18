@@ -17,34 +17,14 @@ type persistedResult struct {
 	Timestamp int64   `json:"timestamp"`
 
 	//The fields below are empty for results saved by older versions.
-	Mode     string  `json:"mode,omitempty"`     //See testKind.
-	Source   string  `json:"source,omitempty"`   //See testKind.
 	Duration float64 `json:"duration,omitempty"` //Seconds spent typing.
-	Seconds  int     `json:"seconds,omitempty"`  //See testKind.
-	Words    int     `json:"words,omitempty"`    //See testKind.
-	Punct    bool    `json:"punct,omitempty"`    //See testKind.
-	Numbers  bool    `json:"numbers,omitempty"`  //See testKind.
-	Focus    int     `json:"focus,omitempty"`    //See testKind.
+	testKind         //Saved as fields of the result.
 }
 
-func (r persistedResult) kind() testKind {
-	return testKind{
-		mode:    r.Mode,
-		source:  r.Source,
-		seconds: r.Seconds,
-		words:   r.Words,
-		punct:   r.Punct,
-		numbers: r.Numbers,
-		focus:   r.Focus,
-	}
-}
-
-// withKind returns r as the result of the given kind of test.
-func (r persistedResult) withKind(k testKind) persistedResult {
-	r.Mode, r.Source = k.mode, k.source
-	r.Seconds, r.Words, r.Punct, r.Numbers, r.Focus = k.seconds, k.words, k.punct, k.numbers, k.focus
-
-	return r
+// String describes r, rather than only its kind as the String method of the
+// embedded testKind would.
+func (r persistedResult) String() string {
+	return fmt.Sprintf("%d wpm, %.2f%% accuracy, %.1fs at %d (%s)", r.Wpm, r.Accuracy, r.Duration, r.Timestamp, r.testKind)
 }
 
 // The interfaces below give access to the data saved between runs of tt,

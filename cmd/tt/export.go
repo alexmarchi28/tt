@@ -35,24 +35,39 @@ func exportResults(w io.Writer, st historyStore, asJSON bool) error {
 		return writeJSON(w, nonNil(results))
 	}
 
-	rows := [][]string{{"timestamp", "wpm", "accuracy", "duration", "mode", "source", "seconds", "words", "punct", "numbers", "focus"}}
+	header := make([]string, len(resultColumns))
+	for i, c := range resultColumns {
+		header[i] = c.name
+	}
+
+	rows := [][]string{header}
 	for _, r := range results {
-		rows = append(rows, []string{
-			strconv.FormatInt(r.Timestamp, 10),
-			strconv.Itoa(r.Wpm),
-			strconv.FormatFloat(r.Accuracy, 'f', 2, 64),
-			strconv.FormatFloat(r.Duration, 'f', 2, 64),
-			r.Mode,
-			r.Source,
-			strconv.Itoa(r.Seconds),
-			strconv.Itoa(r.Words),
-			strconv.FormatBool(r.Punct),
-			strconv.FormatBool(r.Numbers),
-			strconv.Itoa(r.Focus),
-		})
+		row := make([]string, len(resultColumns))
+		for i, c := range resultColumns {
+			row[i] = c.value(r)
+		}
+		rows = append(rows, row)
 	}
 
 	return csv.NewWriter(w).WriteAll(rows)
+}
+
+// resultColumns are the columns of the results exported as CSV.
+var resultColumns = []struct {
+	name  string
+	value func(r persistedResult) string
+}{
+	{"timestamp", func(r persistedResult) string { return strconv.FormatInt(r.Timestamp, 10) }},
+	{"wpm", func(r persistedResult) string { return strconv.Itoa(r.Wpm) }},
+	{"accuracy", func(r persistedResult) string { return strconv.FormatFloat(r.Accuracy, 'f', 2, 64) }},
+	{"duration", func(r persistedResult) string { return strconv.FormatFloat(r.Duration, 'f', 2, 64) }},
+	{"mode", func(r persistedResult) string { return r.Mode }},
+	{"source", func(r persistedResult) string { return r.Source }},
+	{"seconds", func(r persistedResult) string { return strconv.Itoa(r.Seconds) }},
+	{"words", func(r persistedResult) string { return strconv.Itoa(r.Words) }},
+	{"punct", func(r persistedResult) string { return strconv.FormatBool(r.Punct) }},
+	{"numbers", func(r persistedResult) string { return strconv.FormatBool(r.Numbers) }},
+	{"focus", func(r persistedResult) string { return strconv.Itoa(r.Focus) }},
 }
 
 func exportMistakes(w io.Writer, st historyStore, asJSON bool) error {

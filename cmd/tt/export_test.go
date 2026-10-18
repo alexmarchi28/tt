@@ -23,12 +23,9 @@ func export(t *testing.T, st historyStore, data string, asJSON bool) string {
 func exportedResults() []persistedResult {
 	return []persistedResult{
 		{Wpm: 40, Accuracy: 80, Timestamp: 1000},
-		persistedResult{Wpm: 72, Accuracy: 96.5, Timestamp: 2000, Duration: 12.5}.
-			withKind(testKind{mode: "words", source: "1000en", seconds: 15, punct: true, numbers: true}),
-		persistedResult{Wpm: 65, Accuracy: 100, Timestamp: 3000, Duration: 30}.
-			withKind(testKind{mode: "quotes", source: "my, quotes"}),
-		persistedResult{Wpm: 55, Accuracy: 98, Timestamp: 4000, Duration: 20}.
-			withKind(testKind{mode: "adaptive", source: "1000en", words: 50, focus: 40}),
+		persistedResult{Wpm: 72, Accuracy: 96.5, Timestamp: 2000, Duration: 12.5, testKind: testKind{Mode: "words", Source: "1000en", Seconds: 15, Punct: true, Numbers: true}},
+		persistedResult{Wpm: 65, Accuracy: 100, Timestamp: 3000, Duration: 30, testKind: testKind{Mode: "quotes", Source: "my, quotes"}},
+		persistedResult{Wpm: 55, Accuracy: 98, Timestamp: 4000, Duration: 20, testKind: testKind{Mode: "adaptive", Source: "1000en", Words: 50, Focus: 40}},
 	}
 }
 

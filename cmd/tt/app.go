@@ -155,7 +155,8 @@ func (a *app) record(res testResult) (personalBest, error) {
 		Accuracy:  res.accuracy(),
 		Timestamp: timestamp,
 		Duration:  res.duration.Seconds(),
-	}.withKind(a.kind))
+		testKind:  a.kind,
+	})
 	if err != nil {
 		return personalBest{}, err
 	}

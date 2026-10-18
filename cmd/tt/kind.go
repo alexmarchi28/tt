@@ -18,25 +18,27 @@ const (
 
 // testKind describes the tests whose results are compared with each other:
 // where their text comes from and how it is made.
+// Its fields are saved with the results, see persistedResult, and are empty
+// for results saved by older versions.
 type testKind struct {
-	mode   string // One of the modes above.
-	source string // The word list, quote file or file used, if any.
+	Mode   string `json:"mode,omitempty"`   // One of the modes above.
+	Source string `json:"source,omitempty"` // The word list, quote file or file used, if any.
 
-	seconds int  // Time limit, 0 for none.
-	words   int  // Words of untimed tests made of words, 0 for other tests.
-	punct   bool // Whether the words are turned into sentences.
-	numbers bool // Whether some of the words are replaced with numbers.
-	focus   int  // Percentage of the words of adaptive tests with the pairs practiced.
+	Seconds int  `json:"seconds,omitempty"` // Time limit, 0 for none.
+	Words   int  `json:"words,omitempty"`   // Words of untimed tests made of words, 0 for other tests.
+	Punct   bool `json:"punct,omitempty"`   // Whether the words are turned into sentences.
+	Numbers bool `json:"numbers,omitempty"` // Whether some of the words are replaced with numbers.
+	Focus   int  `json:"focus,omitempty"`   // Percentage of the words of adaptive tests with the pairs practiced.
 }
 
 func (k testKind) String() string {
-	if k.mode == "" {
+	if k.Mode == "" {
 		return "unknown"
 	}
 
-	name := k.mode
-	if k.source != "" {
-		name += " " + k.source
+	name := k.Mode
+	if k.Source != "" {
+		name += " " + k.Source
 	}
 
 	return strings.Join(append([]string{name}, k.variant()...), ", ")
@@ -45,20 +47,20 @@ func (k testKind) String() string {
 // variant describes how the text of the tests is made.
 func (k testKind) variant() []string {
 	var v []string
-	if k.seconds > 0 {
-		v = append(v, fmt.Sprintf("%ds", k.seconds))
+	if k.Seconds > 0 {
+		v = append(v, fmt.Sprintf("%ds", k.Seconds))
 	}
-	if k.words > 0 {
-		v = append(v, fmt.Sprintf("%d words", k.words))
+	if k.Words > 0 {
+		v = append(v, fmt.Sprintf("%d words", k.Words))
 	}
-	if k.punct {
+	if k.Punct {
 		v = append(v, "punctuation")
 	}
-	if k.numbers {
+	if k.Numbers {
 		v = append(v, "numbers")
 	}
-	if k.focus > 0 {
-		v = append(v, fmt.Sprintf("focus %d%%", k.focus))
+	if k.Focus > 0 {
+		v = append(v, fmt.Sprintf("focus %d%%", k.Focus))
 	}
 
 	return v
@@ -67,25 +69,25 @@ func (k testKind) variant() []string {
 // madeOfWords reports whether the tests are made of random words, see
 // wordOptions.
 func (k testKind) madeOfWords() bool {
-	return k.mode == modeWords || k.mode == modeMistakes || k.mode == modeAdaptive
+	return k.Mode == modeWords || k.Mode == modeMistakes || k.Mode == modeAdaptive
 }
 
 // withVariant returns k completed with how the tests are made according to
 // the command line options.
 func (k testKind) withVariant(opts options) testKind {
 	if opts.timeout != -1 {
-		k.seconds = int(opts.timeout / time.Second)
+		k.Seconds = int(opts.timeout / time.Second)
 	}
 
 	if k.madeOfWords() {
-		k.punct, k.numbers = opts.punct, opts.numbers
+		k.Punct, k.Numbers = opts.punct, opts.numbers
 		if opts.timeout == -1 {
-			k.words = opts.n * opts.g
+			k.Words = opts.n * opts.g
 		}
 	}
 
-	if k.mode == modeAdaptive {
-		k.focus = opts.focus
+	if k.Mode == modeAdaptive {
+		k.Focus = opts.focus
 	}
 
 	return k
