@@ -7,7 +7,6 @@ import (
 	"io"
 	"math"
 	"math/rand"
-	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -16,8 +15,8 @@ import (
 )
 
 // The generators below return functions producing the successive tests of a
-// session, each made of one or more segments. They return nil once there are
-// no more tests.
+// session, each made of one or more segments, see funcSource. They return nil
+// once there are no more tests.
 
 // generatorStore gives the generators the saved data they make tests from.
 type generatorStore interface {
@@ -35,53 +34,61 @@ type textSources struct {
 	stdinIsTerminal bool
 }
 
-// newTestGenerator returns a function producing the successive tests
-// requested on the command line, or nil once there are no more, and what they
-// are made of.
-func newTestGenerator(opts options, src textSources) (func() []segment, testKind, error) {
-	gen, kind, err := selectTestGenerator(opts, src)
+// newTestSource returns the source of the tests requested on the command
+// line and what they are made of.
+func newTestSource(opts options, src textSources) (testSource, testKind, error) {
+	tests, kind, err := selectTestSource(opts, src)
 	if err != nil {
 		return nil, testKind{}, err
 	}
 
-	return gen, kind.withVariant(opts), nil
+	return tests, kind.withVariant(opts), nil
 }
 
-// selectTestGenerator returns the generator of the tests requested on the
-// command line and where their text comes from, see newTestGenerator.
-func selectTestGenerator(opts options, src textSources) (func() []segment, testKind, error) {
+// selectTestSource returns the source of the tests requested on the command
+// line and where their text comes from, see newTestSource.
+func selectTestSource(opts options, src textSources) (testSource, testKind, error) {
 	words := newWordOptions(opts)
 	res, rng := src.resources, src.rng
 
 	switch {
 	case opts.adaptive:
 		list := adaptiveWordList(opts)
-		gen, err := generateAdaptiveTest(rng, res, list, words, opts.focus, src.store)
-		return gen, testKind{mode: modeAdaptive, source: filepath.Base(list)}, err
+		tests, err := newAdaptiveSource(rng, res, list, words, opts.focus, src.store)
+		return tests, testKind{mode: modeAdaptive, source: filepath.Base(list)}, err
 	case opts.wordFile != "":
-		gen, err := generateWordTest(rng, res, opts.wordFile, words)
-		return gen, testKind{mode: modeWords, source: filepath.Base(opts.wordFile)}, err
+		tests, err := fromFunc(generateWordTest(rng, res, opts.wordFile, words))
+		return tests, testKind{mode: modeWords, source: filepath.Base(opts.wordFile)}, err
 	case opts.quoteFile != "":
-		gen, err := generateQuoteTest(rng, res, opts.quoteFile)
-		return gen, testKind{mode: modeQuotes, source: filepath.Base(opts.quoteFile)}, err
+		tests, err := fromFunc(generateQuoteTest(rng, res, opts.quoteFile))
+		return tests, testKind{mode: modeQuotes, source: filepath.Base(opts.quoteFile)}, err
 	case opts.mistakes:
-		gen, err := generateMistakesTest(rng, words, src.store)
-		return gen, testKind{mode: modeMistakes}, err
+		tests, err := fromFunc(generateMistakesTest(rng, words, src.store))
+		return tests, testKind{mode: modeMistakes}, err
 	case !src.stdinIsTerminal:
 		b, err := io.ReadAll(src.stdin)
 		if err != nil {
 			return nil, testKind{}, err
 		}
 
-		gen, err := generateTestFromData(b, opts.raw, opts.multi)
-		return gen, testKind{mode: modeText}, err
+		tests, err := fromFunc(generateTestFromData(b, opts.raw, opts.multi))
+		return tests, testKind{mode: modeText}, err
 	case len(opts.files) > 0:
-		gen, err := generateTestFromFile(opts.files[0], opts.startParagraph, src.store)
-		return gen, testKind{mode: modeFile, source: filepath.Base(opts.files[0])}, err
+		tests, err := newFileSource(opts.files[0], opts.startParagraph, src.store)
+		return tests, testKind{mode: modeFile, source: filepath.Base(opts.files[0])}, err
 	default:
-		gen, err := generateWordTest(rng, res, defaultWordList, words)
-		return gen, testKind{mode: modeWords, source: defaultWordList}, err
+		tests, err := fromFunc(generateWordTest(rng, res, defaultWordList, words))
+		return tests, testKind{mode: modeWords, source: defaultWordList}, err
 	}
+}
+
+// fromFunc returns the source of the tests made by gen, unless err is set.
+func fromFunc(gen func() []segment, err error) (testSource, error) {
+	if err != nil {
+		return nil, err
+	}
+
+	return funcSource(gen), nil
 }
 
 // defaultWordList is the word list of word tests unless -words is given.
@@ -357,44 +364,4 @@ func generateTestFromData(data []byte, raw bool, split bool) (func() []segment, 
 			return segments
 		}, nil
 	}
-}
-
-// generateTestFromFile makes a test of each paragraph of the file at path,
-// starting from the given paragraph, or else from the one reached last.
-func generateTestFromFile(path string, startParagraph int, st paragraphStore) (func() []segment, error) {
-	var err error
-
-	if path, err = filepath.Abs(path); err != nil {
-		return nil, err
-	}
-
-	if startParagraph != -1 {
-		if err := st.SetParagraph(path, startParagraph); err != nil {
-			return nil, err
-		}
-	}
-
-	idx := st.Paragraph(path) - 1
-
-	b, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("failed to read %s", path)
-	}
-	paragraphs := getParagraphs(string(b))
-	if len(paragraphs) == 0 {
-		return nil, fmt.Errorf("%s does not contain any text", path)
-	}
-
-	return func() []segment {
-		idx++
-		if err := st.SetParagraph(path, idx); err != nil {
-			panic(err)
-		}
-
-		if idx >= len(paragraphs) {
-			return nil
-		}
-
-		return []segment{{paragraphs[idx], ""}}
-	}, nil
 }

@@ -243,7 +243,7 @@ func TestGenerateTestFromFile(t *testing.T) {
 	st := &memStore{}
 	path := writeTextFile(t, "p0\n\np1\nstill p1\n\np2\n")
 
-	gen := mustGen(generateTestFromFile(path, -1, st))
+	gen := nextFunc(t, mustSource(newFileSource(path, -1, st)))
 	assertNextParagraph(t, gen, "p0")
 	assertNextParagraph(t, gen, "p1\nstill p1")
 	assertNextParagraph(t, gen, "p2")
@@ -254,24 +254,24 @@ func TestGenerateTestFromFileRemembersPosition(t *testing.T) {
 	st := &memStore{}
 	path := writeTextFile(t, "p0\n\np1\n\np2\n")
 
-	gen := mustGen(generateTestFromFile(path, -1, st))
+	gen := nextFunc(t, mustSource(newFileSource(path, -1, st)))
 	assertNextParagraph(t, gen, "p0")
 	assertNextParagraph(t, gen, "p1")
 
 	// A new run resumes from the paragraph that was last shown.
-	gen = mustGen(generateTestFromFile(path, -1, st))
+	gen = nextFunc(t, mustSource(newFileSource(path, -1, st)))
 	assertNextParagraph(t, gen, "p1")
 	assertNextParagraph(t, gen, "p2")
 	assertNextParagraph(t, gen, "")
 
-	gen = mustGen(generateTestFromFile(path, -1, st))
+	gen = nextFunc(t, mustSource(newFileSource(path, -1, st)))
 	assertNextParagraph(t, gen, "")
 
 	// -start overrides (and resets) the stored position.
-	gen = mustGen(generateTestFromFile(path, 0, st))
+	gen = nextFunc(t, mustSource(newFileSource(path, 0, st)))
 	assertNextParagraph(t, gen, "p0")
 
-	gen = mustGen(generateTestFromFile(path, 2, st))
+	gen = nextFunc(t, mustSource(newFileSource(path, 2, st)))
 	assertNextParagraph(t, gen, "p2")
 }
 
@@ -280,9 +280,9 @@ func TestGenerateTestFromFileTracksFilesSeparately(t *testing.T) {
 	a := writeTextFile(t, "a0\n\na1\n")
 	b := writeTextFile(t, "b0\n\nb1\n")
 
-	assertNextParagraph(t, mustGen(generateTestFromFile(a, 1, st)), "a1")
-	assertNextParagraph(t, mustGen(generateTestFromFile(b, -1, st)), "b0")
-	assertNextParagraph(t, mustGen(generateTestFromFile(a, -1, st)), "a1")
+	assertNextParagraph(t, nextFunc(t, mustSource(newFileSource(a, 1, st))), "a1")
+	assertNextParagraph(t, nextFunc(t, mustSource(newFileSource(b, -1, st))), "b0")
+	assertNextParagraph(t, nextFunc(t, mustSource(newFileSource(a, -1, st))), "a1")
 }
 
 func TestNewTestGenerator(t *testing.T) {
@@ -332,11 +332,11 @@ func TestNewTestGenerator(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			gen, kind, err := newTestGenerator(parseFlags(tc.args), textSources{st, res, newRand(), strings.NewReader(tc.stdin), tc.stdinIsTerminal})
+			gen, kind, err := newTestSource(parseFlags(tc.args), textSources{st, res, newRand(), strings.NewReader(tc.stdin), tc.stdinIsTerminal})
 			if err != nil {
 				t.Fatal(err)
 			}
-			tc.check(t, gen())
+			tc.check(t, nextTest(t, gen))
 
 			if kind != tc.kind {
 				t.Errorf("kind = %+v, want %+v", kind, tc.kind)
@@ -651,7 +651,7 @@ func TestGeneratorsRejectEmptyText(t *testing.T) {
 		{"raw", func() (func() []segment, error) { return generateTestFromData([]byte(" \n"), true, false) }, "there is no text to type"},
 		{"paragraphs", func() (func() []segment, error) { return generateTestFromData([]byte(" \n\n "), false, false) }, "there is no text to type"},
 		{"multi", func() (func() []segment, error) { return generateTestFromData(nil, false, true) }, "there is no text to type"},
-		{"file", func() (func() []segment, error) { return generateTestFromFile(blankFile, -1, &memStore{}) }, blankFile + " does not contain any text"},
+		{"file", func() (func() []segment, error) { _, err := newFileSource(blankFile, -1, &memStore{}); return nil, err }, blankFile + " does not contain any text"},
 		{"quotes", func() (func() []segment, error) { return generateQuoteTest(newRand(), res, "blank") }, "blank does not contain any quotes"},
 	}
 
@@ -708,11 +708,11 @@ func TestGeneratorsAreReproducible(t *testing.T) {
 		{"-adaptive", "-numbers"},
 	} {
 		tests := func() [][]segment {
-			gen, _, err := newTestGenerator(parseFlags(args), textSources{st, res, newRand(), strings.NewReader(""), true})
+			gen, _, err := newTestSource(parseFlags(args), textSources{st, res, newRand(), strings.NewReader(""), true})
 			if err != nil {
 				t.Fatal(err)
 			}
-			return [][]segment{gen(), gen(), gen()}
+			return [][]segment{nextTest(t, gen), nextTest(t, gen), nextTest(t, gen)}
 		}
 
 		if first, second := tests(), tests(); !reflect.DeepEqual(first, second) {

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io"
 	"math"
 	"reflect"
 	"strings"
@@ -186,7 +185,7 @@ func TestGenerateAdaptiveTestFavoursWeakWords(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "list", "the her err rare")
 
-	got := drawShares(t, mustGen(generateAdaptiveTest(newRand(), res, "list", wordOptions{n: 100, g: 4}, 0, keyStatsOf(weakTH()))))
+	got := drawShares(t, nextFunc(t, mustSource(newAdaptiveSource(newRand(), res, "list", wordOptions{n: 100, g: 4}, 0, keyStatsOf(weakTH())))))
 
 	// Uniformly drawn every word would make a quarter of the test.
 	for _, w := range []string{"her", "err", "rare"} {
@@ -200,7 +199,7 @@ func TestGenerateAdaptiveTestWithoutStatistics(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "list", "the her err rare")
 
-	got := drawShares(t, mustGen(generateAdaptiveTest(newRand(), res, "list", wordOptions{n: 100, g: 4}, 40, keyStatsOf(newKeyStats()))))
+	got := drawShares(t, nextFunc(t, mustSource(newAdaptiveSource(newRand(), res, "list", wordOptions{n: 100, g: 4}, 40, keyStatsOf(newKeyStats())))))
 
 	for _, w := range []string{"the", "her", "err", "rare"} {
 		if got[w] < 0.18 || got[w] > 0.32 {
@@ -218,7 +217,7 @@ func thShare(t *testing.T, focus int) float64 {
 	writeUserResource(t, dir, "words", "list", "the this that them then ab cd fg ij kl mn op qu vw xz ac bd ce df eg")
 
 	share := 0.0
-	for w, s := range drawShares(t, mustGen(generateAdaptiveTest(newRand(), res, "list", wordOptions{n: 100, g: 4}, focus, keyStatsOf(weakTH())))) {
+	for w, s := range drawShares(t, nextFunc(t, mustSource(newAdaptiveSource(newRand(), res, "list", wordOptions{n: 100, g: 4}, focus, keyStatsOf(weakTH()))))) {
 		if strings.Contains(w, "th") {
 			share += s
 		}
@@ -250,9 +249,11 @@ func TestGenerateAdaptiveTestFocusOnASingleWord(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "list", "the ab cd")
 
+	src := mustSource(newAdaptiveSource(newRand(), res, "list", wordOptions{n: 4, g: 1}, 100, keyStatsOf(weakTH())))
 	done := make(chan []segment, 1)
 	go func() {
-		done <- mustGen(generateAdaptiveTest(newRand(), res, "list", wordOptions{n: 4, g: 1}, 100, keyStatsOf(weakTH())))()
+		test, _ := src.next()
+		done <- test
 	}()
 
 	select {
@@ -289,36 +290,26 @@ func drawShares(t *testing.T, gen func() []segment) map[string]float64 {
 func TestAppShowsAdaptiveFocus(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "list", "the her err rare")
-	st := newTestStore(t)
-	if err := writeValue(st.path(keyStatsFile), weakTH()); err != nil {
-		t.Fatal(err)
-	}
+	src := mustSource(newAdaptiveSource(newRand(), res, "list", wordOptions{n: 5, g: 1}, 40, keyStatsOf(weakTH())))
 
-	sim := newSimScreen(t)
-	a, err := newApp(sim, parseFlags([]string{"-adaptive", "-words", "list", "-noreport"}), testKind{mode: "adaptive", source: "list"}, appDeps{st, res, time.Now})
-	if err != nil {
-		t.Fatal(err)
-	}
-	a.typer.tty = io.Discard
-
-	var calls int
-	done := startApp(a, testSequence(&calls, "ab"))
+	a, sim := newTestApp(t, parseFlags([]string{"-noreport"}))
+	done := startSource(a, src)
 	waitForScreenText(t, sim, "Practicing th", true)
 
 	sendKeys(t, sim, tcell.KeyCtrlC)
 	waitExitCode(t, done)
 }
 
-// The word list of adaptive tests is read by both the generator and the app.
 func TestAdaptiveWordListFromStdin(t *testing.T) {
 	res, _ := newTestResources(t)
-	res.stdin = &onceReader{r: strings.NewReader("alpha beta gamma delta")}
-	opts := parseFlags([]string{"-adaptive", "-words", "-"})
+	res.stdin = &onceReader{r: strings.NewReader("alpha")}
+	opts := parseFlags([]string{"-adaptive", "-words", "-", "-n", "3"})
 
-	if _, _, err := newTestGenerator(opts, textSources{newTestStore(t), res, newRand(), strings.NewReader(""), true}); err != nil {
-		t.Fatalf("generator: %v", err)
+	src, _, err := newTestSource(opts, textSources{&memStore{}, res, newRand(), strings.NewReader(""), true})
+	if err != nil {
+		t.Fatal(err)
 	}
-	if _, err := loadAdaptiveWords(res, adaptiveWordList(opts)); err != nil {
-		t.Errorf("loading the word list a second time: %v", err)
+	if got := nextTest(t, src); !reflect.DeepEqual(got, []segment{{"alpha alpha alpha", ""}}) {
+		t.Errorf("next() = %q, want the words read from stdin", got)
 	}
 }
