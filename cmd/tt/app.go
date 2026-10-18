@@ -21,6 +21,7 @@ type appDeps struct {
 	store     sessionStore
 	resources resourceLister
 	now       func() time.Time
+	cursor    cursorShaper // Shapes the cursor while typing.
 }
 
 // app runs the sequence of tests requested on the command line.
@@ -40,47 +41,53 @@ func newApp(scr tcell.Screen, s settings, deps appDeps) (*app, error) {
 	a := &app{rules: s.rules, output: s.output, kind: s.source.kind, scr: scr, store: deps.store, now: deps.now}
 	res, display := deps.resources, s.display
 
-	if display.noTheme {
-		a.typer = NewTyper(scr, true, terminalTheme)
-	} else {
-		th, err := loadTheme(res, display.theme, display.opaqueBg)
-		if err != nil {
-			return nil, fmt.Errorf("%s theme is invalid: %v", display.theme, err)
-		}
-
-		a.typer = NewTyper(scr, display.bold, th)
-		a.theme = display.theme
-
-		themes := newThemeCycler(res, display.theme, display.opaqueBg)
-		a.typer.CycleTheme = func(direction int) (string, error) {
-			name, th, err := themes.next(direction)
-			if err != nil || name == "" {
-				return name, err
-			}
-
-			a.typer.SetTheme(th)
-			a.typer.RefreshScreen()
-			a.theme = name
-			return name, nil
-		}
+	opts := []typerOption{
+		withRules(typingRules{noSkip: s.rules.noSkip, noBackspace: s.rules.noBackspace}),
+		withPace(s.rules.pace),
+		withClock(deps.now),
+		withCursor(deps.cursor),
 	}
-
-	a.typer.SetHighlightMode(display.highlightCurrent, display.highlightNext)
-
-	a.typer.now = deps.now
-	a.typer.SkipWord = !s.rules.noSkip
-	a.typer.DisableBackspace = s.rules.noBackspace
-	a.typer.BlockCursor = display.blockCursor
-	a.typer.ShowWpm = display.showWpm
-	a.typer.ShowAccuracy = display.showAccuracy
-	a.typer.Blind = s.rules.blind
-	a.typer.Pace = s.rules.pace
 	if display.reflow {
-		a.typer.Wrap = func(text string, sw int) string {
+		opts = append(opts, withWrap(func(text string, sw int) string {
 			return reflow(text, lineWidth(display.maxLineLen, sw))
-		}
+		}))
 	}
 
+	viewOpts := viewOptions{
+		bold:             display.bold || display.noTheme, //Typed text can't be told apart by its colour.
+		highlightCurrent: display.highlightCurrent,
+		highlightNext:    display.highlightNext,
+		blind:            s.rules.blind,
+		showWpm:          display.showWpm,
+		showAccuracy:     display.showAccuracy,
+	}
+
+	if display.noTheme {
+		a.typer = newTyper(scr, newView(scr, terminalTheme, viewOpts), opts...)
+		return a, nil
+	}
+
+	th, err := loadTheme(res, display.theme, display.opaqueBg)
+	if err != nil {
+		return nil, fmt.Errorf("%s theme is invalid: %v", display.theme, err)
+	}
+	a.theme = display.theme
+
+	v := newView(scr, th, viewOpts)
+	themes := newThemeCycler(res, display.theme, display.opaqueBg)
+	cycle := func(direction int) (string, error) {
+		name, th, err := themes.next(direction)
+		if err != nil || name == "" {
+			return name, err
+		}
+
+		v.setTheme(th)
+		v.clear()
+		a.theme = name
+		return name, nil
+	}
+
+	a.typer = newTyper(scr, v, append(opts, withThemeCycler(cycle))...)
 	return a, nil
 }
 
@@ -104,7 +111,7 @@ func (a *app) run(src testSource) (int, error) {
 		}
 
 		if d, ok := src.(describer); ok {
-			a.typer.ShowStatusMessage(d.describe(), 0)
+			a.typer.showStatusMessage(d.describe(), 0)
 		}
 
 		o, res := a.typer.Start(tests[idx], a.rules.timeout)

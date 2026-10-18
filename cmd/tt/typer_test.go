@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"fmt"
-	"io"
 	"reflect"
 	"strings"
 	"sync"
@@ -62,14 +61,7 @@ func waitForScreenText(t *testing.T, sim tcell.SimulationScreen, needle string, 
 }
 
 func TestQuestionMarkTogglesKeyboardHelp(t *testing.T) {
-	sim := tcell.NewSimulationScreen("")
-	if err := sim.Init(); err != nil {
-		t.Fatalf("Init: %v", err)
-	}
-	defer sim.Fini()
-
-	typer := NewTyper(sim, true, testTheme)
-	typer.tty = io.Discard
+	typer, sim := newTestTyper(t)
 	done := make(chan outcome, 1)
 	go func() {
 		o, _ := typer.start("alpha beta", -1, false, "")
@@ -105,14 +97,22 @@ var (
 	testTheme = theme{testFg, testBg, testHi, testHi2, testHi3, testErrCol}
 )
 
-func newTestTyper(t *testing.T) (*typer, tcell.SimulationScreen) {
+// newTestTyper returns a typer with the given options on a simulation screen,
+// drawing with the default view options.
+func newTestTyper(t *testing.T, opts ...typerOption) (*typer, tcell.SimulationScreen) {
+	t.Helper()
+
+	return newTestTyperWithView(t, defaultViewOptions, opts...)
+}
+
+// newTestTyperWithView returns a typer with the given options on a
+// simulation screen, drawing with the given view options. It uses the keys of
+// linux, whatever the system running the tests.
+func newTestTyperWithView(t *testing.T, vo viewOptions, opts ...typerOption) (*typer, tcell.SimulationScreen) {
 	t.Helper()
 
 	sim := newSimScreen(t)
-
-	ty := NewTyper(sim, true, testTheme)
-	ty.tty = io.Discard
-	ty.keys = newKeymap("linux") //The keys of the tests, whatever the system running them.
+	ty := newTyper(sim, newView(sim, testTheme, vo), append([]typerOption{withKeymap(newKeymap("linux"))}, opts...)...)
 
 	return ty, sim
 }
@@ -252,8 +252,7 @@ func TestTyperBackspaceAcrossLineBreak(t *testing.T) {
 }
 
 func TestTyperDisableBackspace(t *testing.T) {
-	ty, sim := newTestTyper(t)
-	ty.DisableBackspace = true
+	ty, sim := newTestTyper(t, withRules(typingRules{noBackspace: true}))
 
 	got := typeText(t, ty, sim, "ab cd", "x", tcell.KeyBackspace2, "b c", tcell.KeyCtrlW, "d")
 	assertOutcome(t, got, outcomeComplete, 4, 3, 1, []mistake{{"ab", "xb"}})
@@ -301,8 +300,7 @@ func TestTyperSpaceAtWordStartIsIgnored(t *testing.T) {
 }
 
 func TestTyperNoSkip(t *testing.T) {
-	ty, sim := newTestTyper(t)
-	ty.SkipWord = false
+	ty, sim := newTestTyper(t, withRules(typingRules{noSkip: true}))
 
 	got := typeText(t, ty, sim, "ab cd", "a  cd")
 	assertOutcome(t, got, outcomeComplete, 4, 4, 1, []mistake{{"ab", "a "}})
@@ -363,9 +361,8 @@ func wrapAtScreenWidth(text string, sw int) string {
 }
 
 func TestTyperResizeKeepsProgress(t *testing.T) {
-	ty, sim := newTestTyper(t)
-	ty.Wrap = wrapAtScreenWidth
-	clock := useFakeClock(ty)
+	clock := newFakeClock()
+	ty, sim := newTestTyper(t, withWrap(wrapAtScreenWidth), withFakeClock(clock))
 
 	done := startTyper(ty, []segment{{"alpha beta gamma delta", ""}}, -1)
 	x, y := textOrigin(t, sim, "alpha beta gamma delta")
@@ -401,8 +398,7 @@ func TestTyperResizeWithoutWrap(t *testing.T) {
 }
 
 func TestTyperWrapsEachSegmentAtTheCurrentWidth(t *testing.T) {
-	ty, sim := newTestTyper(t)
-	ty.Wrap = wrapAtScreenWidth
+	ty, sim := newTestTyper(t, withWrap(wrapAtScreenWidth))
 
 	done := startTyper(ty, []segment{{"ab", ""}, {"alpha beta gamma delta", ""}}, -1)
 	waitForScreenText(t, sim, "ab", true)
@@ -434,8 +430,8 @@ func TestTyperMultipleSegments(t *testing.T) {
 }
 
 func TestTyperTimeout(t *testing.T) {
-	ty, sim := newTestTyper(t)
-	clock := useFakeClock(ty)
+	clock := newFakeClock()
+	ty, sim := newTestTyper(t, withFakeClock(clock))
 
 	done := startTyper(ty, []segment{{"alpha beta", ""}}, 10*time.Second)
 	x, y := textOrigin(t, sim, "alpha beta")
@@ -452,8 +448,8 @@ func TestTyperTimeout(t *testing.T) {
 }
 
 func TestTyperTimeoutIgnoresLateKeys(t *testing.T) {
-	ty, sim := newTestTyper(t)
-	clock := useFakeClock(ty)
+	clock := newFakeClock()
+	ty, sim := newTestTyper(t, withFakeClock(clock))
 
 	done := startTyper(ty, []segment{{"abcd", ""}}, 10*time.Second)
 	x, y := textOrigin(t, sim, "abcd")
@@ -474,8 +470,8 @@ func TestTyperTimeoutIgnoresLateKeys(t *testing.T) {
 }
 
 func TestTyperTimeoutSpansSegments(t *testing.T) {
-	ty, sim := newTestTyper(t)
-	clock := useFakeClock(ty)
+	clock := newFakeClock()
+	ty, sim := newTestTyper(t, withFakeClock(clock))
 
 	// The time spent on the first segment is subtracted from the time
 	// available for the second one.
@@ -501,8 +497,8 @@ func TestTyperTimeoutSpansSegments(t *testing.T) {
 }
 
 func TestTyperTimerStartsOnFirstKey(t *testing.T) {
-	ty, sim := newTestTyper(t)
-	clock := useFakeClock(ty)
+	clock := newFakeClock()
+	ty, sim := newTestTyper(t, withFakeClock(clock))
 
 	done := startTyper(ty, []segment{{"ab", ""}}, 2*time.Second)
 	textOrigin(t, sim, "ab")
@@ -595,8 +591,7 @@ func waitForColors(t *testing.T, sim tcell.SimulationScreen, x, y int, want map[
 }
 
 func TestTyperColors(t *testing.T) {
-	ty, sim := newTestTyper(t)
-	ty.SkipWord = false
+	ty, sim := newTestTyper(t, withRules(typingRules{noSkip: true}))
 
 	done := startTyper(ty, []segment{{"ab cd ef", ""}}, -1)
 	x, y := textOrigin(t, sim, "ab cd ef")
@@ -643,8 +638,7 @@ func TestTyperHighlightModes(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ty, sim := newTestTyper(t)
-			ty.SetHighlightMode(tc.highlightCurrent, tc.highlightNext)
+			ty, sim := newTestTyperWithView(t, viewOptions{bold: true, highlightCurrent: tc.highlightCurrent, highlightNext: tc.highlightNext})
 
 			done := startTyper(ty, []segment{{"ab cd ef", ""}}, -1)
 			x, y := textOrigin(t, sim, "ab cd ef")
@@ -662,12 +656,11 @@ func TestTyperHighlightModes(t *testing.T) {
 }
 
 func TestTyperSetThemeWhileTyping(t *testing.T) {
-	ty, sim := newTestTyper(t)
-
-	ty.CycleTheme = func(direction int) (string, error) {
-		ty.SetTheme(theme{tcell.ColorAqua, tcell.ColorNavy, tcell.ColorLime, tcell.ColorPurple, tcell.ColorOlive, tcell.ColorMaroon})
+	var ty *typer
+	ty, sim := newTestTyper(t, withThemeCycler(func(direction int) (string, error) {
+		ty.view.setTheme(theme{tcell.ColorAqua, tcell.ColorNavy, tcell.ColorLime, tcell.ColorPurple, tcell.ColorOlive, tcell.ColorMaroon})
 		return "custom", nil
-	}
+	}))
 
 	done := startTyper(ty, []segment{{"ab cd", ""}}, -1)
 	x, y := textOrigin(t, sim, "ab cd")
@@ -684,16 +677,14 @@ func TestTyperSetThemeWhileTyping(t *testing.T) {
 }
 
 func TestTyperCycleTheme(t *testing.T) {
-	ty, sim := newTestTyper(t)
-
 	directions := make(chan int, 10)
-	ty.CycleTheme = func(direction int) (string, error) {
+	ty, sim := newTestTyper(t, withThemeCycler(func(direction int) (string, error) {
 		directions <- direction
 		if direction > 0 {
 			return "nord", nil
 		}
 		return "", fmt.Errorf("no valid themes available")
-	}
+	}))
 
 	done := startTyper(ty, []segment{{"ab", ""}}, -1)
 
@@ -727,10 +718,8 @@ func TestTyperShowsAttribution(t *testing.T) {
 }
 
 func TestTyperShowsLiveStats(t *testing.T) {
-	ty, sim := newTestTyper(t)
-	ty.ShowWpm = true
-	ty.ShowAccuracy = true
-	clock := useFakeClock(ty)
+	clock := newFakeClock()
+	ty, sim := newTestTyperWithView(t, viewOptions{bold: true, highlightCurrent: true, highlightNext: true, showWpm: true, showAccuracy: true}, withFakeClock(clock))
 
 	done := startTyper(ty, []segment{{"ab cd ef", ""}}, -1)
 	x, y := textOrigin(t, sim, "ab cd ef")
@@ -786,8 +775,7 @@ func TestCalcAccuracy(t *testing.T) {
 }
 
 func TestTyperLiveAccuracyWithoutKeystrokes(t *testing.T) {
-	ty, sim := newTestTyper(t)
-	ty.ShowAccuracy = true
+	ty, sim := newTestTyperWithView(t, viewOptions{bold: true, highlightCurrent: true, highlightNext: true, showAccuracy: true})
 
 	done := startTyper(ty, []segment{{"ab cd", ""}}, -1)
 	sendKeys(t, sim, " ")
@@ -842,30 +830,20 @@ func TestTestResultStats(t *testing.T) {
 }
 
 func TestTyperCursorShape(t *testing.T) {
-	for _, blockCursor := range []bool{false, true} {
-		ty, sim := newTestTyper(t)
-		ty.BlockCursor = blockCursor
+	var tty bytes.Buffer
+	ty, sim := newTestTyper(t, withCursor(ttyCursor{&tty}))
 
-		var tty bytes.Buffer
-		ty.tty = &tty
+	typeText(t, ty, sim, "ab", "ab")
 
-		typeText(t, ty, sim, "ab", "ab")
-
-		// A bar cursor is used while typing unless -blockcursor is given.
-		want := "\033[5 q\033[2 q"
-		if blockCursor {
-			want = ""
-		}
-		if tty.String() != want {
-			t.Errorf("with BlockCursor %t the terminal got %q, want %q", blockCursor, tty.String(), want)
-		}
+	// The cursor has the shape of typing while typing only.
+	if want := "\033[5 q\033[2 q"; tty.String() != want {
+		t.Errorf("the terminal got %q, want %q", tty.String(), want)
 	}
 }
 
 func TestTyperTab(t *testing.T) {
 	for _, skip := range []bool{true, false} {
-		ty, sim := newTestTyper(t)
-		ty.SkipWord = skip
+		ty, sim := newTestTyper(t, withRules(typingRules{noSkip: !skip}))
 
 		got := typeText(t, ty, sim, "if x {\n\treturn\n}", "if x {", tcell.KeyTab, "return}")
 		if got.outcome != outcomeComplete || got.mistakes != nil || got.wrongKeys != 0 {
@@ -875,8 +853,7 @@ func TestTyperTab(t *testing.T) {
 }
 
 func TestTyperDrawsTabs(t *testing.T) {
-	ty, sim := newTestTyper(t)
-	ty.SkipWord = false
+	ty, sim := newTestTyper(t, withRules(typingRules{noSkip: true}))
 
 	done := startTyper(ty, []segment{{"ab\n\tcd", ""}}, -1)
 	x, y := textOrigin(t, sim, "ab")
@@ -905,9 +882,7 @@ func TestTyperDrawsTabs(t *testing.T) {
 }
 
 func TestTyperBlind(t *testing.T) {
-	ty, sim := newTestTyper(t)
-	ty.SkipWord = false
-	ty.Blind = true
+	ty, sim := newTestTyperWithView(t, viewOptions{bold: true, highlightCurrent: true, highlightNext: true, blind: true}, withRules(typingRules{noSkip: true}))
 
 	done := startTyper(ty, []segment{{"ab cd ef", ""}}, -1)
 	x, y := textOrigin(t, sim, "ab cd ef")
@@ -944,17 +919,21 @@ func (c *fakeClock) advance(d time.Duration) {
 	c.t = c.t.Add(d)
 }
 
-// useFakeClock makes ty use a fake clock and update the screen often.
-func useFakeClock(ty *typer) *fakeClock {
-	clock := &fakeClock{t: time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)}
-	ty.now = clock.now
-	ty.tick = 10 * time.Millisecond
-	return clock
+func newFakeClock() *fakeClock {
+	return &fakeClock{t: time.Date(2026, 10, 10, 12, 0, 0, 0, time.UTC)}
+}
+
+// withFakeClock makes a typer use clock and update the screen often.
+func withFakeClock(clock *fakeClock) typerOption {
+	return func(t *typer) {
+		withClock(clock.now)(t)
+		withTick(10 * time.Millisecond)(t)
+	}
 }
 
 func TestTyperMeasuresTimeWithItsClock(t *testing.T) {
-	ty, sim := newTestTyper(t)
-	clock := useFakeClock(ty)
+	clock := newFakeClock()
+	ty, sim := newTestTyper(t, withFakeClock(clock))
 
 	done := startTyper(ty, []segment{{"abcde", ""}}, -1)
 	x, y := textOrigin(t, sim, "abcde")
@@ -994,9 +973,8 @@ func waitForReversed(t *testing.T, sim tcell.SimulationScreen, x, y, n int, want
 }
 
 func TestTyperPacer(t *testing.T) {
-	ty, sim := newTestTyper(t)
-	ty.Pace = 60
-	clock := useFakeClock(ty)
+	clock := newFakeClock()
+	ty, sim := newTestTyper(t, withPace(60), withFakeClock(clock))
 
 	done := startTyper(ty, []segment{{"abcdefghij", ""}}, -1)
 	x, y := textOrigin(t, sim, "abcdefghij")
@@ -1024,8 +1002,8 @@ func TestTyperPacer(t *testing.T) {
 }
 
 func TestTyperWithoutPacer(t *testing.T) {
-	ty, sim := newTestTyper(t)
-	clock := useFakeClock(ty)
+	clock := newFakeClock()
+	ty, sim := newTestTyper(t, withFakeClock(clock))
 
 	done := startTyper(ty, []segment{{"abcdefghij", ""}}, -1)
 	x, y := textOrigin(t, sim, "abcdefghij")
@@ -1044,26 +1022,22 @@ func TestTyperWithoutPacer(t *testing.T) {
 }
 
 func TestTyperRefreshInterval(t *testing.T) {
-	ty, _ := newTestTyper(t)
-
-	if got := ty.refreshInterval(); got != 500*time.Millisecond {
-		t.Errorf("without a pacer the screen is updated every %v, want 500ms", got)
+	if ty, _ := newTestTyper(t); ty.refreshInterval() != 500*time.Millisecond {
+		t.Errorf("without a pacer the screen is updated every %v, want 500ms", ty.refreshInterval())
 	}
 
-	ty.Pace = 60
-	if got := ty.refreshInterval(); got != paceTick {
-		t.Errorf("with a pacer the screen is updated every %v, want %v", got, paceTick)
+	if ty, _ := newTestTyper(t, withPace(60)); ty.refreshInterval() != paceTick {
+		t.Errorf("with a pacer the screen is updated every %v, want %v", ty.refreshInterval(), paceTick)
 	}
 
-	ty.tick = 10 * time.Millisecond
-	if got := ty.refreshInterval(); got != 10*time.Millisecond {
-		t.Errorf("refreshInterval() = %v, want the shorter configured interval", got)
+	if ty, _ := newTestTyper(t, withPace(60), withTick(10*time.Millisecond)); ty.refreshInterval() != 10*time.Millisecond {
+		t.Errorf("refreshInterval() = %v, want the shorter configured interval", ty.refreshInterval())
 	}
 }
 
 func TestTyperRecordsKeystrokes(t *testing.T) {
-	ty, sim := newTestTyper(t)
-	clock := useFakeClock(ty)
+	clock := newFakeClock()
+	ty, sim := newTestTyper(t, withFakeClock(clock))
 
 	done := startTyper(ty, []segment{{"ab", ""}, {"c", ""}}, -1)
 	x, y := textOrigin(t, sim, "ab")

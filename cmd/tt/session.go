@@ -1,15 +1,27 @@
 package main
 
 import (
-	"strconv"
 	"time"
-
-	"github.com/gdamore/tcell"
 )
 
-// session is the typing of a single segment of a test.
+// typingRules say how the keys typed are handled.
+type typingRules struct {
+	noSkip      bool // Space is typed like any character, rather than skipping the current word.
+	noBackspace bool // Typed characters can't be deleted.
+}
+
+// sessionDeps are what a session is typed with.
+type sessionDeps struct {
+	rules typingRules
+	now   func() time.Time
+	wrap  func(text string, screenWidth int) string // Lays out the text on the screen, nil to show it as is.
+	pace  int                                       // Speed in WPM of a pacer going through the text, 0 for none.
+}
+
+// session is the typing of a single segment of a test, laid out on a screen
+// of a given size.
 type session struct {
-	t           *typer
+	sessionDeps
 	state       *typingState
 	attribution string
 	timeLimit   time.Duration // -1 for no time limit.
@@ -20,27 +32,28 @@ type session struct {
 	nc, nr int // Size of the text.
 }
 
-func (t *typer) newSession(text string, timeLimit time.Duration, attribution string) *session {
+func newSession(text, attribution string, timeLimit time.Duration, sw, sh int, deps sessionDeps) *session {
 	s := &session{
-		t:           t,
+		sessionDeps: deps,
 		attribution: attribution,
 		timeLimit:   timeLimit,
+		sw:          sw,
+		sh:          sh,
 	}
 
-	s.sw, s.sh = t.Scr.Size()
-	s.state = newTypingState(s.wrap(text))
+	s.state = newTypingState(s.layout(text))
 	s.center()
 
 	return s
 }
 
-// wrap lays out text on the screen.
-func (s *session) wrap(text string) string {
-	if s.t.Wrap == nil {
+// layout lays out text on the screen.
+func (s *session) layout(text string) string {
+	if s.wrap == nil {
 		return text
 	}
 
-	return s.t.Wrap(text, s.sw)
+	return s.wrap(text, s.sw)
 }
 
 // center places the text at the center of the screen.
@@ -50,28 +63,31 @@ func (s *session) center() {
 	s.y = (s.sh - s.nr) / 2
 }
 
-// resize lays out the text again for the current size of the screen, keeping
+// resize lays out the text again for a screen of the given size, keeping
 // what was typed.
-func (s *session) resize() {
-	s.sw, s.sh = s.t.Scr.Size()
-	s.state.relayout(s.wrap(string(s.state.text)))
+func (s *session) resize(sw, sh int) {
+	s.sw, s.sh = sw, sh
+	s.state.relayout(s.layout(string(s.state.text)))
 	s.center()
-	s.t.Scr.Clear()
 }
 
 func (s *session) startTimer() {
 	if s.startTime.IsZero() {
-		s.startTime = s.t.now()
+		s.startTime = s.now()
 	}
+}
+
+func (s *session) started() bool {
+	return !s.startTime.IsZero()
 }
 
 // elapsed returns the time since the timer started, 0 before it does.
 func (s *session) elapsed() time.Duration {
-	if s.startTime.IsZero() {
+	if !s.started() {
 		return 0
 	}
 
-	return s.t.now().Sub(s.startTime)
+	return s.now().Sub(s.startTime)
 }
 
 // timeUp reports whether the time limit is reached.
@@ -103,7 +119,7 @@ func (s *session) result() testResult {
 func (s *session) typeRune(r rune) bool {
 	if !s.state.done() {
 		s.startTimer()
-		s.state.typeRune(r, s.t.SkipWord, s.elapsed())
+		s.state.typeRune(r, !s.rules.noSkip, s.elapsed())
 	}
 
 	return s.state.done()
@@ -112,7 +128,7 @@ func (s *session) typeRune(r rune) bool {
 // correct deletes the previous character, or word, unless backspace is
 // disabled.
 func (s *session) correct(word bool) {
-	if s.t.DisableBackspace {
+	if s.rules.noBackspace {
 		return
 	}
 
@@ -124,78 +140,36 @@ func (s *session) correct(word bool) {
 	}
 }
 
-// handleKey handles a key press and returns the outcome of the test if it
-// ended.
-func (s *session) handleKey(ev *tcell.EventKey) (outcome, bool) {
-	t := s.t
+// frame returns what the screen shows of the session.
+func (s *session) frame() frame {
+	f := frame{
+		text:        s.state.text,
+		typed:       s.state.typed,
+		idx:         s.state.idx,
+		x:           s.x,
+		y:           s.y,
+		nc:          s.nc,
+		nr:          s.nr,
+		pace:        -1,
+		attribution: s.attribution,
+	}
 
-	switch t.keys.action(ev) {
-	case actionQuit:
-		return outcomeQuit, true
-	case actionRestart:
-		return outcomeRestart, true
-	case actionNext:
-		return outcomeNext, true
-	case actionPrevious:
-		return outcomePrevious, true
-	case actionRedraw:
-		t.Scr.Sync()
-	case actionNextTheme:
-		t.cycleTheme(1)
-	case actionPreviousTheme:
-		t.cycleTheme(-1)
-	case actionDeleteChar:
-		s.correct(false)
-	case actionDeleteWord:
-		s.correct(true)
-	case actionToggleHelp:
-		if !s.state.expects(ev.Rune()) {
-			t.showKeyboardHelp = !t.showKeyboardHelp
-		} else if s.typeRune(ev.Rune()) {
-			return outcomeComplete, true
+	if s.started() {
+		if s.pace > 0 {
+			f.pace = paceIndex(s.state.text, s.elapsed(), s.pace)
 		}
-	case actionNone:
-		switch ev.Key() {
-		case tcell.KeyTab:
-			return outcomeComplete, s.typeRune('\t')
-		case tcell.KeyRune:
-			return outcomeComplete, s.typeRune(ev.Rune())
+		if s.timeLimit != -1 {
+			f.timed, f.timeLeft = true, s.timeLimit-s.elapsed()
+		}
+
+		//Only what the live statistics need, see view.drawLiveStats.
+		f.stats = &testResult{
+			duration:     s.duration(),
+			correctChars: s.state.correctChars(),
+			correctKeys:  s.state.correctKeys,
+			wrongKeys:    s.state.wrongKeys,
 		}
 	}
 
-	return outcomeComplete, false
-}
-
-func (s *session) redraw() {
-	t := s.t
-
-	pace := -1
-	if t.Pace > 0 && !s.startTime.IsZero() {
-		pace = paceIndex(s.state.text, s.elapsed(), t.Pace)
-	}
-
-	t.clearKeyboardHelpArea(s.sw, s.sh)
-	t.drawText(s.state, s.x, s.y, pace)
-
-	aw, ah := calcStringDimensions(s.attribution)
-	drawString(t.Scr, s.x+s.nc-aw, s.y+s.nr+1, s.attribution, t.defaultStyle)
-
-	if s.timeLimit != -1 && !s.startTime.IsZero() {
-		remaining := s.timeLimit - s.elapsed()
-		drawString(t.Scr, s.x+s.nc/2, s.y+s.nr+ah+1, "      ", t.defaultStyle)
-		drawString(t.Scr, s.x+s.nc/2, s.y+s.nr+ah+1, strconv.Itoa(int(remaining/1e9)+1), t.defaultStyle)
-	}
-
-	if (t.ShowWpm || t.ShowAccuracy) && !s.startTime.IsZero() {
-		t.drawLiveStats(s.x+s.nc/2-4, s.y-2, s.result())
-	}
-
-	t.drawStatusMessage(s.sw, s.sh)
-
-	if t.showKeyboardHelp {
-		t.drawKeyboardHelp(s.sw, s.sh)
-	}
-
-	//Potentially inefficient, but seems to be good enough
-	t.Scr.Show()
+	return f
 }

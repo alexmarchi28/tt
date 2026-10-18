@@ -2,8 +2,6 @@ package main
 
 import (
 	"fmt"
-	"io"
-	"os"
 	"runtime"
 	"time"
 
@@ -34,115 +32,92 @@ type mistake struct {
 // paceTick is the longest interval between screen updates with a pacer.
 const paceTick = 50 * time.Millisecond
 
+// typer runs the event loop of tests: it hands the keys pressed to the
+// session typed and draws its frames with a view.
 type typer struct {
-	Scr              tcell.Screen
-	SkipWord         bool
-	ShowWpm          bool
-	ShowAccuracy     bool
-	DisableBackspace bool
-	BlockCursor      bool
-	Blind            bool // Show mistakes like correctly typed characters.
-	Pace             int  // Speed in WPM of a pacer shown through the text, 0 for none.
-	CycleTheme       func(direction int) (string, error)
-	Wrap             func(text string, screenWidth int) string // Lays out the text on the screen, nil to show it as is.
-	keys             keymap
-	tty              io.Writer
-	now              func() time.Time // The clock, replaced in tests.
-	tick             time.Duration    // Interval between screen updates.
+	scr        tcell.Screen
+	view       *view
+	keys       keymap
+	session    sessionDeps // Given to the session of each segment.
+	tick       time.Duration
+	cursor     cursorShaper
+	cycleTheme func(direction int) (string, error) // Switches to another theme and returns its name.
 
-	emboldenTypedText   bool
-	highlightCurrent    bool
-	highlightNext       bool
-	theme               theme
-	currentWordStyle    tcell.Style
-	nextWordStyle       tcell.Style
-	incorrectSpaceStyle tcell.Style
-	incorrectStyle      tcell.Style
-	correctStyle        tcell.Style
-	defaultStyle        tcell.Style
-	statusMessage       string
-	statusMessageUntil  time.Time
-	showKeyboardHelp    bool
+	statusMessage      string
+	statusMessageUntil time.Time
+	showHelp           bool
 }
 
-func NewTyper(scr tcell.Screen, emboldenTypedText bool, th theme) *typer {
-	var tty io.Writer
+// typerOption configures a typer, see newTyper.
+type typerOption func(*typer)
 
-	tty, err := os.OpenFile("/dev/tty", os.O_WRONLY, 0)
-	//Will fail on windows, but tt is still mostly usable via tcell
-	if err != nil {
-		tty = io.Discard
-	}
+func withRules(rules typingRules) typerOption {
+	return func(t *typer) { t.session.rules = rules }
+}
 
+// withPace shows a pacer going through the text at the given speed in WPM.
+func withPace(wpm int) typerOption {
+	return func(t *typer) { t.session.pace = wpm }
+}
+
+// withWrap lays out the text with wrap rather than showing it as is.
+func withWrap(wrap func(text string, screenWidth int) string) typerOption {
+	return func(t *typer) { t.session.wrap = wrap }
+}
+
+// withThemeCycler lets the keys of the keymap switch to the next or previous
+// theme with cycle.
+func withThemeCycler(cycle func(direction int) (string, error)) typerOption {
+	return func(t *typer) { t.cycleTheme = cycle }
+}
+
+func withClock(now func() time.Time) typerOption {
+	return func(t *typer) { t.session.now = now }
+}
+
+// withTick sets the interval between screen updates.
+func withTick(tick time.Duration) typerOption {
+	return func(t *typer) { t.tick = tick }
+}
+
+func withCursor(c cursorShaper) typerOption {
+	return func(t *typer) { t.cursor = c }
+}
+
+func withKeymap(km keymap) typerOption {
+	return func(t *typer) { t.keys = km }
+}
+
+// newTyper returns a typer drawing on scr with v. By default it uses the
+// keys of the running system and the system clock, and leaves the cursor
+// shape as it is.
+func newTyper(scr tcell.Screen, v *view, opts ...typerOption) *typer {
 	t := &typer{
-		Scr:      scr,
-		SkipWord: true,
-		keys:     newKeymap(runtime.GOOS),
-		tty:      tty,
-		now:      time.Now,
-		tick:     500 * time.Millisecond,
-
-		emboldenTypedText: emboldenTypedText,
-		highlightCurrent:  true,
-		highlightNext:     true,
+		scr:     scr,
+		view:    v,
+		keys:    newKeymap(runtime.GOOS),
+		session: sessionDeps{now: time.Now},
+		tick:    500 * time.Millisecond,
+		cursor:  keptCursor{},
 	}
 
-	t.SetTheme(th)
+	for _, opt := range opts {
+		opt(t)
+	}
+
 	return t
 }
 
-func (t *typer) applyStyles() {
-	def := tcell.StyleDefault.
-		Foreground(t.theme.fgcol).
-		Background(t.theme.bgcol)
-
-	correctStyle := def.Foreground(t.theme.hicol)
-	if t.emboldenTypedText {
-		correctStyle = correctStyle.Bold(true)
-	}
-
-	currentWordStyle := def.Foreground(t.theme.hicol2)
-	nextWordStyle := def.Foreground(t.theme.hicol3)
-	if !t.highlightNext {
-		currentWordStyle = nextWordStyle
-		nextWordStyle = def
-	}
-	if !t.highlightCurrent {
-		currentWordStyle = def
-	}
-
-	t.defaultStyle = def
-	t.correctStyle = correctStyle
-	t.currentWordStyle = currentWordStyle
-	t.nextWordStyle = nextWordStyle
-	t.incorrectStyle = def.Foreground(t.theme.errcol)
-	t.incorrectSpaceStyle = def.Background(t.theme.errcol)
-}
-
-func (t *typer) SetTheme(th theme) {
-	t.theme = th
-	t.applyStyles()
-}
-
-func (t *typer) SetHighlightMode(highlightCurrent, highlightNext bool) {
-	t.highlightCurrent = highlightCurrent
-	t.highlightNext = highlightNext
-	t.applyStyles()
-}
-
-func (t *typer) RefreshScreen() {
-	t.Scr.SetStyle(t.defaultStyle)
-	t.Scr.Clear()
-}
-
-func (t *typer) ShowStatusMessage(message string, duration time.Duration) {
+// showStatusMessage shows a message above the text for the given duration,
+// or until it is replaced if the duration is not positive.
+func (t *typer) showStatusMessage(message string, duration time.Duration) {
 	t.statusMessage = message
 	if duration <= 0 {
 		t.statusMessageUntil = time.Time{}
 		return
 	}
 
-	t.statusMessageUntil = t.now().Add(duration)
+	t.statusMessageUntil = t.session.now().Add(duration)
 }
 
 func (t *typer) statusMessageActive() string {
@@ -150,61 +125,13 @@ func (t *typer) statusMessageActive() string {
 		return ""
 	}
 
-	if !t.statusMessageUntil.IsZero() && t.now().After(t.statusMessageUntil) {
+	if !t.statusMessageUntil.IsZero() && t.session.now().After(t.statusMessageUntil) {
 		t.statusMessage = ""
 		t.statusMessageUntil = time.Time{}
 		return ""
 	}
 
 	return t.statusMessage
-}
-
-func (t *typer) keyboardHelpDimensions() (width, height int) {
-	lines := t.keys.help()
-	height = len(lines)
-	for _, line := range lines {
-		if len([]rune(line)) > width {
-			width = len([]rune(line))
-		}
-	}
-
-	return
-}
-
-func (t *typer) clearKeyboardHelpArea(sw, sh int) {
-	width, height := t.keyboardHelpDimensions()
-	if width > sw {
-		width = sw
-	}
-	if height > sh {
-		height = sh
-	}
-
-	for y := 0; y < height; y++ {
-		for x := 0; x < width; x++ {
-			t.Scr.SetContent(x, y, ' ', nil, t.defaultStyle)
-		}
-	}
-}
-
-func (t *typer) drawKeyboardHelp(sw, sh int) {
-	for y, line := range t.keys.help() {
-		if y >= sh {
-			return
-		}
-
-		style := t.defaultStyle
-		if y == 0 {
-			style = t.currentWordStyle.Bold(true)
-		}
-
-		for x, r := range line {
-			if x >= sw {
-				break
-			}
-			t.Scr.SetContent(x, y, r, nil, style)
-		}
-	}
 }
 
 // testResult measures the typing of a test.
@@ -271,38 +198,33 @@ func (t *typer) Start(text []segment, timeout time.Duration) (o outcome, res tes
 // start runs the typing of a single segment. The timer starts with the first
 // key press, unless startImmediately is set.
 func (t *typer) start(text string, timeLimit time.Duration, startImmediately bool, attribution string) (outcome, testResult) {
-	s := t.newSession(text, timeLimit, attribution)
+	sw, sh := t.scr.Size()
+	s := newSession(text, attribution, timeLimit, sw, sh, t.session)
 	if startImmediately {
 		s.startTimer()
 	}
 
-	if !t.BlockCursor {
-		t.tty.Write([]byte("\033[5 q"))
-
-		//Assumes original cursor shape was a block (the one true cursor shape), there doesn't appear to be a
-		//good way to save/restore the shape if the user has changed it from the otcs.
-		defer t.tty.Write([]byte("\033[2 q"))
-	}
-
-	t.Scr.SetStyle(t.defaultStyle)
+	t.cursor.typing()
+	defer t.cursor.restore()
 
 	stopTicker := t.startTicker()
 	defer stopTicker()
 
-	t.Scr.Clear()
+	t.view.clear()
 	for {
-		s.redraw()
+		t.draw(s)
 
-		ev := t.Scr.PollEvent()
+		ev := t.scr.PollEvent()
 		if s.timeUp() { //Whatever happened after the time limit comes too late.
 			return outcomeComplete, s.result()
 		}
 
 		switch ev := ev.(type) {
 		case *tcell.EventResize:
-			s.resize()
+			s.resize(t.scr.Size())
+			t.view.clear()
 		case *tcell.EventKey:
-			if o, ended := s.handleKey(ev); ended {
+			if o, ended := t.handleKey(s, ev); ended {
 				if o != outcomeComplete {
 					return o, testResult{}
 				}
@@ -312,6 +234,56 @@ func (t *typer) start(text string, timeLimit time.Duration, startImmediately boo
 		default: //The ticks of startTicker only update the screen.
 		}
 	}
+}
+
+// draw draws the frame of s with the status message and help of the typer.
+func (t *typer) draw(s *session) {
+	f := s.frame()
+	f.status = t.statusMessageActive()
+	f.help = t.keys.help()
+	f.showHelp = t.showHelp
+
+	t.view.draw(f)
+}
+
+// handleKey handles a key pressed while typing s and returns the outcome of
+// the test if it ended.
+func (t *typer) handleKey(s *session, ev *tcell.EventKey) (outcome, bool) {
+	switch t.keys.action(ev) {
+	case actionQuit:
+		return outcomeQuit, true
+	case actionRestart:
+		return outcomeRestart, true
+	case actionNext:
+		return outcomeNext, true
+	case actionPrevious:
+		return outcomePrevious, true
+	case actionRedraw:
+		t.view.sync()
+	case actionNextTheme:
+		t.switchTheme(1)
+	case actionPreviousTheme:
+		t.switchTheme(-1)
+	case actionDeleteChar:
+		s.correct(false)
+	case actionDeleteWord:
+		s.correct(true)
+	case actionToggleHelp:
+		if !s.state.expects(ev.Rune()) {
+			t.showHelp = !t.showHelp
+		} else if s.typeRune(ev.Rune()) {
+			return outcomeComplete, true
+		}
+	case actionNone:
+		switch ev.Key() {
+		case tcell.KeyTab:
+			return outcomeComplete, s.typeRune('\t')
+		case tcell.KeyRune:
+			return outcomeComplete, s.typeRune(ev.Rune())
+		}
+	}
+
+	return outcomeComplete, false
 }
 
 // startTicker injects nil events into the event loop at regular intervals to
@@ -329,7 +301,7 @@ func (t *typer) startTicker() (stop func()) {
 			}
 
 			time.Sleep(tick)
-			t.Scr.PostEventWait(nil)
+			t.scr.PostEventWait(nil)
 		}
 	}()
 
@@ -339,120 +311,25 @@ func (t *typer) startTicker() (stop func()) {
 // refreshInterval returns the interval between screen updates. The pacer
 // moves smoothly only if the screen is updated often.
 func (t *typer) refreshInterval() time.Duration {
-	if t.Pace > 0 && t.tick > paceTick {
+	if t.session.pace > 0 && t.tick > paceTick {
 		return paceTick
 	}
 
 	return t.tick
 }
 
-// drawText draws the text of the test at (x, y), styling each character
-// according to what was typed. The character at pace is reversed.
-func (t *typer) drawText(state *typingState, x, y int, pace int) {
-	cx := x
-	cy := y
-	wordPositions := highlightWordPositions(state.text, state.idx)
-
-	for i, r := range state.text {
-		if r == '\n' {
-			cy++
-			cx = x
-			continue
-		}
-
-		if i == state.idx {
-			t.Scr.ShowCursor(cx, cy)
-		}
-
-		var style tcell.Style
-		switch {
-		case i >= state.idx && wordPositions[i] == 0:
-			style = t.currentWordStyle
-		case i >= state.idx && wordPositions[i] == 1:
-			style = t.nextWordStyle
-		case i >= state.idx:
-			style = t.defaultStyle
-		case t.Blind || r == state.typed[i]:
-			style = t.correctStyle
-		case r == ' ' || r == '\t':
-			style = t.incorrectSpaceStyle
-		default:
-			style = t.incorrectStyle
-		}
-
-		if i == pace {
-			style = style.Reverse(true)
-		}
-
-		glyph := r
-		if r == '\t' {
-			glyph = ' '
-		}
-		for j := 0; j < cellWidth(r); j++ {
-			t.Scr.SetContent(cx+j, cy, glyph, nil, style)
-		}
-		cx += cellWidth(r)
-	}
-}
-
-// drawLiveStats draws the enabled live statistics above the text.
-func (t *typer) drawLiveStats(x, y int, r testResult) {
-	if r.duration <= 1e7 { //Avoid flashing large numbers on test start.
-		return
-	}
-
-	wpmY := y
-	if t.ShowAccuracy {
-		drawString(t.Scr, x, y, formatLiveAccuracy(r.accuracy()), t.defaultStyle)
-		wpmY--
-	}
-
-	if t.ShowWpm {
-		drawString(t.Scr, x, wpmY, fmt.Sprintf("WPM: %-10d\n", r.wpm()), t.defaultStyle)
-	}
-}
-
-func formatLiveAccuracy(accuracy float64) string {
-	if accuracy == 100 {
-		return fmt.Sprintf("Accuracy: %.0f%%\n", accuracy)
-	}
-
-	return fmt.Sprintf("Accuracy: %.2f%%\n", accuracy)
-}
-
-// drawStatusMessage draws the current status message, if any, centered on
-// the second line of the screen.
-func (t *typer) drawStatusMessage(sw, sh int) {
-	statusY := 0
-	if sh > 1 {
-		statusY = 1
-	}
-	for i := 0; i < sw; i++ {
-		t.Scr.SetContent(i, statusY, ' ', nil, t.defaultStyle)
-	}
-
-	if msg := t.statusMessageActive(); msg != "" {
-		msgW, _ := calcStringDimensions(msg)
-		msgX := (sw - msgW) / 2
-		if msgX < 0 {
-			msgX = 0
-		}
-		drawString(t.Scr, msgX, statusY, msg, t.currentWordStyle.Bold(true))
-	}
-}
-
-// cycleTheme switches to the next (direction > 0) or previous theme and
+// switchTheme switches to the next (direction > 0) or previous theme and
 // briefly shows its name.
-func (t *typer) cycleTheme(direction int) {
-	if t.CycleTheme == nil {
+func (t *typer) switchTheme(direction int) {
+	if t.cycleTheme == nil {
 		return
 	}
 
-	themeName, err := t.CycleTheme(direction)
+	themeName, err := t.cycleTheme(direction)
 	if err != nil {
-		t.ShowStatusMessage(err.Error(), 2*time.Second)
+		t.showStatusMessage(err.Error(), 2*time.Second)
 	} else if themeName != "" {
-		t.ShowStatusMessage(fmt.Sprintf("Theme: %s", themeName), 2*time.Second)
+		t.showStatusMessage(fmt.Sprintf("Theme: %s", themeName), 2*time.Second)
 	}
 }
 

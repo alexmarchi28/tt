@@ -1,7 +1,6 @@
 package main
 
 import (
-	"io"
 	"reflect"
 	"strings"
 	"testing"
@@ -17,11 +16,10 @@ func newTestApp(t *testing.T, s settings) (*app, tcell.SimulationScreen) {
 	sim := newSimScreen(t)
 
 	s.source.kind = testKind{Mode: "words", Source: "test"}
-	a, err := newApp(sim, s, appDeps{newTestStore(t), res, time.Now})
+	a, err := newApp(sim, s, appDeps{newTestStore(t), res, time.Now, keptCursor{}})
 	if err != nil {
 		t.Fatal(err)
 	}
-	a.typer.tty = io.Discard
 
 	return a, sim
 }
@@ -278,18 +276,21 @@ func TestAppWithoutTheme(t *testing.T) {
 	sendKeys(t, sim, tcell.KeyCtrlN, tcell.KeyCtrlC)
 	waitExitCode(t, done)
 
-	if a.theme != "" || a.typer.CycleTheme != nil {
+	if a.theme != "" || a.typer.cycleTheme != nil {
 		t.Errorf("themes should not be used with -notheme, theme to remember %q", a.theme)
 	}
 }
 
 func TestNewAppAppliesOptions(t *testing.T) {
-	opts := resolveFlags([]string{"-noskip", "-nobackspace", "-showwpm", "-showaccuracy", "-nohighlight", "-blockcursor", "-blind", "-pace", "70"})
+	opts := resolveFlags([]string{"-noskip", "-nobackspace", "-showwpm", "-showaccuracy", "-nohighlight", "-blind", "-pace", "70", "-raw"})
 	a, _ := newTestApp(t, opts)
 
 	ty := a.typer
-	if ty.SkipWord || !ty.DisableBackspace || !ty.ShowWpm || !ty.ShowAccuracy || ty.highlightCurrent || ty.highlightNext || !ty.BlockCursor || !ty.Blind || ty.Pace != 70 {
-		t.Errorf("options not applied to the typer: %+v", ty)
+	if want := (typingRules{noSkip: true, noBackspace: true}); ty.session.rules != want || ty.session.pace != 70 || ty.session.wrap != nil {
+		t.Errorf("typer rules %+v, pace %d, wrapping %t, want %+v, 70 and no wrapping", ty.session.rules, ty.session.pace, ty.session.wrap != nil, want)
+	}
+	if want := (viewOptions{blind: true, showWpm: true, showAccuracy: true}); ty.view.opts != want {
+		t.Errorf("view options %+v, want %+v", ty.view.opts, want)
 	}
 	if a.theme != "default" {
 		t.Errorf("theme to remember = %q, want default", a.theme)
