@@ -195,7 +195,7 @@ func TestNewAppWithInvalidTheme(t *testing.T) {
 	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "themes", "broken", "fgcol: nope")
 
-	_, err := newApp(newSimScreen(t), parseFlags([]string{"-theme", "broken"}), testKind{}, appDeps{&memStore{}, res, time.Now})
+	_, err := newApp(newSimScreen(t), resolveFlags([]string{"-theme", "broken"}), appDeps{&memStore{}, res, time.Now})
 	if err == nil || !strings.HasPrefix(err.Error(), "broken theme is invalid: ") {
 		t.Errorf("newApp with an invalid theme: %v, want an error", err)
 	}

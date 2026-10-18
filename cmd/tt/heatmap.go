@@ -199,11 +199,21 @@ func formatKeys(ks keyStats, rows []string, color bool) string {
 	return b.String()
 }
 
+// keyboardLayout returns the rows of the named keyboard layout, see layouts.
+func keyboardLayout(name string) ([]string, error) {
+	rows, ok := layouts[name]
+	if !ok {
+		return nil, fmt.Errorf("unknown layout %s, use one of: %s", name, strings.Join(sortedKeys(layouts), ", "))
+	}
+
+	return rows, nil
+}
+
 // printKeys prints how each key is typed on the given keyboard layout.
 func printKeys(w io.Writer, st keyStatsStore, layout string, color bool) error {
-	rows, ok := layouts[layout]
-	if !ok {
-		return fmt.Errorf("unknown layout %s, use one of: %s", layout, strings.Join(sortedKeys(layouts), ", "))
+	rows, err := keyboardLayout(layout)
+	if err != nil {
+		return err
 	}
 
 	ks := st.KeyStats()
@@ -212,6 +222,6 @@ func printKeys(w io.Writer, st keyStatsStore, layout string, color bool) error {
 		return err
 	}
 
-	_, err := fmt.Fprint(w, formatKeys(ks, rows, color))
+	_, err = fmt.Fprint(w, formatKeys(ks, rows, color))
 	return err
 }

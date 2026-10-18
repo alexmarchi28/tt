@@ -7,7 +7,6 @@ import (
 	"io"
 	"math"
 	"math/rand"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"unicode"
@@ -27,58 +26,46 @@ type generatorStore interface {
 
 // textSources are what the generators make the text of tests from.
 type textSources struct {
-	store           generatorStore
-	resources       resourceReader
-	rng             *rand.Rand
-	stdin           io.Reader // Its text is typed unless it is a terminal.
-	stdinIsTerminal bool
+	store     generatorStore
+	resources resourceReader
+	rng       *rand.Rand
+	stdin     io.Reader // Typed in mode text.
 }
 
-// newTestSource returns the source of the tests requested on the command
-// line and what they are made of.
-func newTestSource(opts options, src textSources) (testSource, testKind, error) {
-	tests, kind, err := selectTestSource(opts, src)
-	if err != nil {
-		return nil, testKind{}, err
-	}
+// newTestSource returns the source of the tests described by s.
+func newTestSource(s sourceSettings, src textSources) (testSource, error) {
+	res, rng, words := src.resources, src.rng, s.words
 
-	return tests, kind.withVariant(opts), nil
-}
-
-// selectTestSource returns the source of the tests requested on the command
-// line and where their text comes from, see newTestSource.
-func selectTestSource(opts options, src textSources) (testSource, testKind, error) {
-	words := newWordOptions(opts)
-	res, rng := src.resources, src.rng
-
-	switch {
-	case opts.adaptive:
-		list := adaptiveWordList(opts)
-		tests, err := newAdaptiveSource(rng, res, list, words, opts.focus, src.store)
-		return tests, testKind{Mode: modeAdaptive, Source: filepath.Base(list)}, err
-	case opts.wordFile != "":
-		tests, err := fromFunc(generateWordTest(rng, res, opts.wordFile, words))
-		return tests, testKind{Mode: modeWords, Source: filepath.Base(opts.wordFile)}, err
-	case opts.quoteFile != "":
-		tests, err := fromFunc(generateQuoteTest(rng, res, opts.quoteFile))
-		return tests, testKind{Mode: modeQuotes, Source: filepath.Base(opts.quoteFile)}, err
-	case opts.mistakes:
-		tests, err := fromFunc(generateMistakesTest(rng, words, src.store))
-		return tests, testKind{Mode: modeMistakes}, err
-	case !src.stdinIsTerminal:
-		b, err := io.ReadAll(src.stdin)
+	switch s.kind.Mode {
+	case modeAdaptive:
+		tests, err := newAdaptiveSource(rng, res, s.path, words, s.focus, src.store)
 		if err != nil {
-			return nil, testKind{}, err
+			return nil, err
 		}
 
-		tests, err := fromFunc(generateTestFromData(b, opts.raw, opts.multi))
-		return tests, testKind{Mode: modeText}, err
-	case len(opts.files) > 0:
-		tests, err := newFileSource(opts.files[0], opts.startParagraph, src.store)
-		return tests, testKind{Mode: modeFile, Source: filepath.Base(opts.files[0])}, err
+		return tests, nil
+	case modeWords:
+		return fromFunc(generateWordTest(rng, res, s.path, words))
+	case modeQuotes:
+		return fromFunc(generateQuoteTest(rng, res, s.path))
+	case modeMistakes:
+		return fromFunc(generateMistakesTest(rng, words, src.store))
+	case modeText:
+		b, err := io.ReadAll(src.stdin)
+		if err != nil {
+			return nil, err
+		}
+
+		return fromFunc(generateTestFromData(b, s.raw, s.multi))
+	case modeFile:
+		tests, err := newFileSource(s.path, s.startParagraph, src.store)
+		if err != nil {
+			return nil, err
+		}
+
+		return tests, nil
 	default:
-		tests, err := fromFunc(generateWordTest(rng, res, defaultWordList, words))
-		return tests, testKind{Mode: modeWords, Source: defaultWordList}, err
+		return nil, fmt.Errorf("unknown mode %q", s.kind.Mode)
 	}
 }
 

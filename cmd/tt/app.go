@@ -25,7 +25,8 @@ type appDeps struct {
 
 // app runs the sequence of tests requested on the command line.
 type app struct {
-	opts    options
+	rules   ruleSettings
+	output  outputSettings
 	kind    testKind
 	scr     tcell.Screen
 	store   sessionStore
@@ -35,22 +36,22 @@ type app struct {
 	theme   string // Theme to remember on exit, empty if none.
 }
 
-func newApp(scr tcell.Screen, opts options, kind testKind, deps appDeps) (*app, error) {
-	a := &app{opts: opts, kind: kind, scr: scr, store: deps.store, now: deps.now}
-	res := deps.resources
+func newApp(scr tcell.Screen, s settings, deps appDeps) (*app, error) {
+	a := &app{rules: s.rules, output: s.output, kind: s.source.kind, scr: scr, store: deps.store, now: deps.now}
+	res, display := deps.resources, s.display
 
-	if opts.noTheme {
+	if display.noTheme {
 		a.typer = NewTyper(scr, true, terminalTheme)
 	} else {
-		th, err := loadTheme(res, opts.themeName, opts.opaqueBg)
+		th, err := loadTheme(res, display.theme, display.opaqueBg)
 		if err != nil {
-			return nil, fmt.Errorf("%s theme is invalid: %v", opts.themeName, err)
+			return nil, fmt.Errorf("%s theme is invalid: %v", display.theme, err)
 		}
 
-		a.typer = NewTyper(scr, opts.bold, th)
-		a.theme = opts.themeName
+		a.typer = NewTyper(scr, display.bold, th)
+		a.theme = display.theme
 
-		themes := newThemeCycler(res, opts.themeName, opts.opaqueBg)
+		themes := newThemeCycler(res, display.theme, display.opaqueBg)
 		a.typer.CycleTheme = func(direction int) (string, error) {
 			name, th, err := themes.next(direction)
 			if err != nil || name == "" {
@@ -64,22 +65,19 @@ func newApp(scr tcell.Screen, opts options, kind testKind, deps appDeps) (*app, 
 		}
 	}
 
-	a.typer.SetHighlightMode(
-		!(opts.noHighlightCurrent || opts.noHighlight),
-		!(opts.noHighlightNext || opts.noHighlight),
-	)
+	a.typer.SetHighlightMode(display.highlightCurrent, display.highlightNext)
 
 	a.typer.now = deps.now
-	a.typer.SkipWord = !opts.noSkip
-	a.typer.DisableBackspace = opts.noBackspace
-	a.typer.BlockCursor = opts.blockCursor
-	a.typer.ShowWpm = opts.showWpm
-	a.typer.ShowAccuracy = opts.showAccuracy
-	a.typer.Blind = opts.blind
-	a.typer.Pace = opts.pace
-	if !opts.raw {
+	a.typer.SkipWord = !s.rules.noSkip
+	a.typer.DisableBackspace = s.rules.noBackspace
+	a.typer.BlockCursor = display.blockCursor
+	a.typer.ShowWpm = display.showWpm
+	a.typer.ShowAccuracy = display.showAccuracy
+	a.typer.Blind = s.rules.blind
+	a.typer.Pace = s.rules.pace
+	if display.reflow {
 		a.typer.Wrap = func(text string, sw int) string {
-			return reflow(text, lineWidth(opts.maxLineLen, sw))
+			return reflow(text, lineWidth(display.maxLineLen, sw))
 		}
 	}
 
@@ -109,7 +107,7 @@ func (a *app) run(src testSource) (int, error) {
 			a.typer.ShowStatusMessage(d.describe(), 0)
 		}
 
-		res := a.typer.Start(tests[idx], a.opts.timeout)
+		res := a.typer.Start(tests[idx], a.rules.timeout)
 
 		switch res.rc {
 		case TyperNext:
@@ -124,7 +122,7 @@ func (a *app) run(src testSource) (int, error) {
 				return 1, err
 			}
 
-			if !a.opts.noReport {
+			if !a.output.noReport {
 				attribution := ""
 				if len(tests[idx]) == 1 {
 					attribution = tests[idx][0].Attribution
@@ -133,7 +131,7 @@ func (a *app) run(src testSource) (int, error) {
 					return 1, nil
 				}
 			}
-			if a.opts.oneShot {
+			if a.output.oneShot {
 				return 0, nil
 			}
 

@@ -308,7 +308,7 @@ func TestNewTestGenerator(t *testing.T) {
 		{"stdin", nil, "piped text\n\nmore", false, exactly("piped text", "more"), testKind{Mode: "text"}},
 		{"word list over stdin", []string{"-words", "200en", "-n", "4"}, "piped text", false, wordsPerSegment(4), testKind{Mode: "words", Source: "200en", Words: 4}},
 		{"file", []string{book}, "", true, exactly("first paragraph"), testKind{Mode: "file", Source: "book.txt"}},
-		{"stdin over file", []string{book}, "piped text", false, exactly("piped text"), testKind{Mode: "text"}},
+		{"file over stdin", []string{book}, "piped text", false, exactly("first paragraph"), testKind{Mode: "file", Source: "book.txt"}},
 		{"mistakes", []string{"-mistakes", "-n", "3"}, "", true, exactly("ab ab ab"), testKind{Mode: "mistakes", Words: 3}},
 		{"punctuation and numbers", []string{"-punct", "-numbers", "-n", "200"}, "", true, func(t *testing.T, segments []segment) {
 			if len(segments) != 1 || !endsSentence(segments[0].Text) || !strings.ContainsAny(segments[0].Text, "0123456789") {
@@ -318,7 +318,6 @@ func TestNewTestGenerator(t *testing.T) {
 		{"mistakes over stdin", []string{"-mistakes", "-n", "2"}, "piped text", false, exactly("ab ab"), testKind{Mode: "mistakes", Words: 2}},
 		{"adaptive", []string{"-adaptive", "-n", "5"}, "", true, wordsPerSegment(5), testKind{Mode: "adaptive", Source: "1000en", Words: 5, Focus: 40}},
 		{"adaptive word list", []string{"-adaptive", "-words", "200en", "-n", "5", "-focus", "70"}, "piped text", false, wordsPerSegment(5), testKind{Mode: "adaptive", Source: "200en", Words: 5, Focus: 70}},
-		{"focus without -adaptive", []string{"-n", "5", "-focus", "70"}, "", true, wordsPerSegment(5), testKind{Mode: "words", Source: "1000en", Words: 5}},
 		{"timed words", []string{"-t", "10", "-n", "5"}, "", true, lastsAtLeast(10*time.Second, 5), testKind{Mode: "words", Source: "1000en", Seconds: 10}},
 		{"timed mistakes", []string{"-mistakes", "-t", "10", "-n", "5"}, "", true, lastsAtLeast(10*time.Second, 5), testKind{Mode: "mistakes", Seconds: 10}},
 		{"timed adaptive", []string{"-adaptive", "-t", "10", "-n", "5"}, "", true, lastsAtLeast(10*time.Second, 5), testKind{Mode: "adaptive", Source: "1000en", Seconds: 10, Focus: 40}},
@@ -332,14 +331,18 @@ func TestNewTestGenerator(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			gen, kind, err := newTestSource(parseFlags(tc.args), textSources{st, res, newRand(), strings.NewReader(tc.stdin), tc.stdinIsTerminal})
+			s, err := resolve(parseFlags(tc.args), tc.stdinIsTerminal)
+			if err != nil {
+				t.Fatal(err)
+			}
+			gen, err := newTestSource(s.source, textSources{st, res, newRand(), strings.NewReader(tc.stdin)})
 			if err != nil {
 				t.Fatal(err)
 			}
 			tc.check(t, nextTest(t, gen))
 
-			if kind != tc.kind {
-				t.Errorf("kind = %+v, want %+v", kind, tc.kind)
+			if s.source.kind != tc.kind {
+				t.Errorf("kind = %+v, want %+v", s.source.kind, tc.kind)
 			}
 		})
 	}
@@ -708,7 +711,7 @@ func TestGeneratorsAreReproducible(t *testing.T) {
 		{"-adaptive", "-numbers"},
 	} {
 		tests := func() [][]segment {
-			gen, _, err := newTestSource(parseFlags(args), textSources{st, res, newRand(), strings.NewReader(""), true})
+			gen, err := newTestSource(resolveFlags(args).source, textSources{st, res, newRand(), strings.NewReader("")})
 			if err != nil {
 				t.Fatal(err)
 			}

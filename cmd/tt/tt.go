@@ -66,6 +66,10 @@ func run(args []string, env environment) int {
 	if err != nil {
 		return 2 //The flag package reports the error.
 	}
+	s, err := resolve(opts, env.stdinIsTerminal)
+	if err != nil {
+		return fail(env.stderr, err)
+	}
 
 	home, err := env.homeDir()
 	if err != nil {
@@ -76,21 +80,15 @@ func run(args []string, env environment) int {
 		resources: newResources(home, env.stdin),
 		rng:       rand.New(rand.NewSource(env.now().UnixNano())),
 	}
-	if err := opts.validate(); err != nil {
-		return fail(env.stderr, err)
-	}
-
-	for _, c := range commands {
-		if c.requested(opts) {
-			if err := c.run(opts, env, deps); err != nil {
-				return fail(env.stderr, err)
-			}
-
-			return 0
+	if s.command != nil {
+		if err := s.command.run(s, env, deps); err != nil {
+			return fail(env.stderr, err)
 		}
+
+		return 0
 	}
 
-	rc, err := runTests(opts, env, deps)
+	rc, err := runTests(s, env, deps)
 	if err != nil {
 		return fail(env.stderr, err)
 	}
@@ -111,52 +109,56 @@ type dependencies struct {
 	rng       *rand.Rand
 }
 
-// commands are the actions of tt other than typing tests, the first one
-// requested being run.
-var commands = []struct {
-	requested func(options) bool
-	run       func(options, environment, dependencies) error
-}{
-	{func(o options) bool { return o.listType != "" }, listCommand},
-	{func(o options) bool { return o.version }, versionCommand},
-	{func(o options) bool { return o.stats }, statsCommand},
-	{func(o options) bool { return o.keys }, keysCommand},
-	{func(o options) bool { return o.export != "" }, exportCommand},
+// command is an action of tt other than typing tests.
+type command struct {
+	flag  string // The flag requesting it.
+	given func(o options) bool
+	run   func(s settings, env environment, deps dependencies) error
 }
 
-func listCommand(opts options, env environment, deps dependencies) error {
-	for _, name := range deps.resources.list(opts.listType) {
+// commands are the actions of tt other than typing tests, at most one of
+// which can be requested, see requestedCommand.
+var commands = []command{
+	{"list", func(o options) bool { return o.listType != "" }, listCommand},
+	{"v", func(o options) bool { return o.version }, versionCommand},
+	{"stats", func(o options) bool { return o.stats }, statsCommand},
+	{"keys", func(o options) bool { return o.keys }, keysCommand},
+	{"export", func(o options) bool { return o.export != "" }, exportCommand},
+}
+
+func listCommand(s settings, env environment, deps dependencies) error {
+	for _, name := range deps.resources.list(s.list) {
 		fmt.Fprintln(env.stdout, name)
 	}
 
 	return nil
 }
 
-func versionCommand(_ options, env environment, _ dependencies) error {
+func versionCommand(_ settings, env environment, _ dependencies) error {
 	_, err := fmt.Fprintln(env.stdout, "tt version "+versionString())
 	return err
 }
 
-func statsCommand(_ options, env environment, deps dependencies) error {
+func statsCommand(_ settings, env environment, deps dependencies) error {
 	return printStats(env.stdout, deps.store, env.now())
 }
 
-func keysCommand(opts options, env environment, deps dependencies) error {
-	return printKeys(env.stdout, deps.store, opts.layout, env.stdoutIsTerminal && env.getenv("NO_COLOR") == "")
+func keysCommand(s settings, env environment, deps dependencies) error {
+	return printKeys(env.stdout, deps.store, s.layout, env.stdoutIsTerminal && env.getenv("NO_COLOR") == "")
 }
 
-func exportCommand(opts options, env environment, deps dependencies) error {
-	return exportData(env.stdout, deps.store, opts.export, opts.json)
+func exportCommand(s settings, env environment, deps dependencies) error {
+	return exportData(env.stdout, deps.store, s.export, s.output.json)
 }
 
 // runTests types the tests requested on the command line and returns the
 // exit code.
-func runTests(opts options, env environment, deps dependencies) (int, error) {
+func runTests(s settings, env environment, deps dependencies) (int, error) {
 	st, res := deps.store, deps.resources
 
-	if !opts.noTheme && !opts.themeExplicit {
-		if rememberedTheme := loadRememberedTheme(st, res, opts.opaqueBg); rememberedTheme != "" {
-			opts.themeName = rememberedTheme
+	if !s.display.noTheme && !s.display.themeExplicit {
+		if rememberedTheme := loadRememberedTheme(st, res, s.display.opaqueBg); rememberedTheme != "" {
+			s.display.theme = rememberedTheme
 		}
 	}
 
@@ -169,18 +171,18 @@ func runTests(opts options, env environment, deps dependencies) (int, error) {
 		return 0, err
 	}
 
-	tests, kind, err := newTestSource(opts, textSources{st, res, deps.rng, env.stdin, env.stdinIsTerminal})
+	tests, err := newTestSource(s.source, textSources{st, res, deps.rng, env.stdin})
 	if err != nil {
 		return 0, err
 	}
 
-	if opts.paceTarget != "" {
-		if opts.pace, err = paceFromResults(opts.paceTarget, stored, kind); err != nil {
+	if s.rules.paceTarget != "" {
+		if s.rules.pace, err = paceFromResults(s.rules.paceTarget, stored, s.source.kind); err != nil {
 			return 0, err
 		}
 	}
 
-	scr, err := env.newScreen(!opts.noTheme)
+	scr, err := env.newScreen(!s.display.noTheme)
 	if err != nil {
 		return 0, err
 	}
@@ -193,7 +195,7 @@ func runTests(opts options, env environment, deps dependencies) (int, error) {
 	restore := func() { fini.Do(scr.Fini) }
 	defer restore()
 
-	a, err := newApp(scr, opts, kind, appDeps{st, res, env.now})
+	a, err := newApp(scr, s, appDeps{st, res, env.now})
 	if err != nil {
 		return 0, err
 	}
@@ -204,7 +206,7 @@ func runTests(opts options, env environment, deps dependencies) (int, error) {
 	if err := a.saveTheme(); err != nil {
 		fmt.Fprintf(env.stderr, "WARNING: could not save theme selection: %v\n", err)
 	}
-	if err := writeResults(env.stdout, a.results, opts.json, opts.csv); err != nil {
+	if err := writeResults(env.stdout, a.results, s.output.json, s.output.csv); err != nil {
 		return 0, err
 	}
 

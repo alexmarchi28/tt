@@ -28,6 +28,9 @@ Modes
                         those with the pairs of letters being practiced
                         (default: 40).
 
+    Only one mode can be used at a time. Text piped to stdin is typed unless
+    a mode or a file is given.
+
 Word Mode (also applies to -mistakes and -adaptive)
     -n GROUPSZ          Sets the number of words which constitute a group.
     -g NGROUPS          Sets the number of groups which constitute a test.
@@ -114,7 +117,8 @@ type options struct {
 	themeName string
 	files     []string
 
-	themeExplicit      bool // Whether -theme was given.
+	given map[string]bool // The flags given, rather than left to their default.
+
 	mistakes           bool
 	adaptive           bool
 	punct              bool
@@ -201,11 +205,8 @@ func parseArgs(args []string, stdout, stderr io.Writer) (options, error) {
 		return options{}, err
 	}
 
-	fs.Visit(func(f *flag.Flag) {
-		if f.Name == "theme" {
-			opts.themeExplicit = true
-		}
-	})
+	opts.given = map[string]bool{}
+	fs.Visit(func(f *flag.Flag) { opts.given[f.Name] = true })
 
 	opts.files = fs.Args()
 
