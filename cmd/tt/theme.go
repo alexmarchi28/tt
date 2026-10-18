@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -32,10 +33,12 @@ var terminalTheme = theme{
 
 // loadTheme reads the named theme. Unless opaqueBg is set the background is
 // left transparent and bgcol is not required.
-func loadTheme(name string, opaqueBg bool) (theme, error) {
-	b := readResource("themes", name)
-	if b == nil {
+func loadTheme(res resourceReader, name string, opaqueBg bool) (theme, error) {
+	b, err := res.read("themes", name)
+	if errors.Is(err, errNoResource) {
 		return theme{}, fmt.Errorf("%s does not appear to be a valid theme", name)
+	} else if err != nil {
+		return theme{}, err
 	}
 
 	cfg := parseConfig(b)
@@ -98,7 +101,7 @@ func newTcellColor(s string) (tcell.Color, error) {
 }
 
 // loadRememberedTheme returns the theme selected last, if it is still valid.
-func loadRememberedTheme(st configStore, disableTransparentBg bool) string {
+func loadRememberedTheme(st configStore, res resourceReader, disableTransparentBg bool) string {
 	cfg, err := st.Config()
 	if err != nil {
 		return ""
@@ -109,7 +112,7 @@ func loadRememberedTheme(st configStore, disableTransparentBg bool) string {
 		return ""
 	}
 
-	if _, err := loadTheme(themeName, disableTransparentBg); err != nil {
+	if _, err := loadTheme(res, themeName, disableTransparentBg); err != nil {
 		return ""
 	}
 
@@ -118,13 +121,15 @@ func loadRememberedTheme(st configStore, disableTransparentBg bool) string {
 
 // themeCycler steps through the available themes, skipping invalid ones.
 type themeCycler struct {
+	res      resourceReader
 	names    []string
 	idx      int // Index of the current theme in names, -1 if it is not one of them.
 	opaqueBg bool
 }
 
-func newThemeCycler(names []string, current string, opaqueBg bool) *themeCycler {
-	return &themeCycler{names, indexResourceName(names, current), opaqueBg}
+func newThemeCycler(res resourceLister, current string, opaqueBg bool) *themeCycler {
+	names := res.list("themes")
+	return &themeCycler{res, names, indexResourceName(names, current), opaqueBg}
 }
 
 // next loads the next (direction > 0) or previous valid theme. The name is
@@ -146,7 +151,7 @@ func (c *themeCycler) next(direction int) (string, theme, error) {
 		}
 
 		name := c.names[c.idx]
-		if th, err := loadTheme(name, c.opaqueBg); err == nil {
+		if th, err := loadTheme(c.res, name, c.opaqueBg); err == nil {
 			return name, th, nil
 		}
 	}

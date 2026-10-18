@@ -1,55 +1,35 @@
 package main
 
 import (
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/alexmarchi28/tt"
 	"github.com/gdamore/tcell"
 )
 
-// TestMain re-executes main() when asked to by runCLI, and otherwise points
-// the user resources at a throwaway directory so that tests never read the
-// real ones.
-func TestMain(m *testing.M) {
-	if os.Getenv("TT_TEST_RUN_MAIN") == "1" {
-		main()
-		os.Exit(0)
-	}
-
-	dir, err := os.MkdirTemp("", "tt-test")
-	if err != nil {
-		panic(err)
-	}
-
-	setStorageDir(dir)
-	code := m.Run()
-	os.RemoveAll(dir)
-	os.Exit(code)
-}
-
-func setStorageDir(dir string) {
-	configDirs = []string{filepath.Join(dir, ".tt")}
-}
-
-// useTempStorage gives the calling test its own empty directory of user
-// resources and returns its path. User resources can be placed in
-// <dir>/.tt/<type>/<name>.
-func useTempStorage(t *testing.T) string {
+// newTestResources returns the resources of the calling test: user resources
+// in a directory of its own, whose path is returned (see writeUserResource),
+// then the builtin ones. Resources named "-" are read from an empty stdin.
+func newTestResources(t *testing.T) (*resources, string) {
 	t.Helper()
 
-	oldConfigDirs := configDirs
-	t.Cleanup(func() { configDirs = oldConfigDirs })
-
 	dir := t.TempDir()
-	setStorageDir(dir)
-	return dir
+	res := &resources{
+		dirs:     []fs.FS{os.DirFS(filepath.Join(dir, ".tt")), tt.Builtin},
+		stdin:    &onceReader{r: strings.NewReader("")},
+		readFile: os.ReadFile,
+	}
+
+	return res, dir
 }
 
 // writeUserResource creates a user resource (theme, word list, quote file)
-// inside the storage directory returned by useTempStorage.
+// inside the directory returned by newTestResources.
 func writeUserResource(t *testing.T, dir, typ, name, content string) string {
 	t.Helper()
 

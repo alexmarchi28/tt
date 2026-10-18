@@ -46,10 +46,10 @@ func TestGenerateTestFromDataParagraphs(t *testing.T) {
 }
 
 func TestGenerateWordTest(t *testing.T) {
-	dir := useTempStorage(t)
+	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "greek", "alpha beta\tgamma\ndelta")
 
-	gen := mustGen(generateWordTest("greek", wordOptions{n: 3, g: 2}))
+	gen := mustGen(generateWordTest(res, "greek", wordOptions{n: 3, g: 2}))
 	allowed := map[string]bool{"alpha": true, "beta": true, "gamma": true, "delta": true}
 
 	for i := 0; i < 20; i++ {
@@ -77,9 +77,9 @@ func TestGenerateWordTest(t *testing.T) {
 }
 
 func TestGenerateWordTestUsesBuiltinLists(t *testing.T) {
-	useTempStorage(t)
+	res, _ := newTestResources(t)
 
-	gen := mustGen(generateWordTest("1000en", wordOptions{n: 50, g: 1}))
+	gen := mustGen(generateWordTest(res, "1000en", wordOptions{n: 50, g: 1}))
 	for i := 0; i < 100; i++ {
 		segments := gen()
 		if len(segments) != 1 {
@@ -90,10 +90,10 @@ func TestGenerateWordTestUsesBuiltinLists(t *testing.T) {
 }
 
 func TestGenerateWordTestIgnoresBlankEntries(t *testing.T) {
-	dir := useTempStorage(t)
+	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "blanks", "\n  alpha beta\n\ngamma\t\n")
 
-	gen := mustGen(generateWordTest("blanks", wordOptions{n: 10, g: 1}))
+	gen := mustGen(generateWordTest(res, "blanks", wordOptions{n: 10, g: 1}))
 	for i := 0; i < 100; i++ {
 		assertWords(t, gen()[0].Text, 10)
 	}
@@ -116,13 +116,13 @@ func assertWords(t *testing.T, text string, n int) {
 }
 
 func TestGenerateQuoteTest(t *testing.T) {
-	dir := useTempStorage(t)
+	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "quotes", "mine", `[
 		{"text": "first quote", "attribution": "someone"},
 		{"text": "second quote", "attribution": "someone else"}
 	]`)
 
-	gen := mustGen(generateQuoteTest("mine"))
+	gen := mustGen(generateQuoteTest(res, "mine"))
 	seen := map[string]bool{}
 
 	for i := 0; i < 50; i++ {
@@ -145,9 +145,9 @@ func TestGenerateQuoteTest(t *testing.T) {
 }
 
 func TestBuiltinQuotesAreValid(t *testing.T) {
-	useTempStorage(t)
+	res, _ := newTestResources(t)
 
-	names := listResourceNames("quotes")
+	names := res.list("quotes")
 	for _, want := range []string{"en", "it"} {
 		if indexResourceName(names, want) == -1 {
 			t.Errorf("no builtin %s quotes in %q", want, names)
@@ -156,7 +156,11 @@ func TestBuiltinQuotesAreValid(t *testing.T) {
 
 	for _, name := range names {
 		var quotes []segment
-		if err := json.Unmarshal(readResource("quotes", name), &quotes); err != nil {
+		b, err := res.read("quotes", name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(b, &quotes); err != nil {
 			t.Fatalf("builtin quotes %s: %v", name, err)
 		}
 
@@ -181,10 +185,10 @@ var checkedWordLists = []struct {
 }
 
 func TestBuiltinWordLists(t *testing.T) {
-	useTempStorage(t)
+	res, _ := newTestResources(t)
 
 	for _, list := range checkedWordLists {
-		words, err := loadWords(list.name)
+		words, err := loadWords(res, list.name)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -281,7 +285,7 @@ func TestGenerateTestFromFileTracksFilesSeparately(t *testing.T) {
 }
 
 func TestNewTestGenerator(t *testing.T) {
-	useTempStorage(t)
+	res, _ := newTestResources(t)
 	book := writeTextFile(t, "first paragraph\n\nsecond paragraph\n")
 	st := mistakesOf("ab")
 
@@ -327,7 +331,7 @@ func TestNewTestGenerator(t *testing.T) {
 
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			gen, kind, err := newTestGenerator(parseFlags(tc.args), strings.NewReader(tc.stdin), tc.stdinIsTerminal, st)
+			gen, kind, err := newTestGenerator(parseFlags(tc.args), strings.NewReader(tc.stdin), tc.stdinIsTerminal, st, res)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -568,10 +572,10 @@ func TestAddNumbers(t *testing.T) {
 }
 
 func TestGenerateWordTestDecorations(t *testing.T) {
-	dir := useTempStorage(t)
+	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "greek", "alpha beta gamma delta")
 
-	gen := mustGen(generateWordTest("greek", wordOptions{n: 30, g: 2, punctuation: true, numbers: true}))
+	gen := mustGen(generateWordTest(res, "greek", wordOptions{n: 30, g: 2, punctuation: true, numbers: true}))
 	digits := false
 
 	for i := 0; i < 20; i++ {
@@ -593,10 +597,10 @@ func TestGenerateWordTestDecorations(t *testing.T) {
 }
 
 func TestGenerateWordTestMinChars(t *testing.T) {
-	dir := useTempStorage(t)
+	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "words", "greek", "alpha beta gamma delta")
 
-	gen := mustGen(generateWordTest("greek", wordOptions{n: 3, g: 1, minChars: 100}))
+	gen := mustGen(generateWordTest(res, "greek", wordOptions{n: 3, g: 1, minChars: 100}))
 	for i := 0; i < 20; i++ {
 		segments := gen()
 
@@ -614,7 +618,7 @@ func TestGenerateWordTestMinChars(t *testing.T) {
 	}
 
 	// -g still sets the least number of groups.
-	gen = mustGen(generateWordTest("greek", wordOptions{n: 3, g: 50, minChars: 100}))
+	gen = mustGen(generateWordTest(res, "greek", wordOptions{n: 3, g: 50, minChars: 100}))
 	if segments := gen(); len(segments) != 50 {
 		t.Errorf("got %d segments, want 50", len(segments))
 	}
@@ -631,7 +635,7 @@ func mustGen(gen func() []segment, err error) func() []segment {
 }
 
 func TestGeneratorsRejectEmptyText(t *testing.T) {
-	dir := useTempStorage(t)
+	res, dir := newTestResources(t)
 	blankFile := writeTextFile(t, "  \n\n\t\n")
 	writeUserResource(t, dir, "quotes", "blank", `[{"text": " "}, {"text": ""}]`)
 
@@ -644,7 +648,7 @@ func TestGeneratorsRejectEmptyText(t *testing.T) {
 		{"paragraphs", func() (func() []segment, error) { return generateTestFromData([]byte(" \n\n "), false, false) }, "there is no text to type"},
 		{"multi", func() (func() []segment, error) { return generateTestFromData(nil, false, true) }, "there is no text to type"},
 		{"file", func() (func() []segment, error) { return generateTestFromFile(blankFile, -1, &memStore{}) }, blankFile + " does not contain any text"},
-		{"quotes", func() (func() []segment, error) { return generateQuoteTest("blank") }, "blank does not contain any quotes"},
+		{"quotes", func() (func() []segment, error) { return generateQuoteTest(res, "blank") }, "blank does not contain any quotes"},
 	}
 
 	for _, tc := range tests {
@@ -657,10 +661,10 @@ func TestGeneratorsRejectEmptyText(t *testing.T) {
 }
 
 func TestGenerateQuoteTestIgnoresBlankQuotes(t *testing.T) {
-	dir := useTempStorage(t)
+	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "quotes", "some-blank", `[{"text": "  "}, {"text": "real quote"}]`)
 
-	gen := mustGen(generateQuoteTest("some-blank"))
+	gen := mustGen(generateQuoteTest(res, "some-blank"))
 	for i := 0; i < 20; i++ {
 		if got := gen(); got[0].Text != "real quote" {
 			t.Fatalf("got %q, want the only quote with text", got)
@@ -669,11 +673,11 @@ func TestGenerateQuoteTestIgnoresBlankQuotes(t *testing.T) {
 }
 
 func TestGenerateQuoteTestReturnsCopies(t *testing.T) {
-	dir := useTempStorage(t)
+	res, dir := newTestResources(t)
 	writeUserResource(t, dir, "quotes", "one", `[{"text": "the only quote"}]`)
 
 	// The app reflows the text of the tests it is given.
-	gen := mustGen(generateQuoteTest("one"))
+	gen := mustGen(generateQuoteTest(res, "one"))
 	gen()[0].Text = "reflowed"
 
 	if got := gen()[0].Text; got != "the only quote" {

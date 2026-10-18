@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -113,20 +112,15 @@ type jsonStore struct {
 	dataDir, configDir string
 }
 
-// newJSONStore returns the store of the user whose home directory is given
-// by homeDir. getenv gives the environment variables.
-func newJSONStore(getenv func(string) string, homeDir func() (string, error)) (*jsonStore, error) {
-	home, err := homeDir()
-	if err != nil {
-		return nil, errors.New("could not resolve the home directory")
-	}
-
+// newJSONStore returns the store of the user whose home directory is home.
+// getenv gives the environment variables.
+func newJSONStore(getenv func(string) string, home string) *jsonStore {
 	data := filepath.Join(home, ".local", "share", "tt")
 	if xdg := getenv("XDG_DATA_HOME"); xdg != "" {
 		data = filepath.Join(xdg, "tt")
 	}
 
-	return &jsonStore{dataDir: data, configDir: filepath.Join(home, ".config", "tt")}, nil
+	return &jsonStore{dataDir: data, configDir: filepath.Join(home, ".config", "tt")}
 }
 
 // path returns the path of the given file of the data directory.

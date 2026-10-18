@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -83,12 +82,7 @@ func (s *memStore) SaveConfig(cfg appConfig) error {
 func newTestStore(t *testing.T) *jsonStore {
 	t.Helper()
 
-	s, err := newJSONStore(func(string) string { return "" }, func() (string, error) { return t.TempDir(), nil })
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	return s
+	return newJSONStore(func(string) string { return "" }, t.TempDir())
 }
 
 func TestNewJSONStore(t *testing.T) {
@@ -101,21 +95,14 @@ func TestNewJSONStore(t *testing.T) {
 			return ""
 		}
 	}
-	homeDir := func() (string, error) { return home, nil }
 
-	s, err := newJSONStore(getenv(""), homeDir)
-	if err != nil || s.dataDir != filepath.Join(home, ".local", "share", "tt") || s.configDir != filepath.Join(home, ".config", "tt") {
-		t.Errorf("store = %+v, %v, want the default directories", s, err)
+	s := newJSONStore(getenv(""), home)
+	if s.dataDir != filepath.Join(home, ".local", "share", "tt") || s.configDir != filepath.Join(home, ".config", "tt") {
+		t.Errorf("store = %+v, want the default directories", s)
 	}
 
-	s, err = newJSONStore(getenv("/xdg"), homeDir)
-	if err != nil || s.dataDir != filepath.Join("/xdg", "tt") {
-		t.Errorf("store = %+v, %v, want the data in XDG_DATA_HOME", s, err)
-	}
-
-	_, err = newJSONStore(getenv(""), func() (string, error) { return "", errors.New("no home") })
-	if err == nil || err.Error() != "could not resolve the home directory" {
-		t.Errorf("store without a home directory: %v, want an error", err)
+	if s := newJSONStore(getenv("/xdg"), home); s.dataDir != filepath.Join("/xdg", "tt") {
+		t.Errorf("store = %+v, want the data in XDG_DATA_HOME", s)
 	}
 }
 
@@ -278,10 +265,7 @@ func TestStoreConfig(t *testing.T) {
 
 func TestStoreReadsWithoutCreatingDirectories(t *testing.T) {
 	home := t.TempDir()
-	s, err := newJSONStore(func(string) string { return "" }, func() (string, error) { return home, nil })
-	if err != nil {
-		t.Fatal(err)
-	}
+	s := newJSONStore(func(string) string { return "" }, home)
 
 	s.Results()
 	s.Mistakes()
@@ -296,8 +280,9 @@ func TestStoreReadsWithoutCreatingDirectories(t *testing.T) {
 
 func TestRememberedTheme(t *testing.T) {
 	s := newTestStore(t)
+	res, _ := newTestResources(t)
 
-	if got := loadRememberedTheme(s, false); got != "" {
+	if got := loadRememberedTheme(s, res, false); got != "" {
 		t.Errorf("without a config file got %q, want no theme", got)
 	}
 
@@ -313,7 +298,7 @@ func TestRememberedTheme(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		if got := loadRememberedTheme(s, false); got != want {
+		if got := loadRememberedTheme(s, res, false); got != want {
 			t.Errorf("with saved theme %q got %q, want %q", saved, got, want)
 		}
 	}

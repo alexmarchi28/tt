@@ -165,8 +165,8 @@ type adaptiveWords struct {
 	frequency map[string]float64 // See pairFrequencies.
 }
 
-func loadAdaptiveWords(name string) (adaptiveWords, error) {
-	words, err := loadWords(name)
+func loadAdaptiveWords(res resourceReader, name string) (adaptiveWords, error) {
+	words, err := loadWords(res, name)
 	if err != nil {
 		return adaptiveWords{}, err
 	}
@@ -255,8 +255,8 @@ func weightedPick(words []string, weight func(word string) float64) func() strin
 // generateAdaptiveTest draws words from the given word list according to the
 // latest key statistics, focus percent of them with the pairs of letters to
 // practice, see adaptiveWords.draw.
-func generateAdaptiveTest(name string, o wordOptions, focus int, st keyStatsStore) (func() []segment, error) {
-	a, err := loadAdaptiveWords(name)
+func generateAdaptiveTest(res resourceReader, name string, o wordOptions, focus int, st keyStatsStore) (func() []segment, error) {
+	a, err := loadAdaptiveWords(res, name)
 	if err != nil {
 		return nil, err
 	}
