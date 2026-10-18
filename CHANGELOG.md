@@ -13,6 +13,8 @@ Changed:
 
 Fixed:
  - The Russian word list contained the English word TRUE.
+ - Resizing the terminal no longer restarts the test: the text is wrapped again
+   for the new width, keeping what was typed and the time.
 
 # 1.1.0:
 

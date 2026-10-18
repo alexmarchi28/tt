@@ -67,6 +67,11 @@ func newApp(scr tcell.Screen, opts options, kind testKind) *app {
 	a.typer.ShowAccuracy = opts.showAccuracy
 	a.typer.Blind = opts.blind
 	a.typer.Pace = opts.pace
+	if !opts.raw {
+		a.typer.Wrap = func(text string, sw int) string {
+			return reflow(text, lineWidth(opts.maxLineLen, sw))
+		}
+	}
 
 	return a
 }
@@ -84,13 +89,6 @@ func (a *app) run(testFn func() []segment) int {
 
 		if tests[idx] == nil {
 			return 0
-		}
-
-		if !a.opts.raw {
-			sw, _ := a.scr.Size()
-			for i := range tests[idx] {
-				tests[idx][i].Text = reflow(tests[idx][i].Text, lineWidth(a.opts.maxLineLen, sw))
-			}
 		}
 
 		if a.words != nil {
@@ -125,12 +123,6 @@ func (a *app) run(testFn func() []segment) int {
 			idx++
 		case TyperSigInt:
 			return 1
-
-		case TyperResize:
-			//Resize events restart the test, this shouldn't be a problem in the vast majority of cases
-			//and allows us to avoid baking rewrapping logic into the typer.
-
-			//TODO: implement state-preserving resize (maybe)
 		}
 	}
 }

@@ -324,7 +324,6 @@ func TestTyperControlKeys(t *testing.T) {
 		{"ctrl-c", tcell.NewEventKey(tcell.KeyCtrlC, 0, tcell.ModCtrl), TyperSigInt},
 		{"right", tcell.NewEventKey(tcell.KeyRight, 0, tcell.ModNone), TyperNext},
 		{"left", tcell.NewEventKey(tcell.KeyLeft, 0, tcell.ModNone), TyperPrevious},
-		{"resize", tcell.NewEventResize(100, 30), TyperResize},
 	}
 
 	for _, tc := range tests {
@@ -337,6 +336,72 @@ func TestTyperControlKeys(t *testing.T) {
 			}
 		})
 	}
+}
+
+// resizeScreen changes the size of the screen and notifies the typer.
+func resizeScreen(t *testing.T, sim tcell.SimulationScreen, width, height int) {
+	t.Helper()
+
+	sim.SetSize(width, height)
+	sendKeys(t, sim, tcell.NewEventResize(width, height))
+}
+
+// wrapAtScreenWidth wraps the text at the width of the screen.
+func wrapAtScreenWidth(text string, sw int) string {
+	return reflow(text, sw)
+}
+
+func TestTyperResizeKeepsProgress(t *testing.T) {
+	ty, sim := newTestTyper(t)
+	ty.Wrap = wrapAtScreenWidth
+	clock := useFakeClock(ty)
+
+	done := startTyper(ty, []segment{{"alpha beta gamma delta", ""}}, -1)
+	x, y := textOrigin(t, sim, "alpha beta gamma delta")
+
+	sendKeys(t, sim, "alpha bx")
+	waitForColors(t, sim, x, y, map[int]cellWant{7: {testErrCol, testBg, false}})
+	clock.advance(30 * time.Second)
+
+	resizeScreen(t, sim, 12, 25)
+	waitForScreenText(t, sim, "beta gamma", false)
+	waitForScreenText(t, sim, "gamma delta", true)
+
+	clock.advance(30 * time.Second)
+	sendKeys(t, sim, "ta gamma delta")
+
+	got := waitOutcome(t, done)
+	assertOutcome(t, got, TyperComplete, 21, 18, 1, []mistake{{"beta", "bxta"}})
+	if got.duration != time.Minute || len(got.keystrokes) != 22 {
+		t.Errorf("duration %v, %d keystrokes, want 1m and 22", got.duration, len(got.keystrokes))
+	}
+}
+
+func TestTyperResizeWithoutWrap(t *testing.T) {
+	ty, sim := newTestTyper(t)
+
+	done := startTyper(ty, []segment{{"alpha beta", ""}}, -1)
+	sendKeys(t, sim, "alpha")
+	resizeScreen(t, sim, 40, 10)
+	waitForScreenText(t, sim, "alpha beta", true)
+	sendKeys(t, sim, " beta")
+
+	assertOutcome(t, waitOutcome(t, done), TyperComplete, 10, 9, 0, nil)
+}
+
+func TestTyperWrapsEachSegmentAtTheCurrentWidth(t *testing.T) {
+	ty, sim := newTestTyper(t)
+	ty.Wrap = wrapAtScreenWidth
+
+	done := startTyper(ty, []segment{{"ab", ""}, {"alpha beta gamma delta", ""}}, -1)
+	waitForScreenText(t, sim, "ab", true)
+	resizeScreen(t, sim, 12, 25)
+	sendKeys(t, sim, "ab")
+	waitForScreenText(t, sim, "gamma delta", true)
+	waitForScreenText(t, sim, "beta gamma", false)
+	sendKeys(t, sim, "alpha beta gamma delta")
+
+	assertOutcome(t, waitOutcome(t, done), TyperComplete, 24, 21, 0, nil)
 }
 
 func TestTyperMultipleSegments(t *testing.T) {

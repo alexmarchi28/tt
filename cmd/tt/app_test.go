@@ -196,6 +196,28 @@ func TestAppReflowsText(t *testing.T) {
 	}
 }
 
+func TestAppResizeKeepsTheTest(t *testing.T) {
+	opts := parseFlags(nil)
+	opts.noReport = true
+	opts.maxLineLen = 80
+	a, sim := newTestApp(t, opts)
+
+	var calls int
+	done := startApp(a, testSequence(&calls, "alpha beta gamma delta"))
+	waitForScreenText(t, sim, "beta gamma", true)
+
+	sendKeys(t, sim, "alpha be")
+	resizeScreen(t, sim, 20, 25)
+	waitForScreenText(t, sim, "gamma delta", true)
+	waitForScreenText(t, sim, "beta gamma", false)
+	sendKeys(t, sim, "ta gamma delta")
+	waitExitCode(t, done)
+
+	if calls != 2 || len(a.results) != 1 || a.results[0].Mistakes != nil {
+		t.Errorf("%d tests generated, results = %+v, want 2 and one test without mistakes", calls, a.results)
+	}
+}
+
 func TestAppRawMode(t *testing.T) {
 	opts := parseFlags(nil)
 	opts.noReport = true

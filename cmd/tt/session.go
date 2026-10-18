@@ -24,17 +24,40 @@ type session struct {
 func (t *typer) newSession(text string, timeLimit time.Duration, attribution string) *session {
 	s := &session{
 		t:           t,
-		state:       newTypingState(text),
 		attribution: attribution,
 		timeLimit:   timeLimit,
 	}
 
 	s.sw, s.sh = t.Scr.Size()
-	s.nc, s.nr = calcStringDimensions(text)
-	s.x = (s.sw - s.nc) / 2
-	s.y = (s.sh - s.nr) / 2
+	s.state = newTypingState(s.wrap(text))
+	s.center()
 
 	return s
+}
+
+// wrap lays out text on the screen.
+func (s *session) wrap(text string) string {
+	if s.t.Wrap == nil {
+		return text
+	}
+
+	return s.t.Wrap(text, s.sw)
+}
+
+// center places the text at the center of the screen.
+func (s *session) center() {
+	s.nc, s.nr = calcStringDimensions(string(s.state.text))
+	s.x = (s.sw - s.nc) / 2
+	s.y = (s.sh - s.nr) / 2
+}
+
+// resize lays out the text again for the current size of the screen, keeping
+// what was typed.
+func (s *session) resize() {
+	s.sw, s.sh = s.t.Scr.Size()
+	s.state.relayout(s.wrap(string(s.state.text)))
+	s.center()
+	s.t.Scr.Clear()
 }
 
 func (s *session) startTimer() {
