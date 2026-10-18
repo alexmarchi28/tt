@@ -5,6 +5,7 @@ import (
 	"runtime"
 	"time"
 
+	"github.com/alexmarchi28/tt/internal/textgen"
 	"github.com/alexmarchi28/tt/internal/typing"
 	"github.com/gdamore/tcell"
 )
@@ -19,11 +20,6 @@ const (
 	outcomePrevious
 	outcomeNext
 )
-
-type segment struct {
-	Text        string `json:"text"`
-	Attribution string `json:"attribution"`
-}
 
 // paceTick is the longest interval between screen updates with a pacer.
 const paceTick = 50 * time.Millisecond
@@ -176,7 +172,7 @@ func (r testResult) accuracy() float64 {
 // Start runs a test made of the given segments and returns how it ended
 // along with the typing of the segments typed. A timeout of -1 disables the
 // time limit.
-func (t *typer) Start(text []segment, timeout time.Duration) (o outcome, res testResult) {
+func (t *typer) Start(text []textgen.Segment, timeout time.Duration) (o outcome, res testResult) {
 	timeLeft := timeout
 
 	for i, s := range text {

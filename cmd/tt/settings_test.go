@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/alexmarchi28/tt/internal/history"
+	"github.com/alexmarchi28/tt/internal/textgen"
 )
 
 // resolveFlags resolves command line arguments known to be valid, stdin
@@ -160,7 +161,7 @@ func TestResolveGroups(t *testing.T) {
 		t.Errorf("output = %+v, want %+v", s.output, want)
 	}
 
-	wantWords := wordOptions{n: 5, g: 2, punctuation: true, numbers: true, minChars: 30 * fastestCpm / 60}
+	wantWords := textgen.WordOptions{N: 5, G: 2, Punctuation: true, Numbers: true, MinChars: 30 * fastestCpm / 60}
 	if s.source.words != wantWords {
 		t.Errorf("words = %+v, want %+v", s.source.words, wantWords)
 	}

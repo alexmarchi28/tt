@@ -8,6 +8,7 @@ import (
 	"github.com/alexmarchi28/tt/internal/history"
 	"github.com/alexmarchi28/tt/internal/stats"
 	"github.com/alexmarchi28/tt/internal/store"
+	"github.com/alexmarchi28/tt/internal/textgen"
 	"github.com/gdamore/tcell"
 )
 
@@ -107,7 +108,7 @@ func (a *app) useTyper(ty *typer) {
 // run shows the tests of src until there are no more or the user quits, and
 // returns the exit code. It stops at the first test which can't be made or
 // whose outcome can't be saved.
-func (a *app) run(src testSource) (int, error) {
+func (a *app) run(src textgen.Source) (int, error) {
 	tests := newTestHistory(src)
 
 	for {
@@ -118,8 +119,8 @@ func (a *app) run(src testSource) (int, error) {
 			return 1, err
 		}
 
-		if d, ok := src.(describer); ok {
-			a.typer.showStatusMessage(d.describe(), 0)
+		if d, ok := src.(textgen.Describer); ok {
+			a.typer.showStatusMessage(d.Describe(), 0)
 		}
 
 		switch o, res := a.typer.Start(test, a.rules.timeout); o {
@@ -143,7 +144,7 @@ func (a *app) run(src testSource) (int, error) {
 // complete records and reports a completed test. It tells whether the app
 // must stop, with its exit code: the outcome can't be saved, the user quit
 // from the report, or a single test was requested.
-func (a *app) complete(test []segment, res testResult) (stop bool, rc int, err error) {
+func (a *app) complete(test []textgen.Segment, res testResult) (stop bool, rc int, err error) {
 	best, err := a.record(res)
 	if err != nil {
 		return true, 1, err
@@ -161,7 +162,7 @@ func (a *app) complete(test []segment, res testResult) (stop bool, rc int, err e
 
 // attributionOf returns the attribution of a test made of a single text, such
 // as a quote, and nothing for tests mixing several texts.
-func attributionOf(test []segment) string {
+func attributionOf(test []textgen.Segment) string {
 	if len(test) == 1 {
 		return test[0].Attribution
 	}

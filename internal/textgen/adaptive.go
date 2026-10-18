@@ -1,4 +1,4 @@
-package main
+package textgen
 
 import (
 	"math"
@@ -20,7 +20,7 @@ type adaptiveWords struct {
 	frequency map[string]float64 // See keystats.PairFrequencies.
 }
 
-func loadAdaptiveWords(res resourceReader, name string) (adaptiveWords, error) {
+func loadAdaptiveWords(res Resources, name string) (adaptiveWords, error) {
 	words, err := loadWords(res, name)
 	if err != nil {
 		return adaptiveWords{}, err

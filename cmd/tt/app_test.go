@@ -8,6 +8,7 @@ import (
 
 	"github.com/alexmarchi28/tt/internal/history"
 	"github.com/alexmarchi28/tt/internal/resource"
+	"github.com/alexmarchi28/tt/internal/textgen"
 	"github.com/alexmarchi28/tt/internal/typing"
 	"github.com/gdamore/tcell"
 )
@@ -29,24 +30,24 @@ func newTestApp(t *testing.T, s settings) (*app, tcell.SimulationScreen) {
 
 // testSequence returns a test generator producing the given texts, one test
 // each, and then nil. The number of calls is stored in calls.
-func testSequence(calls *int, texts ...string) func() []segment {
-	return func() []segment {
+func testSequence(calls *int, texts ...string) func() []textgen.Segment {
+	return func() []textgen.Segment {
 		*calls++
 		if *calls > len(texts) {
 			return nil
 		}
 
-		return []segment{{texts[*calls-1], ""}}
+		return []textgen.Segment{{Text: texts[*calls-1]}}
 	}
 }
 
-func startApp(a *app, testFn func() []segment) <-chan int {
-	return startSource(a, funcSource(testFn))
+func startApp(a *app, testFn func() []textgen.Segment) <-chan int {
+	return startSource(a, textgen.Func(testFn))
 }
 
 // startSource runs the app in the background on the tests of src. The exit
 // code is delivered on the returned channel, -1 for an error.
-func startSource(a *app, src testSource) <-chan int {
+func startSource(a *app, src textgen.Source) <-chan int {
 	done := make(chan int, 1)
 	go func() {
 		rc, err := a.run(src)
@@ -175,9 +176,9 @@ func TestAppReport(t *testing.T) {
 	a, sim := newTestApp(t, resolveFlags(nil))
 
 	var calls int
-	done := startApp(a, func() []segment {
+	done := startApp(a, func() []textgen.Segment {
 		calls++
-		return []segment{{"ab cd", "Someone"}}
+		return []textgen.Segment{{Text: "ab cd", Attribution: "Someone"}}
 	})
 
 	sendKeys(t, sim, "xb cd")
@@ -401,7 +402,7 @@ func TestAppReportsCompletedTests(t *testing.T) {
 	rep := &fakeReporter{quitAt: 2}
 	a.reporter = rep
 
-	done := startApp(a, func() []segment { return []segment{{"ab", "Someone"}} })
+	done := startApp(a, func() []textgen.Segment { return []textgen.Segment{{Text: "ab", Attribution: "Someone"}} })
 	sendKeys(t, sim, "ab", "ab")
 
 	if rc := waitExitCode(t, done); rc != 1 {

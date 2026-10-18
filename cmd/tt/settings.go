@@ -9,6 +9,7 @@ import (
 
 	"github.com/alexmarchi28/tt/internal/history"
 	"github.com/alexmarchi28/tt/internal/stats"
+	"github.com/alexmarchi28/tt/internal/textgen"
 )
 
 // settings is the configuration of tt resolved once from the command line
@@ -31,7 +32,7 @@ type settings struct {
 type sourceSettings struct {
 	kind           history.Kind // Mode, source and variant of the tests.
 	path           string       // The word list, quote file or file typed, as given.
-	words          wordOptions
+	words          textgen.WordOptions
 	focus          int // Percentage of the words of adaptive tests with the pairs practiced.
 	startParagraph int // Paragraph of the file to start from, -1 for the one reached last.
 	raw            bool
@@ -243,10 +244,10 @@ func adaptiveWordList(opts options) string {
 
 // newWordOptions returns the options of word tests given on the command line.
 // Timed tests get enough words to last until the time is up.
-func newWordOptions(opts options) wordOptions {
-	o := wordOptions{n: opts.n, g: opts.g, punctuation: opts.punct, numbers: opts.numbers}
+func newWordOptions(opts options) textgen.WordOptions {
+	o := textgen.WordOptions{N: opts.n, G: opts.g, Punctuation: opts.punct, Numbers: opts.numbers}
 	if opts.timeout != -1 {
-		o.minChars = int(opts.timeout.Minutes() * fastestCpm)
+		o.MinChars = int(opts.timeout.Minutes() * fastestCpm)
 	}
 
 	return o
@@ -272,3 +273,10 @@ func withVariant(k history.Kind, opts options) history.Kind {
 
 	return k
 }
+
+// defaultWordList is the word list of word tests unless -words is given.
+const defaultWordList = "1000en"
+
+// fastestCpm is a speed beyond the reach of any typist (500 wpm), at which
+// timed word tests still don't run out of words.
+const fastestCpm = 2500

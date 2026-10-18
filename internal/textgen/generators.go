@@ -1,10 +1,9 @@
-package main
+package textgen
 
 import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"math"
 	"math/rand"
 	"strconv"
@@ -12,93 +11,55 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/alexmarchi28/tt/internal/history"
 	"github.com/alexmarchi28/tt/internal/resource"
 	"github.com/alexmarchi28/tt/internal/typing"
 )
 
 // The generators below return functions producing the successive tests of a
-// session, each made of one or more segments, see funcSource. They return nil
-// once there are no more tests.
+// session, each made of one or more segments, see Func. They return nil once
+// there are no more tests.
 
-// generatorStore gives the generators the saved data they make tests from.
-type generatorStore interface {
-	mistakeStore
-	keyStatsStore
-	paragraphStore
+// Words makes tests of words drawn from the named word list.
+func Words(rng *rand.Rand, res Resources, name string, o WordOptions) (Source, error) {
+	return fromFunc(generateWordTest(rng, res, name, o))
 }
 
-// textSources are what the generators make the text of tests from.
-type textSources struct {
-	store     generatorStore
-	resources resourceReader
-	rng       *rand.Rand
-	stdin     io.Reader // Typed in mode text.
+// Quotes makes tests of quotes drawn from the named quote file.
+func Quotes(rng *rand.Rand, res Resources, name string) (Source, error) {
+	return fromFunc(generateQuoteTest(rng, res, name))
 }
 
-// newTestSource returns the source of the tests described by s.
-func newTestSource(s sourceSettings, src textSources) (testSource, error) {
-	res, rng, words := src.resources, src.rng, s.words
+// Mistakes makes tests of the recently mistyped words, the most frequently
+// mistyped ones coming up more often.
+func Mistakes(rng *rand.Rand, o WordOptions, st MistakeStore) (Source, error) {
+	return fromFunc(generateMistakesTest(rng, o, st))
+}
 
-	switch s.kind.Mode {
-	case history.ModeAdaptive:
-		tests, err := newAdaptiveSource(rng, res, s.path, words, s.focus, src.store)
-		if err != nil {
-			return nil, err
-		}
-
-		return tests, nil
-	case history.ModeWords:
-		return fromFunc(generateWordTest(rng, res, s.path, words))
-	case history.ModeQuotes:
-		return fromFunc(generateQuoteTest(rng, res, s.path))
-	case history.ModeMistakes:
-		return fromFunc(generateMistakesTest(rng, words, src.store))
-	case history.ModeText:
-		b, err := io.ReadAll(src.stdin)
-		if err != nil {
-			return nil, err
-		}
-
-		return fromFunc(generateTestFromData(b, s.raw, s.multi))
-	case history.ModeFile:
-		tests, err := newFileSource(s.path, s.startParagraph, src.store)
-		if err != nil {
-			return nil, err
-		}
-
-		return tests, nil
-	default:
-		return nil, fmt.Errorf("unknown mode %q", s.kind.Mode)
-	}
+// Text makes tests of the paragraphs of text: all of them in a test, one
+// per test (split), or text as is (raw).
+func Text(text []byte, raw, split bool) (Source, error) {
+	return fromFunc(generateTestFromData(text, raw, split))
 }
 
 // fromFunc returns the source of the tests made by gen, unless err is set.
-func fromFunc(gen func() []segment, err error) (testSource, error) {
+func fromFunc(gen func() []Segment, err error) (Source, error) {
 	if err != nil {
 		return nil, err
 	}
 
-	return funcSource(gen), nil
+	return Func(gen), nil
 }
 
-// defaultWordList is the word list of word tests unless -words is given.
-const defaultWordList = "1000en"
-
-// fastestCpm is a speed beyond the reach of any typist (500 wpm), at which
-// timed word tests still don't run out of words.
-const fastestCpm = 2500
-
-// wordOptions describes the tests made of random words.
-type wordOptions struct {
-	n           int  // Words per segment.
-	g           int  // Least number of segments per test.
-	punctuation bool // Turn the words into sentences.
-	numbers     bool // Replace some of the words with numbers.
-	minChars    int  // Groups are added until the test has this many characters.
+// WordOptions describes the tests made of random words.
+type WordOptions struct {
+	N           int  // Words per segment.
+	G           int  // Least number of segments per test.
+	Punctuation bool // Turn the words into sentences.
+	Numbers     bool // Replace some of the words with numbers.
+	MinChars    int  // Groups are added until the test has this many characters.
 }
 
-func generateWordTest(rng *rand.Rand, res resourceReader, name string, o wordOptions) (func() []segment, error) {
+func generateWordTest(rng *rand.Rand, res Resources, name string, o WordOptions) (func() []Segment, error) {
 	words, err := loadWords(res, name)
 	if err != nil {
 		return nil, err
@@ -108,7 +69,7 @@ func generateWordTest(rng *rand.Rand, res resourceReader, name string, o wordOpt
 }
 
 // loadWords returns the words of the named word list.
-func loadWords(res resourceReader, name string) ([]string, error) {
+func loadWords(res Resources, name string) ([]string, error) {
 	b, err := res.Read("words", name)
 	if errors.Is(err, resource.ErrNotFound) {
 		return nil, fmt.Errorf("%s does not appear to be a valid word list, see '-list words' for a list of builtin word lists", name)
@@ -148,7 +109,7 @@ func weightedMistakes(mistakes []typing.Mistake, n int) []string {
 
 // generateMistakesTest practices the recently mistyped words, the most
 // frequently mistyped ones coming up more often.
-func generateMistakesTest(rng *rand.Rand, o wordOptions, st mistakeStore) (func() []segment, error) {
+func generateMistakesTest(rng *rand.Rand, o WordOptions, st MistakeStore) (func() []Segment, error) {
 	mistakes, err := st.Mistakes()
 	if err != nil {
 		return nil, err
@@ -163,12 +124,12 @@ func generateMistakesTest(rng *rand.Rand, o wordOptions, st mistakeStore) (func(
 }
 
 // wordTest makes tests of words drawn by draw, one segment per group.
-func wordTest(rng *rand.Rand, draw func(n int) []string, o wordOptions) func() []segment {
-	return func() []segment {
-		var segments []segment
-		for chars := 0; len(segments) < o.g || chars < o.minChars; {
+func wordTest(rng *rand.Rand, draw func(n int) []string, o WordOptions) func() []Segment {
+	return func() []Segment {
+		var segments []Segment
+		for chars := 0; len(segments) < o.G || chars < o.MinChars; {
 			text := wordGroup(rng, draw, o)
-			segments = append(segments, segment{text, ""})
+			segments = append(segments, Segment{text, ""})
 			chars += utf8.RuneCountInString(text)
 		}
 
@@ -178,12 +139,12 @@ func wordTest(rng *rand.Rand, draw func(n int) []string, o wordOptions) func() [
 
 // wordGroup draws a group of words and adds numbers and punctuation to them
 // if requested.
-func wordGroup(rng *rand.Rand, draw func(n int) []string, o wordOptions) string {
-	words := draw(o.n)
-	if o.numbers {
+func wordGroup(rng *rand.Rand, draw func(n int) []string, o WordOptions) string {
+	words := draw(o.N)
+	if o.Numbers {
 		words = addNumbers(rng, words)
 	}
-	if o.punctuation {
+	if o.Punctuation {
 		words = punctuate(rng, words)
 	}
 
@@ -276,8 +237,8 @@ func addNumbers(rng *rand.Rand, words []string) []string {
 	return out
 }
 
-func generateQuoteTest(rng *rand.Rand, res resourceReader, name string) (func() []segment, error) {
-	var quotes []segment
+func generateQuoteTest(rng *rand.Rand, res Resources, name string) (func() []Segment, error) {
+	var quotes []Segment
 
 	if b, err := res.Read("quotes", name); errors.Is(err, resource.ErrNotFound) {
 		return nil, fmt.Errorf("%s does not appear to be a valid quote file, see '-list quotes' for a list of builtin quotes", name)
@@ -287,7 +248,7 @@ func generateQuoteTest(rng *rand.Rand, res resourceReader, name string) (func() 
 		return nil, fmt.Errorf("improperly formatted quote file: %v", err)
 	}
 
-	var withText []segment
+	var withText []Segment
 	for _, q := range quotes {
 		if strings.TrimSpace(q.Text) != "" {
 			withText = append(withText, q)
@@ -299,37 +260,37 @@ func generateQuoteTest(rng *rand.Rand, res resourceReader, name string) (func() 
 		return nil, fmt.Errorf("%s does not contain any quotes", name)
 	}
 
-	return func() []segment {
-		return []segment{quotes[rng.Intn(len(quotes))]}
+	return func() []Segment {
+		return []Segment{quotes[rng.Intn(len(quotes))]}
 	}, nil
 }
 
-func generateTestFromData(data []byte, raw bool, split bool) (func() []segment, error) {
+func generateTestFromData(data []byte, raw bool, split bool) (func() []Segment, error) {
 	paragraphs := getParagraphs(string(data))
 	if len(paragraphs) == 0 {
 		return nil, errors.New("there is no text to type")
 	}
 
 	if raw {
-		return func() []segment { return []segment{{string(data), ""}} }, nil
+		return func() []Segment { return []Segment{{string(data), ""}} }, nil
 	} else if split {
 		i := 0
 
-		return func() []segment {
+		return func() []Segment {
 			if i < len(paragraphs) {
 				p := paragraphs[i]
 				i++
-				return []segment{{p, ""}}
+				return []Segment{{p, ""}}
 			} else {
 				return nil
 			}
 		}, nil
 	} else {
-		return func() []segment {
-			var segments []segment
+		return func() []Segment {
+			var segments []Segment
 
 			for _, p := range paragraphs {
-				segments = append(segments, segment{p, ""})
+				segments = append(segments, Segment{p, ""})
 			}
 
 			return segments

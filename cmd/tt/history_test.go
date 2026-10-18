@@ -4,6 +4,8 @@ import (
 	"io"
 	"reflect"
 	"testing"
+
+	"github.com/alexmarchi28/tt/internal/textgen"
 )
 
 // The tests are made when first needed and kept, so that going back shows
@@ -12,12 +14,12 @@ func TestTestHistory(t *testing.T) {
 	t.Parallel()
 
 	var calls int
-	h := newTestHistory(funcSource(testSequence(&calls, "ab", "cd")))
+	h := newTestHistory(textgen.Func(testSequence(&calls, "ab", "cd")))
 
 	current := func(want string) {
 		t.Helper()
 		got, err := h.current()
-		if err != nil || !reflect.DeepEqual(got, []segment{{want, ""}}) {
+		if err != nil || !reflect.DeepEqual(got, []textgen.Segment{{Text: want}}) {
 			t.Fatalf("current() = %q, %v, want %q", got, err, want)
 		}
 	}
