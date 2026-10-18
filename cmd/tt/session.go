@@ -1,7 +1,6 @@
 package main
 
 import (
-	"runtime"
 	"strconv"
 	"time"
 
@@ -91,7 +90,6 @@ func (s *session) duration() time.Duration {
 
 func (s *session) result() testResult {
 	return testResult{
-		rc:           TyperComplete,
 		duration:     s.duration(),
 		correctChars: s.state.correctChars(),
 		correctKeys:  s.state.correctKeys,
@@ -128,46 +126,44 @@ func (s *session) correct(word bool) {
 
 // handleKey handles a key press and returns the outcome of the test if it
 // ended.
-func (s *session) handleKey(ev *tcell.EventKey) (testResult, bool) {
+func (s *session) handleKey(ev *tcell.EventKey) (outcome, bool) {
 	t := s.t
 
-	if runtime.GOOS != "windows" && ev.Key() == tcell.KeyBackspace { //Control+backspace on unix terms
-		s.correct(true)
-		return testResult{}, false
-	}
-
-	switch ev.Key() {
-	case tcell.KeyCtrlC:
-		return testResult{rc: TyperSigInt}, true
-	case tcell.KeyEscape:
-		return testResult{rc: TyperEscape}, true
-	case tcell.KeyRight:
-		return testResult{rc: TyperNext}, true
-	case tcell.KeyLeft:
-		return testResult{rc: TyperPrevious}, true
-	case tcell.KeyCtrlL:
+	switch t.keys.action(ev) {
+	case actionQuit:
+		return outcomeQuit, true
+	case actionRestart:
+		return outcomeRestart, true
+	case actionNext:
+		return outcomeNext, true
+	case actionPrevious:
+		return outcomePrevious, true
+	case actionRedraw:
 		t.Scr.Sync()
-	case tcell.KeyCtrlN:
+	case actionNextTheme:
 		t.cycleTheme(1)
-	case tcell.KeyCtrlP:
+	case actionPreviousTheme:
 		t.cycleTheme(-1)
-	case tcell.KeyCtrlW:
+	case actionDeleteChar:
+		s.correct(false)
+	case actionDeleteWord:
 		s.correct(true)
-	case tcell.KeyBackspace, tcell.KeyBackspace2:
-		s.correct(ev.Modifiers() == tcell.ModAlt || ev.Modifiers() == tcell.ModCtrl)
-	case tcell.KeyTab:
-		if s.typeRune('\t') {
-			return s.result(), true
-		}
-	case tcell.KeyRune:
-		if ev.Rune() == '?' && !s.state.expects('?') {
+	case actionToggleHelp:
+		if !s.state.expects(ev.Rune()) {
 			t.showKeyboardHelp = !t.showKeyboardHelp
 		} else if s.typeRune(ev.Rune()) {
-			return s.result(), true
+			return outcomeComplete, true
+		}
+	case actionNone:
+		switch ev.Key() {
+		case tcell.KeyTab:
+			return outcomeComplete, s.typeRune('\t')
+		case tcell.KeyRune:
+			return outcomeComplete, s.typeRune(ev.Rune())
 		}
 	}
 
-	return testResult{}, false
+	return outcomeComplete, false
 }
 
 func (s *session) redraw() {

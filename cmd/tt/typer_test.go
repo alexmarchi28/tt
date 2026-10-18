@@ -70,9 +70,10 @@ func TestQuestionMarkTogglesKeyboardHelp(t *testing.T) {
 
 	typer := NewTyper(sim, true, testTheme)
 	typer.tty = io.Discard
-	done := make(chan int, 1)
+	done := make(chan outcome, 1)
 	go func() {
-		done <- typer.start("alpha beta", -1, false, "").rc
+		o, _ := typer.start("alpha beta", -1, false, "")
+		done <- o
 	}()
 
 	sim.InjectKey(tcell.KeyRune, '?', tcell.ModNone)
@@ -84,9 +85,9 @@ func TestQuestionMarkTogglesKeyboardHelp(t *testing.T) {
 
 	sim.InjectKey(tcell.KeyEscape, 0, tcell.ModNone)
 	select {
-	case rc := <-done:
-		if rc != TyperEscape {
-			t.Fatalf("rc = %d, want %d", rc, TyperEscape)
+	case o := <-done:
+		if o != outcomeRestart {
+			t.Fatalf("outcome = %d, want %d", o, outcomeRestart)
 		}
 	case <-time.After(time.Second):
 		t.Fatal("typer did not exit after escape")
@@ -111,15 +112,25 @@ func newTestTyper(t *testing.T) (*typer, tcell.SimulationScreen) {
 
 	ty := NewTyper(sim, true, testTheme)
 	ty.tty = io.Discard
+	ty.keys = newKeymap("linux") //The keys of the tests, whatever the system running them.
 
 	return ty, sim
 }
 
+// typed is what the typer returns for a test.
+type typed struct {
+	outcome outcome
+	testResult
+}
+
 // startTyper runs a test in the background; the outcome is delivered on the
 // returned channel once the typer returns.
-func startTyper(ty *typer, segments []segment, timeout time.Duration) <-chan testResult {
-	done := make(chan testResult, 1)
-	go func() { done <- ty.Start(segments, timeout) }()
+func startTyper(ty *typer, segments []segment, timeout time.Duration) <-chan typed {
+	done := make(chan typed, 1)
+	go func() {
+		o, res := ty.Start(segments, timeout)
+		done <- typed{o, res}
+	}()
 
 	return done
 }
@@ -161,7 +172,7 @@ func sendKeys(t *testing.T, sim tcell.SimulationScreen, items ...interface{}) {
 	}
 }
 
-func waitOutcome(t *testing.T, done <-chan testResult) testResult {
+func waitOutcome(t *testing.T, done <-chan typed) typed {
 	t.Helper()
 
 	select {
@@ -171,12 +182,12 @@ func waitOutcome(t *testing.T, done <-chan testResult) testResult {
 		t.Fatal("typer did not return")
 	}
 
-	return testResult{}
+	return typed{}
 }
 
 // typeText runs a single segment test with the given keys and returns its
 // outcome.
-func typeText(t *testing.T, ty *typer, sim tcell.SimulationScreen, text string, items ...interface{}) testResult {
+func typeText(t *testing.T, ty *typer, sim tcell.SimulationScreen, text string, items ...interface{}) typed {
 	t.Helper()
 
 	done := startTyper(ty, []segment{{text, ""}}, -1)
@@ -184,11 +195,11 @@ func typeText(t *testing.T, ty *typer, sim tcell.SimulationScreen, text string, 
 	return waitOutcome(t, done)
 }
 
-func assertOutcome(t *testing.T, got testResult, rc, correctChars, correctKeys, wrongKeys int, mistakes []mistake) {
+func assertOutcome(t *testing.T, got typed, o outcome, correctChars, correctKeys, wrongKeys int, mistakes []mistake) {
 	t.Helper()
 
-	if got.rc != rc {
-		t.Errorf("rc = %d, want %d", got.rc, rc)
+	if got.outcome != o {
+		t.Errorf("outcome = %d, want %d", got.outcome, o)
 	}
 	if got.correctChars != correctChars {
 		t.Errorf("correct characters = %d, want %d", got.correctChars, correctChars)
@@ -210,7 +221,7 @@ func TestTyperCorrectText(t *testing.T) {
 	got := typeText(t, ty, sim, "alpha beta", "alpha beta")
 
 	// With word skipping enabled spaces are not counted as keystrokes.
-	assertOutcome(t, got, TyperComplete, 10, 9, 0, nil)
+	assertOutcome(t, got, outcomeComplete, 10, 9, 0, nil)
 	if got.duration <= 0 {
 		t.Errorf("duration = %v, want > 0", got.duration)
 	}
@@ -220,24 +231,24 @@ func TestTyperTypo(t *testing.T) {
 	ty, sim := newTestTyper(t)
 
 	got := typeText(t, ty, sim, "alpha beta", "alpxa beta")
-	assertOutcome(t, got, TyperComplete, 9, 8, 1, []mistake{{"alpha", "alpxa"}})
+	assertOutcome(t, got, outcomeComplete, 9, 8, 1, []mistake{{"alpha", "alpxa"}})
 }
 
 func TestTyperBackspace(t *testing.T) {
 	ty, sim := newTestTyper(t)
 
 	got := typeText(t, ty, sim, "alpha beta", "alpx", tcell.KeyBackspace2, "ha beta")
-	assertOutcome(t, got, TyperComplete, 10, 9, 1, nil)
+	assertOutcome(t, got, outcomeComplete, 10, 9, 1, nil)
 
 	got = typeText(t, ty, sim, "ab", tcell.KeyBackspace2, "ab")
-	assertOutcome(t, got, TyperComplete, 2, 2, 0, nil)
+	assertOutcome(t, got, outcomeComplete, 2, 2, 0, nil)
 }
 
 func TestTyperBackspaceAcrossLineBreak(t *testing.T) {
 	ty, sim := newTestTyper(t)
 
 	got := typeText(t, ty, sim, "ab \ncd", "ab ", tcell.KeyBackspace2, " cd")
-	assertOutcome(t, got, TyperComplete, 5, 4, 0, nil)
+	assertOutcome(t, got, outcomeComplete, 5, 4, 0, nil)
 }
 
 func TestTyperDisableBackspace(t *testing.T) {
@@ -245,7 +256,7 @@ func TestTyperDisableBackspace(t *testing.T) {
 	ty.DisableBackspace = true
 
 	got := typeText(t, ty, sim, "ab cd", "x", tcell.KeyBackspace2, "b c", tcell.KeyCtrlW, "d")
-	assertOutcome(t, got, TyperComplete, 4, 3, 1, []mistake{{"ab", "xb"}})
+	assertOutcome(t, got, outcomeComplete, 4, 3, 1, []mistake{{"ab", "xb"}})
 }
 
 func TestTyperDeleteWord(t *testing.T) {
@@ -262,15 +273,15 @@ func TestTyperDeleteWord(t *testing.T) {
 
 			// Inside a word the word itself is deleted.
 			got := typeText(t, ty, sim, "alpha beta", "alpha bx", deleteWord, "beta")
-			assertOutcome(t, got, TyperComplete, 10, 10, 1, nil)
+			assertOutcome(t, got, outcomeComplete, 10, 10, 1, nil)
 
 			// At the start of a word the previous one is deleted.
 			got = typeText(t, ty, sim, "alpha beta", "alpxa ", deleteWord, "alpha beta")
-			assertOutcome(t, got, TyperComplete, 10, 13, 1, nil)
+			assertOutcome(t, got, outcomeComplete, 10, 13, 1, nil)
 
 			// Nothing to delete at the start of the text.
 			got = typeText(t, ty, sim, "ab", deleteWord, "ab")
-			assertOutcome(t, got, TyperComplete, 2, 2, 0, nil)
+			assertOutcome(t, got, outcomeComplete, 2, 2, 0, nil)
 		})
 	}
 }
@@ -279,14 +290,14 @@ func TestTyperSpaceSkipsWord(t *testing.T) {
 	ty, sim := newTestTyper(t)
 
 	got := typeText(t, ty, sim, "alpha beta gamma", "al beta gamma")
-	assertOutcome(t, got, TyperComplete, 13, 11, 0, []mistake{{"alpha", "al___"}})
+	assertOutcome(t, got, outcomeComplete, 13, 11, 0, []mistake{{"alpha", "al___"}})
 }
 
 func TestTyperSpaceAtWordStartIsIgnored(t *testing.T) {
 	ty, sim := newTestTyper(t)
 
 	got := typeText(t, ty, sim, "alpha beta", "alpha  beta")
-	assertOutcome(t, got, TyperComplete, 10, 9, 0, nil)
+	assertOutcome(t, got, outcomeComplete, 10, 9, 0, nil)
 }
 
 func TestTyperNoSkip(t *testing.T) {
@@ -294,36 +305,36 @@ func TestTyperNoSkip(t *testing.T) {
 	ty.SkipWord = false
 
 	got := typeText(t, ty, sim, "ab cd", "a  cd")
-	assertOutcome(t, got, TyperComplete, 4, 4, 1, []mistake{{"ab", "a "}})
+	assertOutcome(t, got, outcomeComplete, 4, 4, 1, []mistake{{"ab", "a "}})
 }
 
 func TestTyperSkipsLineBreaks(t *testing.T) {
 	ty, sim := newTestTyper(t)
 
 	got := typeText(t, ty, sim, "ab\ncd", "abcd")
-	assertOutcome(t, got, TyperComplete, 4, 4, 0, nil)
+	assertOutcome(t, got, outcomeComplete, 4, 4, 0, nil)
 
 	got = typeText(t, ty, sim, "ab \ncd", "ab cd")
-	assertOutcome(t, got, TyperComplete, 5, 4, 0, nil)
+	assertOutcome(t, got, outcomeComplete, 5, 4, 0, nil)
 }
 
 func TestTyperQuestionMarkInText(t *testing.T) {
 	ty, sim := newTestTyper(t)
 
 	got := typeText(t, ty, sim, "why? because", "why? because")
-	assertOutcome(t, got, TyperComplete, 12, 11, 0, nil)
+	assertOutcome(t, got, outcomeComplete, 12, 11, 0, nil)
 }
 
 func TestTyperControlKeys(t *testing.T) {
 	tests := []struct {
 		name string
 		ev   tcell.Event
-		rc   int
+		want outcome
 	}{
-		{"escape", tcell.NewEventKey(tcell.KeyEscape, 0, tcell.ModNone), TyperEscape},
-		{"ctrl-c", tcell.NewEventKey(tcell.KeyCtrlC, 0, tcell.ModCtrl), TyperSigInt},
-		{"right", tcell.NewEventKey(tcell.KeyRight, 0, tcell.ModNone), TyperNext},
-		{"left", tcell.NewEventKey(tcell.KeyLeft, 0, tcell.ModNone), TyperPrevious},
+		{"escape", tcell.NewEventKey(tcell.KeyEscape, 0, tcell.ModNone), outcomeRestart},
+		{"ctrl-c", tcell.NewEventKey(tcell.KeyCtrlC, 0, tcell.ModCtrl), outcomeQuit},
+		{"right", tcell.NewEventKey(tcell.KeyRight, 0, tcell.ModNone), outcomeNext},
+		{"left", tcell.NewEventKey(tcell.KeyLeft, 0, tcell.ModNone), outcomePrevious},
 	}
 
 	for _, tc := range tests {
@@ -331,8 +342,8 @@ func TestTyperControlKeys(t *testing.T) {
 			ty, sim := newTestTyper(t)
 
 			got := typeText(t, ty, sim, "alpha beta", "al", tc.ev)
-			if got.rc != tc.rc {
-				t.Errorf("rc = %d, want %d", got.rc, tc.rc)
+			if got.outcome != tc.want {
+				t.Errorf("outcome = %d, want %d", got.outcome, tc.want)
 			}
 		})
 	}
@@ -371,7 +382,7 @@ func TestTyperResizeKeepsProgress(t *testing.T) {
 	sendKeys(t, sim, "ta gamma delta")
 
 	got := waitOutcome(t, done)
-	assertOutcome(t, got, TyperComplete, 21, 18, 1, []mistake{{"beta", "bxta"}})
+	assertOutcome(t, got, outcomeComplete, 21, 18, 1, []mistake{{"beta", "bxta"}})
 	if got.duration != time.Minute || len(got.keystrokes) != 22 {
 		t.Errorf("duration %v, %d keystrokes, want 1m and 22", got.duration, len(got.keystrokes))
 	}
@@ -386,7 +397,7 @@ func TestTyperResizeWithoutWrap(t *testing.T) {
 	waitForScreenText(t, sim, "alpha beta", true)
 	sendKeys(t, sim, " beta")
 
-	assertOutcome(t, waitOutcome(t, done), TyperComplete, 10, 9, 0, nil)
+	assertOutcome(t, waitOutcome(t, done), outcomeComplete, 10, 9, 0, nil)
 }
 
 func TestTyperWrapsEachSegmentAtTheCurrentWidth(t *testing.T) {
@@ -401,7 +412,7 @@ func TestTyperWrapsEachSegmentAtTheCurrentWidth(t *testing.T) {
 	waitForScreenText(t, sim, "beta gamma", false)
 	sendKeys(t, sim, "alpha beta gamma delta")
 
-	assertOutcome(t, waitOutcome(t, done), TyperComplete, 24, 21, 0, nil)
+	assertOutcome(t, waitOutcome(t, done), outcomeComplete, 24, 21, 0, nil)
 }
 
 func TestTyperMultipleSegments(t *testing.T) {
@@ -411,14 +422,14 @@ func TestTyperMultipleSegments(t *testing.T) {
 	sendKeys(t, sim, "ab cx", "ef")
 	got := waitOutcome(t, done)
 
-	if got.rc != TyperComplete || got.correctChars != 6 || !reflect.DeepEqual(got.mistakes, []mistake{{"cd", "cx"}}) {
-		t.Errorf("got %+v, want rc %d, 6 correct characters and mistakes [{cd cx}]", got, TyperComplete)
+	if got.outcome != outcomeComplete || got.correctChars != 6 || !reflect.DeepEqual(got.mistakes, []mistake{{"cd", "cx"}}) {
+		t.Errorf("got %+v, want outcome %d, 6 correct characters and mistakes [{cd cx}]", got, outcomeComplete)
 	}
 
 	done = startTyper(ty, []segment{{"ab", ""}, {"cd", ""}}, -1)
 	sendKeys(t, sim, "ab", "c", tcell.KeyEscape)
-	if got := waitOutcome(t, done); got.rc != TyperEscape {
-		t.Errorf("rc = %d, want %d", got.rc, TyperEscape)
+	if got := waitOutcome(t, done); got.outcome != outcomeRestart {
+		t.Errorf("outcome = %d, want %d", got.outcome, outcomeRestart)
 	}
 }
 
@@ -434,7 +445,7 @@ func TestTyperTimeout(t *testing.T) {
 	clock.advance(10 * time.Second)
 
 	got := waitOutcome(t, done)
-	assertOutcome(t, got, TyperComplete, 2, 2, 1, []mistake{{"alp", "alx"}})
+	assertOutcome(t, got, outcomeComplete, 2, 2, 1, []mistake{{"alp", "alx"}})
 	if got.duration != 10*time.Second {
 		t.Errorf("duration = %v, want the time limit", got.duration)
 	}
@@ -456,7 +467,7 @@ func TestTyperTimeoutIgnoresLateKeys(t *testing.T) {
 	sendKeys(t, sim, "bcd")
 
 	got := waitOutcome(t, done)
-	assertOutcome(t, got, TyperComplete, 1, 1, 0, nil)
+	assertOutcome(t, got, outcomeComplete, 1, 1, 0, nil)
 	if got.duration != 10*time.Second {
 		t.Errorf("duration = %v, want the time limit", got.duration)
 	}
@@ -484,7 +495,7 @@ func TestTyperTimeoutSpansSegments(t *testing.T) {
 	clock.advance(2 * time.Second)
 
 	got := waitOutcome(t, done)
-	if got.rc != TyperComplete || got.correctChars != 3 || got.duration != 10*time.Second {
+	if got.outcome != outcomeComplete || got.correctChars != 3 || got.duration != 10*time.Second {
 		t.Errorf("got %+v, want the test to end after 10s with 3 characters", got)
 	}
 }
@@ -502,7 +513,7 @@ func TestTyperTimerStartsOnFirstKey(t *testing.T) {
 	sendKeys(t, sim, "ab")
 
 	got := waitOutcome(t, done)
-	assertOutcome(t, got, TyperComplete, 2, 2, 0, nil)
+	assertOutcome(t, got, outcomeComplete, 2, 2, 0, nil)
 	if got.duration != 0 {
 		t.Errorf("duration = %v, want 0 as the clock didn't move while typing", got.duration)
 	}
@@ -693,7 +704,7 @@ func TestTyperCycleTheme(t *testing.T) {
 	waitForScreenText(t, sim, "no valid themes available", true)
 
 	sendKeys(t, sim, "ab")
-	assertOutcome(t, waitOutcome(t, done), TyperComplete, 2, 2, 0, nil)
+	assertOutcome(t, waitOutcome(t, done), outcomeComplete, 2, 2, 0, nil)
 
 	close(directions)
 	var got []int
@@ -753,7 +764,7 @@ func TestTyperCountsKeystrokesOfAllSegments(t *testing.T) {
 	done := startTyper(ty, []segment{{"ab", ""}, {"cd", ""}}, -1)
 	sendKeys(t, sim, "xb", "cd")
 
-	assertOutcome(t, waitOutcome(t, done), TyperComplete, 3, 3, 1, []mistake{{"ab", "xb"}})
+	assertOutcome(t, waitOutcome(t, done), outcomeComplete, 3, 3, 1, []mistake{{"ab", "xb"}})
 }
 
 func TestCalcAccuracy(t *testing.T) {
@@ -790,10 +801,10 @@ func TestTyperSpaceAtLineStartIsIgnored(t *testing.T) {
 	ty, sim := newTestTyper(t)
 
 	got := typeText(t, ty, sim, "ab \ncd", "ab  cd")
-	assertOutcome(t, got, TyperComplete, 5, 4, 0, nil)
+	assertOutcome(t, got, outcomeComplete, 5, 4, 0, nil)
 
 	got = typeText(t, ty, sim, "ab\ncd", "ab cd")
-	assertOutcome(t, got, TyperComplete, 4, 4, 0, nil)
+	assertOutcome(t, got, outcomeComplete, 4, 4, 0, nil)
 }
 
 func TestTyperTypingQuestionMarkDoesNotToggleHelp(t *testing.T) {
@@ -857,7 +868,7 @@ func TestTyperTab(t *testing.T) {
 		ty.SkipWord = skip
 
 		got := typeText(t, ty, sim, "if x {\n\treturn\n}", "if x {", tcell.KeyTab, "return}")
-		if got.rc != TyperComplete || got.mistakes != nil || got.wrongKeys != 0 {
+		if got.outcome != outcomeComplete || got.mistakes != nil || got.wrongKeys != 0 {
 			t.Errorf("with SkipWord %t got %+v, want a completed test without mistakes", skip, got)
 		}
 	}
@@ -912,7 +923,7 @@ func TestTyperBlind(t *testing.T) {
 	// But they still count.
 	sendKeys(t, sim, "cd ef")
 	got := waitOutcome(t, done)
-	assertOutcome(t, got, TyperComplete, 6, 6, 2, []mistake{{"ab", "xb"}})
+	assertOutcome(t, got, outcomeComplete, 6, 6, 2, []mistake{{"ab", "xb"}})
 }
 
 // fakeClock is a clock which only moves when told to.
@@ -1074,7 +1085,7 @@ func TestTyperEmptyText(t *testing.T) {
 
 	// The timer never starts, the test lasts no time at all.
 	got := typeText(t, ty, sim, "", "a")
-	if got.rc != TyperComplete || got.duration != 0 || got.cpm() != 0 || got.wpm() != 0 {
+	if got.outcome != outcomeComplete || got.duration != 0 || got.cpm() != 0 || got.wpm() != 0 {
 		t.Errorf("got %+v (cpm %d), want a completed test without duration nor speed", got, got.cpm())
 	}
 }
