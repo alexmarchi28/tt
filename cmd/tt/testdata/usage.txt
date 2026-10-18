@@ -1,0 +1,89 @@
+usage: tt [options] [file]
+
+Modes
+    -words  WORDFILE    Specifies the file from which words are randomly
+                        drawn (default: 1000en).
+    -quotes QUOTEFILE   Starts quote mode in which quotes are randomly drawn
+                        from the given file. The file should be JSON encoded and
+                        have the following form:
+
+                        [{"text": "foo", attribution: "bar"}]
+
+    -mistakes           Practice the recently mistyped words, the most
+                        frequently mistyped ones coming up more often.
+    -adaptive           Practice the words of the word list (see -words) with
+                        the pairs of letters you type the slowest or miss the
+                        most.
+    -focus PERCENT      The percentage of the words of -adaptive drawn among
+                        those with the pairs of letters being practiced
+                        (default: 40).
+
+    Only one mode can be used at a time. Text piped to stdin is typed unless
+    a mode or a file is given.
+
+Word Mode (also applies to -mistakes and -adaptive)
+    -n GROUPSZ          Sets the number of words which constitute a group.
+    -g NGROUPS          Sets the number of groups which constitute a test.
+    -punct              Turn the words into sentences with capital letters
+                        and punctuation.
+    -numbers            Replace some of the words with numbers.
+
+File Mode
+    -start PARAGRAPH    The offset of the starting paragraph, set this to 0 to
+                        reset progress on a given file.
+
+Aesthetics
+    -showwpm            Display WPM whilst typing.
+    -showaccuracy       Display accuracy whilst typing.
+    -theme THEMEFILE    The theme to use.
+    -w                  The maximum line length in characters. This option is
+                        ignored if -raw is present.
+    -notheme            Attempt to use the default terminal theme.
+                        This may produce odd results depending
+                        on the theme colours.
+    -notransparent      Disable transparent background.
+    -blockcursor        Use the default cursor style.
+    -bold               Embolden typed text.
+
+Test Parameters
+    -t SECONDS          Terminate the test after the given number of seconds.
+                        Word tests have enough words to last until then.
+    -noskip             Disable word skipping when space is pressed.
+    -nobackspace        Disable the backspace key.
+    -blind              Don't show mistakes while typing, they are still
+                        reported at the end of the test.
+    -pace WPM|best|avg  Show a pacer going through the text at the given speed,
+                        or at your best or recent average speed on the same
+                        kind of test.
+    -nohighlight        Disable current and next word highlighting.
+    -highlight1         Only highlight the current word.
+    -highlight2         Only highlight the next word.
+
+Scripting
+    -oneshot            Automatically exit after a single run.
+    -noreport           Don't show a report at the end of a test.
+    -csv                Print the test results to stdout in the form:
+                        [type],[wpm],[cpm],[accuracy],[timestamp].
+    -json               Print the test output in JSON, see also -export.
+    -raw                Don't reflow STDIN text or show one paragraph at a time.
+                        Note that line breaks are determined exclusively by the
+                        input.
+    -multi              Treat each input paragraph as a self contained test.
+
+Misc
+    -list TYPE          Lists internal resources of the given type.
+                        TYPE=[themes|quotes|words]
+    -stats              Print statistics about the saved results: number of
+                        tests, time spent typing, personal best, averages over
+                        time, weekly trend, a chart of the daily progress,
+                        results by kind of test and most mistyped words.
+    -keys               Print how accurately and quickly each key is typed on
+                        a keyboard.
+    -layout LAYOUT      The keyboard layout used by -keys: us, uk, it, es, de,
+                        fr, dvorak, colemak, colemak-dh or workman
+                        (default: us).
+    -export DATA        Print the saved results or mistakes (DATA=results or
+                        mistakes) as CSV, or as JSON with -json.
+
+Version
+    -v                  Print the current version.

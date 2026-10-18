@@ -146,7 +146,7 @@ In `cmd/tt`:
 | File | Contents |
 |---|---|
 | `tt.go` | `main`, `run` and the commands (`-list`, `-stats`, `-keys`, ...) |
-| `options.go`, `settings.go` | Command line options, usage, and the settings resolved from them |
+| `flags.go`, `options.go`, `settings.go` | The flags and the usage generated from them, the options parsed and the settings resolved from them |
 | `app.go`, `history.go` | The sequence of tests: navigation, reports, saving the results |
 | `typer.go`, `session.go` | A test on the screen: event loop, keys, timer |
 | `view.go` | Drawing a test: text, styles, live statistics, help |
