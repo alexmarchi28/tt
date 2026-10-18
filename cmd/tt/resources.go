@@ -6,6 +6,7 @@ import (
 	"path"
 	"path/filepath"
 	"sort"
+	"sync"
 
 	"github.com/alexmarchi28/tt"
 )
@@ -21,9 +22,28 @@ func init() {
 	}
 }
 
+// onceReader reads r entirely the first time it is read and returns the same
+// data afterwards.
+type onceReader struct {
+	r    io.Reader
+	once sync.Once
+	data []byte
+	err  error
+}
+
+func (o *onceReader) readAll() ([]byte, error) {
+	o.once.Do(func() { o.data, o.err = io.ReadAll(o.r) })
+	return o.data, o.err
+}
+
+// stdinResource is the resource named "-". Stdin can only be read once, but
+// the same resource may be needed more than once, e.g. the word list of
+// adaptive tests.
+var stdinResource = &onceReader{r: os.Stdin}
+
 func readResource(typ, name string) []byte {
 	if name == "-" {
-		b, err := io.ReadAll(os.Stdin)
+		b, err := stdinResource.readAll()
 		if err != nil {
 			panic(err)
 		}
