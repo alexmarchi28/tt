@@ -22,6 +22,7 @@ var allowedImports = map[string][]string{
 	"history":  nil,
 	"keystats": {module + "/internal/typing"},
 	"resource": {module},
+	"stats":    {module + "/internal/history", module + "/internal/keystats", module + "/internal/typing"},
 	"store":    {module + "/internal/history", module + "/internal/keystats", module + "/internal/typing"},
 }
 

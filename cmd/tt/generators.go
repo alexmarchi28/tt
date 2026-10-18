@@ -137,9 +137,9 @@ func weightedMistakes(mistakes []typing.Mistake, n int) []string {
 	}
 
 	var words []string
-	for _, w := range mostMistyped(mistakes, len(mistakes)) {
-		for i := 0; i < w.count; i++ {
-			words = append(words, w.word)
+	for _, w := range typing.MostMistyped(mistakes, len(mistakes)) {
+		for i := 0; i < w.Count; i++ {
+			words = append(words, w.Word)
 		}
 	}
 

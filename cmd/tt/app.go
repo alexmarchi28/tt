@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/alexmarchi28/tt/internal/history"
+	"github.com/alexmarchi28/tt/internal/stats"
 	"github.com/alexmarchi28/tt/internal/store"
 	"github.com/gdamore/tcell"
 )
@@ -191,7 +192,7 @@ func (a *app) record(res testResult) (personalBest, error) {
 		return personalBest{}, err
 	}
 
-	if best, ok := bestWpm(previous, a.kind); ok && res.wpm() > best {
+	if best, ok := stats.BestWpm(previous, a.kind); ok && res.wpm() > best {
 		return personalBest{beaten: true, previous: best}, nil
 	}
 

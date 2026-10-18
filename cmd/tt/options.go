@@ -6,6 +6,8 @@ import (
 	"io"
 	"strconv"
 	"time"
+
+	"github.com/alexmarchi28/tt/internal/stats"
 )
 
 // options holds the command line options, see flagSections.
@@ -103,7 +105,7 @@ func (o options) validate() error {
 		return errors.New("-t must be at least 1")
 	case o.pace < 0:
 		return errors.New("-pace can't be negative")
-	case o.paceTarget != "" && o.paceTarget != paceBest && o.paceTarget != paceAverage:
+	case o.paceTarget != "" && o.paceTarget != stats.PaceBest && o.paceTarget != stats.PaceAverage:
 		return errors.New("-pace must be a speed in wpm, best or avg")
 	case o.focus < 0 || o.focus > 100:
 		return errors.New("-focus must be between 0 and 100")

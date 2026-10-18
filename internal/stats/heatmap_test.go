@@ -1,4 +1,4 @@
-package main
+package stats
 
 import (
 	"reflect"
@@ -119,7 +119,7 @@ func testKeyStats() keystats.Stats {
 func TestFormatKeys(t *testing.T) {
 	t.Parallel()
 
-	got := formatKeys(testKeyStats(), layouts["us"], false)
+	got := FormatKeys(testKeyStats(), layouts["us"], false)
 
 	want := "" +
 		"Accuracy by key (· best, █ worst, compared to your other keys)\n" +
@@ -151,7 +151,7 @@ func TestFormatKeysListsOnlyMissedKeys(t *testing.T) {
 	ks.Chars["a"] = keystats.Stat{Count: 20, ErrorRate: 0, Timed: 10, Latency: 100}
 	ks.Chars["b"] = keystats.Stat{Count: 20, ErrorRate: 0.1, Timed: 10, Latency: 100}
 
-	got := formatKeys(ks, layouts["us"], false)
+	got := FormatKeys(ks, layouts["us"], false)
 	if !strings.Contains(got, "Most missed keys  b 10.0%\n") {
 		t.Errorf("keys never missed should not be listed:\n%s", got)
 	}

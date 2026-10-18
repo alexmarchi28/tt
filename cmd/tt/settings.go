@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/alexmarchi28/tt/internal/history"
+	"github.com/alexmarchi28/tt/internal/stats"
 )
 
 // settings is the configuration of tt resolved once from the command line
@@ -88,7 +89,7 @@ func resolve(o options, stdinIsTerminal bool) (settings, error) {
 	if o.listType != "" && !contains(resourceTypes, o.listType) {
 		return settings{}, fmt.Errorf("unknown resource type %s, use one of: %s", o.listType, strings.Join(resourceTypes, ", "))
 	}
-	if _, err := keyboardLayout(o.layout); err != nil {
+	if _, err := stats.KeyboardLayout(o.layout); err != nil {
 		return settings{}, err
 	}
 	if o.csv && o.json {

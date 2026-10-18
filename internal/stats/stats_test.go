@@ -1,4 +1,4 @@
-package main
+package stats
 
 import (
 	"reflect"
@@ -74,28 +74,6 @@ func TestSinceAndBefore(t *testing.T) {
 	}
 }
 
-func TestMostMistyped(t *testing.T) {
-	t.Parallel()
-
-	mistakes := []typing.Mistake{
-		{Word: "the", Typed: "teh"}, {Word: "zebra", Typed: "zerba"}, {Word: "because", Typed: "becuase"}, {Word: "the", Typed: "th_"},
-		{Word: "a", Typed: "s"}, {Word: "because", Typed: "bec"}, {Word: "the", Typed: "hte"}, {Word: "a", Typed: "q"},
-	}
-
-	want := []wordCount{{"the", 3}, {"a", 2}, {"because", 2}, {"zebra", 1}}
-	if got := mostMistyped(mistakes, 10); !reflect.DeepEqual(got, want) {
-		t.Errorf("mostMistyped() = %v, want %v", got, want)
-	}
-
-	if got := mostMistyped(mistakes, 2); !reflect.DeepEqual(got, want[:2]) {
-		t.Errorf("mostMistyped(2) = %v, want %v", got, want[:2])
-	}
-
-	if got := mostMistyped(nil, 10); len(got) != 0 {
-		t.Errorf("mostMistyped(nil) = %v, want nothing", got)
-	}
-}
-
 func TestFormatStats(t *testing.T) {
 	t.Parallel()
 
@@ -135,7 +113,7 @@ func TestFormatStats(t *testing.T) {
 		"the        3\n" +
 		"because    1\n"
 
-	if got := formatStats(stored, mistakes, statsNow); got != want {
+	if got := Format(stored, mistakes, statsNow); got != want {
 		t.Errorf("got\n%s\nwant\n%s", got, want)
 	}
 }
@@ -154,7 +132,7 @@ func TestFormatStatsWithoutHistory(t *testing.T) {
 		"Last week  avg wpm 50.00, avg accuracy 100.00% (1 tests)\n" +
 		"All time   avg wpm 50.00, avg accuracy 100.00% (1 tests)\n"
 
-	if got := formatStats(stored, nil, statsNow); got != want {
+	if got := Format(stored, nil, statsNow); got != want {
 		t.Errorf("got\n%s\nwant\n%s", got, want)
 	}
 }
@@ -222,7 +200,7 @@ func TestFormatStatsByTest(t *testing.T) {
 		"unknown                         avg wpm 40.00, avg accuracy 80.00% (1 tests), best 40 wpm\n" +
 		"words 1000en, 15s, punctuation  avg wpm 66.00, avg accuracy 90.00% (1 tests), best 66 wpm\n"
 
-	if got := formatStats(stored, nil, statsNow); got != want {
+	if got := Format(stored, nil, statsNow); got != want {
 		t.Errorf("got\n%s\nwant\n%s", got, want)
 	}
 }
@@ -240,11 +218,11 @@ func TestBestWpm(t *testing.T) {
 		{Wpm: 60, Kind: history.Kind{Mode: "words", Source: "1000en", Words: 50}},
 	}
 
-	if best, ok := bestWpm(stored, history.Kind{Mode: "words", Source: "1000en", Words: 50}); best != 70 || !ok {
+	if best, ok := BestWpm(stored, history.Kind{Mode: "words", Source: "1000en", Words: 50}); best != 70 || !ok {
 		t.Errorf("bestWpm(words 1000en, 50 words) = %d, %t, want 70, true", best, ok)
 	}
 
-	if best, ok := bestWpm(stored, history.Kind{Mode: "quotes", Source: "en"}); ok {
+	if best, ok := BestWpm(stored, history.Kind{Mode: "quotes", Source: "en"}); ok {
 		t.Errorf("bestWpm(quotes en) = %d, %t, want no result", best, ok)
 	}
 }
@@ -260,21 +238,21 @@ func TestPaceFromResults(t *testing.T) {
 		stored = append(stored, history.Result{Wpm: wpm, Kind: kind}, other)
 	}
 
-	if got, err := paceFromResults("best", stored, kind); got != 90 || err != nil {
+	if got, err := Pace("best", stored, kind); got != 90 || err != nil {
 		t.Errorf("pace best = %d, %v, want 90, the best result of the kind of test", got, err)
 	}
 
 	// The average of the last 10 results: 5 at 50 wpm and 5 at 60 wpm.
-	if got, err := paceFromResults("avg", stored, kind); got != 55 || err != nil {
+	if got, err := Pace("avg", stored, kind); got != 55 || err != nil {
 		t.Errorf("pace avg = %d, %v, want 55, the average of the recent results", got, err)
 	}
 
 	// With fewer results, all of them count.
-	if got, err := paceFromResults("avg", stored[:4], kind); got != 50 || err != nil {
+	if got, err := Pace("avg", stored[:4], kind); got != 50 || err != nil {
 		t.Errorf("pace avg of 2 results = %d, %v, want 50", got, err)
 	}
 
-	_, err := paceFromResults("best", []history.Result{other}, kind)
+	_, err := Pace("best", []history.Result{other}, kind)
 	if err == nil || err.Error() != "-pace best needs a saved result of words 1000en, 50 words" {
 		t.Errorf("error = %v, want the lack of results of the kind of test", err)
 	}
