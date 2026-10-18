@@ -1,8 +1,11 @@
 package main
 
 import (
+	"flag"
 	"io"
+	"os"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 )
@@ -78,6 +81,39 @@ func TestParsePace(t *testing.T) {
 
 		if got := parseFlags(args); got.pace != tc.pace || got.paceTarget != tc.target {
 			t.Errorf("-pace %q: pace %d, target %q, want %d and %q", tc.arg, got.pace, got.paceTarget, tc.pace, tc.target)
+		}
+	}
+}
+
+// The usage generated from the flags reads as the one written by hand before
+// it, kept in testdata/usage.txt. Update the file when a flag changes.
+func TestUsage(t *testing.T) {
+	t.Parallel()
+
+	want, err := os.ReadFile("testdata/usage.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if got := usage(); got != string(want) {
+		t.Errorf("usage differs from testdata/usage.txt:\n%s", got)
+	}
+}
+
+// Each flag of the usage defines the flag it documents, and only that one.
+func TestFlagsDefineWhatTheyDocument(t *testing.T) {
+	t.Parallel()
+
+	for _, section := range flagSections {
+		for _, f := range section.flags {
+			fs := flag.NewFlagSet("tt", flag.ContinueOnError)
+			f.define(fs, &flagValues{})
+
+			var defined []string
+			fs.VisitAll(func(fl *flag.Flag) { defined = append(defined, fl.Name) })
+			if want := strings.TrimPrefix(strings.Fields(f.syntax)[0], "-"); len(defined) != 1 || defined[0] != want {
+				t.Errorf("%q defines %q, want only -%s", f.syntax, defined, want)
+			}
 		}
 	}
 }
